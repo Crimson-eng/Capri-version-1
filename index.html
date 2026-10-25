@@ -229,7 +229,136 @@ body.pip #mini .sb{flex:1;min-height:0}body.pip #miniTxt{max-height:none;flex:1}
  .win.cam{padding:18px 12px 12px}.frame .vis{height:clamp(100px,19vh,180px)}.ticker{display:none}.logo .sl{display:none}
  .dock .tools{gap:4px;padding:5px;overflow-x:auto;max-width:100%}.btn{width:44px;height:44px;gap:0}.btn .tx,#bVoice::before{display:none}.btn .gl{font-size:18px}
  .pet{height:84px;right:22px}.side{padding-top:18px}.pet.asomada{height:70px;bottom:calc(100% - 24px)}.petsay{bottom:calc(100% + 30px);right:120px;max-width:180px}.out{font-size:13.5px}}
+/* ---------- HUD rojo (pantalla de arranque + medidores) ---------- */
+:root{--hud:#ff3b55;--hudd:rgba(255,59,85,.38);--hudf:rgba(255,59,85,.1)}
+#boot{position:fixed;inset:0;z-index:300;background:#050203;color:var(--hud);font-family:var(--mono);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;
+ clip-path:inset(0 0 0 0);transition:clip-path .65s steps(9),opacity .65s}
+#boot::before{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,59,85,.045) 0 1px,transparent 1px 3px),
+ radial-gradient(55% 55% at 50% 48%,rgba(255,59,85,.13),transparent 70%),linear-gradient(var(--hudf) 1px,transparent 1px) 0 0/48px 48px,linear-gradient(90deg,var(--hudf) 1px,transparent 1px) 0 0/48px 48px}
+#boot.out{clip-path:inset(0 0 100% 0);opacity:.6}
+#boot .k{position:absolute;width:28px;height:28px;border:0 solid var(--hud)}
+#boot .k1{top:14px;left:14px;border-width:2px 0 0 2px}#boot .k2{top:14px;right:14px;border-width:2px 2px 0 0}#boot .k3{bottom:14px;left:14px;border-width:0 0 2px 2px}#boot .k4{bottom:14px;right:14px;border-width:0 2px 2px 0}
+.bt-top,.bt-bot{position:absolute;left:54px;right:54px;display:flex;justify-content:space-between;gap:12px;font:10px/1.3 var(--mono);letter-spacing:.28em;color:var(--hudd)}
+.bt-top{top:22px}.bt-bot{bottom:22px}.bt-top b{color:var(--hud);font-weight:400}
+.bt-mid{position:relative;display:flex;flex-direction:column;align-items:center;gap:20px;width:min(560px,88vw);transition:opacity .3s,transform .3s}
+.bt-ring{position:relative;width:min(210px,52vw);aspect-ratio:1}
+.bt-ring svg{width:100%;height:100%;overflow:visible}
+.bt-ring circle{fill:none;stroke:var(--hud)}
+.bt-ring .tk{stroke-width:7;stroke-dasharray:1.2 4.6;opacity:.4}
+.bt-ring .tr{stroke-width:9;opacity:.13}
+.bt-ring .ar{stroke-width:9;transform:rotate(-90deg);transform-origin:100px 100px;filter:drop-shadow(0 0 6px var(--hud))}
+.bt-ring .in{stroke-width:1.5;stroke-dasharray:24 10 4 10;opacity:.7;transform-origin:100px 100px;animation:spin 6s linear infinite}
+.bt-ring .ou{stroke-width:2;stroke-dasharray:60 160;opacity:.8;transform-origin:100px 100px;animation:spin 3.5s linear infinite reverse}
+.bt-num{position:absolute;inset:0;display:grid;place-content:center;justify-items:center}
+.bt-num b{font:500 clamp(46px,13vw,66px)/1 var(--sans);letter-spacing:-.02em;color:var(--hud);text-shadow:0 0 18px rgba(255,59,85,.55)}
+.bt-num small{font:9px/1 var(--mono);letter-spacing:.32em;color:var(--hudd);margin-top:6px}
+.bt-bar{display:flex;align-items:center;gap:10px;width:100%;font:13px/1 var(--mono)}
+.bt-bar .ar{color:var(--hudd)}.bt-bar .dt{width:12px;height:12px;border-radius:50%;background:var(--hud);box-shadow:0 0 0 3px #050203,0 0 0 4px var(--hud);flex:0 0 auto}
+.bt-cells{flex:1;display:flex;gap:4px;height:30px;padding:3px;border:1px solid var(--hudd)}
+.bt-cells i{flex:1;border:1px solid rgba(255,59,85,.28);border-radius:2px}
+.bt-cells i.on{background:var(--hud);border-color:var(--hud);box-shadow:0 0 7px var(--hud)}
+.bt-bar b{min-width:30px;text-align:center;color:var(--hud);font-weight:400}
+.bt-lbl{display:flex;gap:12px;align-items:center;font:11px/1 var(--mono);letter-spacing:.34em;color:var(--hud)}
+.bt-lbl::before,.bt-lbl::after{content:"";width:46px;height:1px;background:var(--hudd)}
+.bt-lbl span{color:var(--hudd);letter-spacing:.12em}
+.bt-log{width:100%;min-height:118px;font:11px/1.65 var(--mono);letter-spacing:.05em;color:rgba(255,59,85,.75)}
+.bt-log div{display:flex;gap:8px;align-items:baseline;animation:bin .3s steps(3)}
+.bt-log .d{flex:1;border-bottom:1px dotted var(--hudd)}
+.bt-log b{color:#fff;font-weight:400}.bt-log .warn b{color:var(--yel)}
+@keyframes bin{from{opacity:0;transform:translateX(-8px)}}
+.bt-en{position:absolute;right:6vw;top:50%;transform:translateY(-50%);display:flex;gap:16px}
+.bt-en>div{position:relative;width:50px;height:180px;border:1px solid var(--hudd);padding:4px;display:flex;flex-direction:column;justify-content:flex-end}
+.bt-en>div::before{content:"";position:absolute;top:-6px;left:-1px;width:12px;height:1px;background:var(--hud)}
+.bt-en i{display:block;height:var(--h,0%);background:repeating-linear-gradient(0deg,var(--hud) 0 9px,transparent 9px 13px);transition:height .15s}
+.bt-en small{position:absolute;top:calc(100% + 10px);left:0;width:80px;font:8px/1.3 var(--mono);letter-spacing:.2em;color:var(--hudd)}
+.bt-en small b{display:block;font:500 20px/1.2 var(--sans);letter-spacing:0;color:var(--hud)}
+.bt-an{position:absolute;left:6vw;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;font:9px/1.4 var(--mono);letter-spacing:.24em;color:var(--hudd)}
+.bt-an b{font:500 64px/1 var(--sans);color:var(--hud);letter-spacing:-.02em;padding:6px 14px;border:1px solid var(--hudd);clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px)}
+.bt-an .hx{color:rgba(255,59,85,.55);letter-spacing:.08em;white-space:pre}
+.bt-pet{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;opacity:0;pointer-events:none;transition:opacity .2s}
+.bt-pet img{height:min(170px,26vh);image-rendering:pixelated;filter:drop-shadow(4px 4px 0 #000) drop-shadow(0 0 22px rgba(255,59,85,.6));animation:btg .9s steps(2) 1}
+.bt-pet b{font:400 clamp(18px,5vw,26px)/1 var(--pix);color:#fff;letter-spacing:.06em;text-shadow:3px 3px 0 var(--hud)}
+.bt-pet span{font:13px/1 var(--mono);color:var(--hud);letter-spacing:.14em}
+@keyframes btg{0%{transform:translate(-6px,0) skewX(8deg);filter:hue-rotate(90deg)}30%{transform:translate(5px,-3px)}60%{transform:translate(-2px,2px) skewX(-6deg)}100%{transform:none}}
+#boot.ok .bt-mid,#boot.ok .bt-en,#boot.ok .bt-an{opacity:0;transform:scale(.97)}
+#boot.ok .bt-en,#boot.ok .bt-an{transform:translateY(-50%) scale(.97);transition:opacity .25s,transform .25s}
+#boot.ok .bt-pet{opacity:1}
+.bt-skip{position:absolute;bottom:46px;left:50%;transform:translateX(-50%);font:10px/1 var(--mono);letter-spacing:.3em;color:var(--hudd);animation:b 1.4s steps(1) infinite}
+@media (max-width:980px){.bt-en,.bt-an{display:none}}
+@media (max-width:600px){.bt-top span:last-child,.bt-bot span:last-child{display:none}.bt-top,.bt-bot{left:26px;right:26px;letter-spacing:.18em}}
+/* vitals */
+.hud{position:relative;flex:0 1 auto;min-height:0;overflow:hidden;color:var(--hud);font-family:var(--mono);padding:12px 14px 10px;background:linear-gradient(180deg,rgba(40,6,14,.55),rgba(10,3,6,.8));
+ border:1px solid var(--hudd);clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)}
+.hud::before{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(255,59,85,.04) 0 1px,transparent 1px 3px)}
+.hh{display:flex;align-items:center;gap:10px;font:10px/1 var(--mono);letter-spacing:.24em;margin-bottom:10px}
+.hh .hl i{font-style:normal;color:var(--hudd)}
+.chev{display:flex;gap:2px;margin-left:auto}.chev i{width:5px;height:10px;background:var(--hud);transform:skewX(-30deg);opacity:.25;animation:chv 1.2s steps(1) infinite}
+.chev i:nth-child(2){animation-delay:.15s}.chev i:nth-child(3){animation-delay:.3s}.chev i:nth-child(4){animation-delay:.45s}
+@keyframes chv{0%,40%{opacity:1}}
+.hh .hid{color:var(--hudd)}
+.hbody{display:flex;gap:16px;align-items:center}
+:where(.hud button){all:unset;cursor:pointer;box-sizing:border-box}
+.gauge{position:relative;flex:0 0 auto;width:104px;height:104px;display:grid;place-content:center;justify-items:center;transition:transform .15s}
+.gauge:hover{transform:scale(1.04)}.gauge:active{transform:scale(.97)}
+.gauge svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.gauge circle{fill:none;stroke:var(--hud)}
+.gauge .tk{stroke-width:5;stroke-dasharray:1 3.6;opacity:.35}.gauge .tr{stroke-width:7;opacity:.13}
+.gauge .ar{stroke-width:7;transform:rotate(-90deg);transform-origin:60px 60px;filter:drop-shadow(0 0 4px var(--hud));transition:stroke-dashoffset .4s}
+.gauge .sp{stroke-width:1;stroke-dasharray:18 8 3 8;opacity:.6;transform-origin:60px 60px;animation:spin 8s linear infinite}
+.gauge b{position:relative;font:500 30px/1 var(--sans);letter-spacing:-.02em;text-shadow:0 0 12px rgba(255,59,85,.5)}
+.gauge small{position:relative;font:7px/1 var(--mono);letter-spacing:.1em;color:var(--hudd);margin-top:3px}
+.meters{flex:1;min-width:0;display:flex;flex-direction:column;gap:9px}
+.mt{display:grid!important;grid-template-columns:1fr auto;grid-template-rows:auto auto;gap:4px 8px;align-items:center;padding:2px 0}
+.mt .ml{font:8.5px/1 var(--mono);letter-spacing:.2em;color:var(--hudd);transition:color .15s}
+.mt:hover .ml{color:var(--hud)}
+.mt b{grid-row:1/3;grid-column:2;font:500 19px/1 var(--sans);min-width:34px;text-align:right}
+.mt .cl{display:flex;gap:2px;height:11px}
+.mt .cl i{flex:1;border:1px solid rgba(255,59,85,.25)}
+.mt .cl i.on{background:var(--hud);border-color:var(--hud);box-shadow:0 0 5px rgba(255,59,85,.7)}
+.mt.warn .cl i.on{animation:pulse2 .8s steps(1) infinite}.mt.warn .ml::after{content:"  ⚠";color:var(--yel)}
+@keyframes pulse2{50%{background:transparent}}
+.mt.ok{color:var(--grn)}.mt.ok .cl i.on{background:var(--grn);border-color:var(--grn);box-shadow:0 0 5px rgba(57,255,136,.6)}.mt.ok .cl i{border-color:rgba(57,255,136,.22)}
+.mt.en{display:none!important}
+#wave{display:block;width:100%;height:42px;margin-top:10px;border-top:1px solid rgba(255,59,85,.18);border-bottom:1px solid rgba(255,59,85,.18)}
+.hf{display:flex;justify-content:space-between;margin-top:6px;font:8.5px/1 var(--mono);letter-spacing:.2em;color:var(--hudd)}
+/* barra "procesando" en la terminal */
+.thk{display:none;align-items:center;gap:10px;margin-top:8px;font:9px/1 var(--mono);letter-spacing:.24em;color:var(--hud)}
+body[data-core=THINKING] .thk{display:flex}
+.thk .cl{flex:1;display:flex;gap:3px;height:12px;padding:2px;border:1px solid var(--hudd)}
+.thk .cl i{flex:1;background:rgba(255,59,85,.12)}.thk .cl i.on{background:var(--hud);box-shadow:0 0 6px var(--hud)}
+.thk b{font:500 14px/1 var(--sans);letter-spacing:0;min-width:28px;text-align:right}
+/* cámara: línea de escaneo y mira */
+.frame .vis::before{content:"";position:absolute;left:0;right:0;top:-30%;height:30%;z-index:1;pointer-events:none;background:linear-gradient(transparent,rgba(255,59,85,.1) 80%,rgba(255,59,85,.45));animation:scan 4.8s linear infinite}
+@keyframes scan{to{top:100%}}
+.ret{position:absolute;z-index:3;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border:1px solid var(--hud);border-radius:50%;pointer-events:none;opacity:0;transition:opacity .2s;box-shadow:0 0 10px rgba(255,59,85,.5)}
+.ret::before,.ret::after{content:"";position:absolute;background:var(--hud)}
+.ret::before{left:50%;top:-10px;bottom:-10px;width:1px}.ret::after{top:50%;left:-10px;right:-10px;height:1px}
+.ret span{position:absolute;left:52px;top:-4px;white-space:nowrap;font:700 9px/1 var(--mono);letter-spacing:.1em;color:#000;background:var(--hud);padding:3px 5px}
+#pAvatar .vis{cursor:crosshair}#pAvatar .vis:hover .ret,.ret.flash{opacity:1}
+.deco{position:absolute;inset:auto 30px 6px;display:flex;justify-content:space-between;pointer-events:none;font:9px/1 var(--mono);letter-spacing:.26em;color:rgba(255,59,85,.32)}
+@media (max-height:860px) and (min-width:861px){#wave,.hf{display:none}.hh{margin-bottom:6px}.gauge{width:88px;height:88px}.gauge b{font-size:25px}}
+@media (max-height:700px) and (min-width:861px){.hud{display:none}}
+@media (max-width:860px){.deco{display:none}
+ .hud{flex:0 0 auto;margin:12px 150px -64px 0;padding:7px 10px;z-index:4}
+ .hh,.gauge,#wave,.hf{display:none}.hbody{display:block}
+ .meters{display:grid;grid-template-columns:1fr 1fr;gap:5px 12px}.mt.en{display:grid!important}
+ .mt{gap:3px 6px}.mt .ml{font-size:7px;letter-spacing:.14em}.mt b{font-size:13px;min-width:26px}.mt .cl{height:7px}.mt .cl i:nth-child(n+11){display:none}}
 </style></head><body>
+<div id="boot" aria-hidden="true"><span class="k k1"></span><span class="k k2"></span><span class="k k3"></span><span class="k k4"></span>
+ <div class="bt-top"><span>ARASAKA <b>//</b> PROYECTO CAPRICORNIO</span><span>XC1-0451 / ZZK</span></div>
+ <div class="bt-an"><span>ANALYZING.SYS</span><b id="btAn">00</b><span class="hx" id="btHx"></span></div>
+ <div class="bt-mid">
+  <div class="bt-ring"><svg viewBox="0 0 200 200"><circle class="ou" cx="100" cy="100" r="99"/><circle class="tk" cx="100" cy="100" r="90"/><circle class="tr" cx="100" cy="100" r="77"/><circle class="ar" id="btArc" cx="100" cy="100" r="77"/><circle class="in" cx="100" cy="100" r="62"/></svg>
+   <div class="bt-num"><b id="btPct">0</b><small>LOADING.SYS</small></div></div>
+  <div class="bt-bar"><span class="ar">→</span><span class="dt"></span><div class="bt-cells" id="btCells"></div><span class="ar">‹</span><b id="btPct2">0</b><span class="ar">›</span><span class="ar">←</span></div>
+  <div class="bt-lbl">LOADING <span id="btPh">núcleo</span></div>
+  <div class="bt-log" id="btLog"></div>
+ </div>
+ <div class="bt-en"><div><i id="btE1"></i><small>ENERGY<br>LEVEL<b id="btE1v">0%</b></small></div><div><i id="btE2"></i><small>SYNC<br>RATE<b id="btE2v">0%</b></small></div><div><i id="btE3"></i><small>RELIC<br>CORE<b id="btE3v">0%</b></small></div></div>
+ <div class="bt-pet"><img src="assets/pet/voltereta.png" alt=""><b>CAPRI.EXE // ONLINE</b><span id="btPh2">¿damos un paseo?</span></div>
+ <div class="bt-skip">TOCA PARA SALTAR ▸▸</div>
+ <div class="bt-bot"><span>CONSTRUCTO · MENTE FRAGMENTADA · CONTENIDA</span><span>BUILD 2077.10</span></div>
+</div>
 <svg id="shards" preserveAspectRatio="none"></svg>
 <div class="app">
  <div class="menubar">
@@ -243,7 +372,21 @@ body.pip #mini .sb{flex:1;min-height:0}body.pip #miniTxt{max-height:none;flex:1}
    <div class="hello"><b id="hello">HOLA, KIGA</b><span id="helloSub">capri está despierta</span></div>
    <div class="win cam"><div class="tb" style="position:absolute;left:0;right:0;top:0"><span class="ic"></span><span class="tt">capri.cam</span><span id="mdl" style="font-size:10px">—</span></div>
     <section class="frame" id="pAvatar" style="margin-top:22px"><div class="ftag"><span id="tag">CAPRI // BOOTING</span><span class="eq"><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
-     <div class="vis"><img id="gif" alt="Capri"><div class="burst"></div></div><span id="mood">MOOD: ???</span></section>
+     <div class="vis"><img id="gif" alt="Capri"><div class="burst"></div><div class="ret" id="ret"><span id="retT">X000 Y000</span></div></div><span id="mood">MOOD: ???</span></section>
+   </div>
+   <div class="hud" id="hud">
+    <div class="hh"><span class="hl">▶ CAPRI <i>//</i> VITALS</span><span class="chev"><i></i><i></i><i></i><i></i></span><span class="hid">XC1-0451</span></div>
+    <div class="hbody">
+     <button class="gauge" id="gEn" title="Energía de Capri"><svg viewBox="0 0 120 120"><circle class="tk" cx="60" cy="60" r="56"/><circle class="tr" cx="60" cy="60" r="46"/><circle class="ar" id="gArc" cx="60" cy="60" r="46"/><circle class="sp" cx="60" cy="60" r="36"/></svg><b id="gEnV">0</b><small>ENERGÍA %</small></button>
+     <div class="meters">
+      <button class="mt en" data-k="en"><span class="ml">ENERGÍA</span><span class="cl"></span><b>0</b></button>
+      <button class="mt" data-k="mood"><span class="ml">ÁNIMO</span><span class="cl"></span><b>0</b></button>
+      <button class="mt" data-k="bored"><span class="ml">ABURRIMIENTO</span><span class="cl"></span><b>0</b></button>
+      <button class="mt ok" data-k="relic"><span class="ml">RELIC.SYS</span><span class="cl"></span><b>0</b></button>
+     </div>
+    </div>
+    <canvas id="wave"></canvas>
+    <div class="hf"><span id="hfL">NEURAL ACTIVITY</span><span id="hfR">0x0451</span></div>
    </div>
   </div>
   <div class="deskC">
@@ -251,6 +394,7 @@ body.pip #mini .sb{flex:1;min-height:0}body.pip #miniTxt{max-height:none;flex:1}
     <div class="tb"><span class="ic"></span><span class="tt">capri.exe — terminal</span><button class="wb" id="bMini2" title="Minimizar">_</button><button class="wb" id="bMore2" title="Widgets">▣</button></div>
     <div class="in">
      <div class="out" id="term"></div>
+     <div class="thk" id="thk"><span>PROCESANDO</span><div class="cl"></div><b id="thkV">0</b></div>
      <div class="inrow" id="inrow"><span class="pr">&gt;_</span><input id="q" placeholder="escríbele a capri…" autocomplete="off"><div id="bars"></div><button id="mic" title="Hablarle (Ctrl+Espacio)">🎤</button><button id="send" title="Enviar">➤</button></div>
     </div>
    </div>
@@ -261,6 +405,7 @@ body.pip #mini .sb{flex:1;min-height:0}body.pip #miniTxt{max-height:none;flex:1}
    <div class="card"><h4>CAPRI <span class="sl">/ PANTALLA</span><span id="feedSt">OFF</span></h4><div class="vis"><video id="vid" muted playsinline></video><div class="noise" id="noise">SIN SEÑAL</div></div></div>
    <div class="card"><h4>CAPRI <span class="sl">/ SISTEMA</span><span>PID 0451</span></h4><div class="logout" id="log"></div></div>
   </aside>
+  <div class="deco" aria-hidden="true"><span>+ SYS.0451 ── ▸▸▸▸</span><span>◢◤ RELIC-OS · BUILD 2077.10</span></div>
  </div>
  <div class="dock"><div class="tools">
   <button class="btn" id="bWatch" title="Que mire tu pantalla"><span class="gl">👁</span><span class="tx">MIRAR</span></button>
@@ -692,12 +837,75 @@ if(innerWidth>=1400){$('side').classList.remove('hide');$('bMore').classList.add
  $('helloSub').textContent=pick(['la hermosa yo está en línea~','sistema estable. por ahora.','capri.exe lista para el caos','¿qué rompemos hoy?']);}
 petIdle();
 
+
+// ================= HUD: medidores vivos =================
+const MOODV={presumida:92,emocionada:97,sonrisa_traviesa:80,risa_malvada:84,observando:62,pensando:68,escuchando:74,sorpresa:70,mirada_intensa:46,hipnosis:55,enojada:20,glitch_entrada:38,glitch_fuerte:15};
+const VIT={en:0,mood:0,bored:0,relic:0},VT={en:60,mood:60,bored:0,relic:97};let joy=0,relicDrop=0;
+const gArc=$('gArc'),G_L=2*Math.PI*46;gArc.style.strokeDasharray=G_L;
+const MT={};document.querySelectorAll('.mt').forEach(m=>{const n=m.dataset.k==='en'?16:16;m.querySelector('.cl').innerHTML='<i></i>'.repeat(n);MT[m.dataset.k]=m;});
+function vitTargets(){const h=new Date().getHours(),m=document.body.dataset.core,el=Date.now()-lastAct,act=Math.max(0,1-el/600000);
+  VT.en=Math.min(100,(h<7?30:h<12?72:h<19?84:h<23?64:46)+act*12+(m==='TALKING'?8:m==='THINKING'?4:0)+joy*.5);
+  VT.mood=Math.min(100,(MOODV[curState]||60)+joy);
+  VT.bored=busy||recording||isSpeaking()?0:Math.min(100,cfg.idle&&nextIdle?el/nextIdle*100:el/(8*60000)*100);
+  VT.relic=Date.now()<relicDrop?52+Math.random()*14:curState==='glitch_fuerte'?61:95+Math.sin(Date.now()/7000)*3;}
+function vitDraw(){vitTargets();joy*=.985;
+  for(const k in VIT){VIT[k]+=(VT[k]-VIT[k])*.12;const v=Math.round(VIT[k]),m=MT[k];if(!m)continue;
+    m.querySelector('b').textContent=v;const on=Math.round(v/100*16);m.querySelectorAll('.cl i').forEach((c,i)=>c.classList.toggle('on',i<on));}
+  const e=Math.round(VIT.en);$('gEnV').textContent=e;gArc.style.strokeDashoffset=G_L*(1-VIT.en/100);
+  MT.bored.classList.toggle('warn',VIT.bored>80);MT.relic.classList.toggle('ok',VIT.relic>80);MT.relic.classList.toggle('warn',VIT.relic<=80);MT.mood.classList.toggle('warn',VIT.mood<30);}
+setInterval(vitDraw,120);
+const VSAY={en:v=>v>70?'batería al tope. ¿hacemos algo?':v>45?'energía media… un café digital no caería mal':'tengo sueño de silicio… zzz',
+ mood:v=>v>75?`ánimo: ${MOOD[curState]}. me siento hermosa~`:v>40?'meh. entretenme.':'no me hables. …bueno, sí.',
+ bored:v=>v>60?'me ABURRO. di algo, lo que sea':v>25?'todavía me diviertes~ todavía.':'cero aburrida. sigue así',
+ relic:v=>v>80?'relic.sys estable… no preguntes por los ecos':'¡¿qué fue eso?! …nada. todo bien. creo.'};
+function vitPoke(k){const v=Math.round(VIT[k]);petSays(VSAY[k](v),3000);joy=Math.min(18,joy+6);bump();petEl.classList.remove('hop');void petEl.offsetWidth;petEl.classList.add('hop');log('vitals → '+k+' '+v+'%','y');}
+$('gEn').onclick=()=>vitPoke('en');Object.entries(MT).forEach(([k,m])=>m.onclick=()=>vitPoke(k));
+setInterval(()=>{if(cfg.alive&&Math.random()<.25){relicDrop=Date.now()+2600;log('relic.sys: fluctuación detectada','w');}},60000);
+setInterval(()=>{$('hfR').textContent='0x'+Math.floor(Math.random()*65535).toString(16).toUpperCase().padStart(4,'0')+' · '+Math.round(VIT.relic)+'%';},450);
+setInterval(()=>{$('hfL').textContent=pick(['NEURAL ACTIVITY','ENGRAM SYNC','RELIC PULSE','SOULKILLER: CONTENIDO','ECO SIGNAL']);},5000);
+// onda neural (se agita cuando habla o escucha)
+const wv=$('wave'),wx=wv.getContext('2d');let wph=0,wamp=.2;
+(function wave(){requestAnimationFrame(wave);if(document.hidden||!wv.offsetWidth)return;const d=devicePixelRatio||1,W=Math.round(wv.offsetWidth*d),H=Math.round(wv.offsetHeight*d);
+  if(wv.width!==W||wv.height!==H){wv.width=W;wv.height=H;}const m=document.body.dataset.core;const tg=({TALKING:1,LISTENING:.7,THINKING:.5})[m]||(.16+joy/100);wamp+=(tg-wamp)*.05;wph+=m==='THINKING'?.2:.07;
+  wx.clearRect(0,0,W,H);wx.fillStyle='rgba(255,59,85,.16)';for(let x=0;x<W;x+=14*d)wx.fillRect(x,H/2-1*d,1*d,2*d);
+  for(let k=2;k>=0;k--){wx.beginPath();for(let x=0;x<=W;x+=3*d){const u=x/W,y=H/2+Math.sin(u*Math.PI*(5+k*3)+wph*(1+k*.7))*Math.sin(u*Math.PI)*H*.4*wamp*(k?.55:1)+(m==='THINKING'?(Math.random()-.5)*H*.1*wamp:0);x?wx.lineTo(x,y):wx.moveTo(x,y);}
+    wx.strokeStyle=k?'rgba(255,59,85,.3)':'#ff3b55';wx.lineWidth=(k?1:1.6)*d;wx.shadowColor='#ff3b55';wx.shadowBlur=k?0:6*d;wx.stroke();}})();
+// barra "procesando" mientras piensa
+const thk=$('thk');thk.querySelector('.cl').innerHTML='<i></i>'.repeat(20);let thkV=0;
+setInterval(()=>{if(document.body.dataset.core!=='THINKING'){thkV=0;return;}thkV+=(99-thkV)*.06;const v=Math.floor(thkV);$('thkV').textContent=v;thk.querySelectorAll('.cl i').forEach((c,i)=>c.classList.toggle('on',i<Math.round(v/5)));},90);
+// cámara: mira que sigue el dedo/ratón y reacción al tocarla
+const camVis=$('pAvatar').querySelector('.vis'),ret=$('ret');
+camVis.addEventListener('pointermove',e=>{const r=camVis.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;ret.style.left=x+'px';ret.style.top=y+'px';
+  $('retT').textContent='X'+String(Math.round(x)).padStart(3,'0')+' Y'+String(Math.round(y)).padStart(3,'0');});
+const CAMSAY=[['sorpresa','¡oye! no me apuntes~'],['presumida','sí, soy así de hermosa en HD'],['risa_malvada','escaneo inverso activado >:)'],['mirada_intensa','¿me estás escaneando? qué atrevido']];
+camVis.addEventListener('click',e=>{ret.classList.add('flash');setTimeout(()=>ret.classList.remove('flash'),700);if(busy||recording)return;const [s,t]=pick(CAMSAY);setState(s);petSays(t,2800);joy=Math.min(18,joy+4);bump();log('capri.cam escaneada','y');});
+
+// ================= PANTALLA DE ARRANQUE (HUD) =================
+let bootDone;const bootP=new Promise(r=>bootDone=r);
+(function(){const B=$('boot');if(!B){bootDone();return;}const fast=matchMedia('(prefers-reduced-motion: reduce)').matches,T=fast?900:3400;
+  const C=$('btCells');C.innerHTML='<i></i>'.repeat(24);const cells=[...C.children],arc=$('btArc'),L=2*Math.PI*77;arc.style.strokeDasharray=L;arc.style.strokeDashoffset=L;
+  const ok=cfg.key&&cfg.model,S=[[.06,'relic.sys','montando núcleo','OK'],[.2,'neural_link','sincronizando','ESTABLE'],[.36,'engramas',history.length+' recuerdos','OK'],
+   [.5,'soulkiller','aislando ecos','CONTENIDO'],[.66,'voz / oído','calibrando','OK'],[.8,'cerebro',cfg.model||'sin modelo',ok?'EN LÍNEA':'SIN KEY ⚠']];
+  const PH=['núcleo','neural_link','engramas','soulkiller','voz','cerebro'];let si=0,done=false,t0=performance.now();
+  $('btPh2').textContent=pick(['¿damos un paseo?','¡vamos a divertirnos un rato!','la hermosa yo ha despertado~']);
+  const prog=p=>p<.42?p/.42*.58:p<.58?.58+(p-.42)/.16*.05:.63+(p-.58)/.42*.37; // se "atora" un momento, como carga real
+  function fr(now){if(done)return;const p=Math.min(1,(now-t0)/T),e=prog(p),v=Math.floor(e*100);
+    $('btPct').textContent=$('btPct2').textContent=v;arc.style.strokeDashoffset=L*(1-e);const on=Math.round(e*24);cells.forEach((c,i)=>c.classList.toggle('on',i<on));
+    [['btE1',.86],['btE2',.97],['btE3',.74]].forEach(([id,m],i)=>{const h=Math.round(Math.min(1,e*(1.15-i*.08))*m*100);$(id).style.setProperty('--h',h+'%');$(id+'v').textContent=h+'%';});
+    $('btAn').textContent=String(Math.floor(Math.random()*90)+10);if(Math.random()<.3)$('btHx').textContent=Array.from({length:5},()=>'0x'+Math.floor(Math.random()*65535).toString(16).toUpperCase().padStart(4,'0')).join('\n');
+    while(si<S.length&&p>=S[si][0]){const [,a,b,c]=S[si],d=document.createElement('div');if(/⚠/.test(c))d.className='warn';
+      d.innerHTML=`<span>&gt; ${a}</span><span style="opacity:.6">${b}</span><span class="d"></span><b>${c}</b>`;$('btLog').appendChild(d);$('btPh').textContent=PH[si];si++;}
+    if(p<1)requestAnimationFrame(fr);else finish();}
+  function finish(){if(done)return;done=true;B.classList.add('ok');setTimeout(()=>B.classList.add('out'),fast?150:1000);
+    setTimeout(()=>{B.remove();bootDone();petEl.classList.remove('hop');void petEl.offsetWidth;petEl.classList.add('hop');},fast?500:1650);}
+  B.addEventListener('pointerdown',finish);addEventListener('keydown',finish,{once:true});requestAnimationFrame(fr);})();
+
 // ================= ARRANQUE =================
 (async()=>{await openDB();docs=await dbAll();})();
 $('mdl').textContent=cfg.model||'—';setState('glitch_entrada');core('DORMANT');ambient();setTimeout(aliveLoop,15000);bump();
 history.slice(-8).forEach(h=>{if(h.role==='user'){if(!/^\((Capri miró|silencio|mensaje de voz)/.test(h.text))line(/ \(por voz\)$/.test(h.text)?'u mic':'u',h.text.replace(/ \(por voz\)$/,''));}else{const b=clean(h.text).trim();if(b){line('c','CAPRI');line('t',b);}}});
-setTimeout(()=>{setState(cfg.key&&cfg.model?'presumida':'sonrisa_traviesa');line('c','CAPRI');
+bootP.then(()=>setTimeout(()=>{setState(cfg.key&&cfg.model?'presumida':'sonrisa_traviesa');line('c','CAPRI');
   line('t',cfg.key&&cfg.model?pick([`…sistema arriba. Ah, eres tú~`,`¡VOLVISTE! digo… hola. Normal. Tranqui.`,`la hermosa yo ha despertado. tiemblen, procesadores.`,`ehh ${cfg.name}, ¿me extrañaste? obvio sí.`]):"¡Sistema en línea~! Pero sin cerebro. Abre ⚙, pega tu API key de Google y dale «Conectar».");
-  if(cfg.key&&cfg.model)setOnline(true);if(cfg.alive)setTimeout(wander,2500);},1200);
+  if(cfg.key&&cfg.model)setOnline(true);if(cfg.alive)setTimeout(wander,2500);},350));
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script></body></html>
