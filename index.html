@@ -850,7 +850,7 @@ const _coreMini=core;core=function(m){_coreMini(m);$('chipTag').textContent='CAP
   if(m==='TALKING')openMini();else if(m==='DORMANT')starT=setTimeout(function back(){if(document.activeElement===mq||mq.value||recording||busy||isSpeaking()){starT=setTimeout(back,5000);return;}toStar();},15000);};
 // en la app de escritorio, los clics atraviesan la pantalla salvo donde está Capri
 if(window.capriDesk){let deskLast=null,mx=-1,my=-1;const deskCheck=()=>{const el=mx<0?null:document.elementFromPoint(mx,my);
-    const on=!document.body.classList.contains('desk')||!!drag||!!(el&&el.closest('#mini,.modal.show'));if(on!==deskLast){deskLast=on;capriDesk.hit(on);}};
+    const on=!document.body.classList.contains('desk')||!!drag||!!window.deskPetDrag?.()||!!(el&&el.closest('#mini,.modal.show'))||!!window.deskPetHit?.(mx,my);if(on!==deskLast){deskLast=on;capriDesk.hit(on);}};
   window.deskHit=()=>{deskLast=null;deskCheck();};addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;deskCheck();});}
 $('bMini').onclick=minimize;$('mExpand').onclick=expand;
 $('mHide').onclick=()=>{if(pipWin)pipWin.close();else toStar();};
@@ -865,7 +865,7 @@ const PET='assets/pet/',petEl=$('pet'),petSay=$('petSay'),miniPet=$('miniPet');l
 const PET_IDLE=['sentada_pierna','sentada_mira','meditar','apoyada'];
 const PET_TALK={emocionada:'pelota',presumida:'enamorada',sonrisa_traviesa:'risa_brazos',risa_malvada:'risa_brazos',sorpresa:'confundida',glitch_entrada:'confundida',glitch_fuerte:'confundida',
  hipnosis:'meditar',mirada_intensa:'apoyada',enojada:'cursor',observando:'sentada_mira',pensando:'laptop',escuchando:'asomada'};
-Object.keys(PET_TALK).concat(PET_IDLE,['bostezo','voltereta']).forEach(n=>{const i=new Image();i.src=PET+n+'.png';});
+Object.values(PET_TALK).concat(PET_IDLE,['bostezo','voltereta']).forEach(n=>{const i=new Image();i.src=PET+n+'.png';});
 function petPose(n,lockMs,force){if(force)petLock=0;else if(Date.now()<petLock&&!lockMs)return;if(lockMs)petLock=Date.now()+lockMs;if(n===petPoseNow)return;petPoseNow=n;
   petEl.src=miniPet.src=PET+n+'.png';petEl.className='pet '+n+(['meditar','sentada_pierna','sentada_mira','apoyada','bostezo'].includes(n)?' breathe':'');}
 function petIdle(){const sleepy=new Date().getHours()<7||Date.now()-lastAct>6*60000;petPose(sleepy?'bostezo':pick(PET_IDLE));}
@@ -962,4 +962,5 @@ bootP.then(()=>setTimeout(()=>{setState(cfg.key&&cfg.model?'presumida':'sonrisa_
   if(cfg.key&&cfg.model)setOnline(true);if(cfg.alive)setTimeout(wander,2500);},350));
 if(DESK){if(cfg.key&&cfg.model)minimize();else expand();}
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
-</script></body></html>
+</script>
+<script src="desk.js"></script></body></html>

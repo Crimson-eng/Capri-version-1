@@ -1,10 +1,31 @@
 // Capri de escritorio: una ventana transparente, encima de todo, del tamaño de la pantalla.
 // Mini Capri ronda por ella; donde no está Capri, los clics pasan a tus otras ventanas.
-const { app, BrowserWindow, Tray, Menu, ipcMain, screen, session, desktopCapturer, shell, nativeImage } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, screen, session, desktopCapturer, shell, nativeImage, globalShortcut } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const { startWindowWatch } = require('./windows');
 
 const CAPRI_URL = process.env.CAPRI_URL || 'https://crimson-eng.github.io/Capri-version-1/';
-let win = null, tray = null, mode = 'desk', offline = false, ready = false, readyT = null;
+let win = null, tray = null, trayMenu = null, mode = 'desk', offline = false, ready = false, readyT = null;
+let watch = null, lastWins = null;
+
+// lo que se elige en su menú: tamaño, si ronda sola, si se sienta en ventanas, si las posee, si está guardada
+const PREFS = { size: 'm', wander: true, sit: true, possess: true, stowed: false };
+const prefsFile = () => path.join(app.getPath('userData'), 'escritorio.json');
+let prefs = null;
+function loadPrefs() {
+  if (!prefs) { try { prefs = { ...PREFS, ...JSON.parse(fs.readFileSync(prefsFile(), 'utf8')) }; } catch { prefs = { ...PREFS }; } }
+  return prefs;
+}
+function setPrefs(patch) {
+  prefs = { ...loadPrefs(), ...patch };
+  try { fs.writeFileSync(prefsFile(), JSON.stringify(prefs, null, 2)); } catch (e) { console.error('[capri] no se guardó la config:', e.message); }
+  send('desk:cfg', prefs);
+  rebuildMenu();
+  return prefs;
+}
+const send = (ch, data) => { if (win && !win.isDestroyed()) win.webContents.send(ch, data); };
+const cmd = (name, extra = {}) => send('desk:cmd', { name, ...extra });
 
 if (!app.requestSingleInstanceLock()) app.quit();
 app.setAppUserModelId('com.crimson.capri');
@@ -64,12 +85,27 @@ function createWindow() {
 
 function run(js) { if (win && !offline) win.webContents.executeJavaScript(js).catch(() => {}); }
 
-function createTray() {
-  tray = new Tray(nativeImage.createFromPath(path.join(__dirname, 'icon.png')).resize({ width: 16, height: 16 }));
-  tray.setToolTip('Capri');
-  const menu = () => Menu.buildFromTemplate([
+// Ctrl+Alt+C: se guarda en su biochip, o vuelve a salir
+function toggleStow() { setPrefs({ stowed: !loadPrefs().stowed }); }
+
+function rebuildMenu() {
+  if (!tray) return;
+  const p = loadPrefs();
+  trayMenu = Menu.buildFromTemplate([
     { label: 'Abrir Capri completa', click: () => run('expand()') },
     { label: 'Mini Capri', click: () => run('minimize()') },
+    { type: 'separator' },
+    { label: 'Teletransportarse', click: () => cmd('teleport') },
+    { label: 'Hacer un truco', click: () => cmd('flourish') },
+    { label: 'Sentarse en una ventana', enabled: process.platform === 'win32', click: () => cmd('sit') },
+    { label: p.stowed ? 'Sacar a Capri' : 'Guardar en su biochip', accelerator: 'Ctrl+Alt+C', click: toggleStow },
+    { label: 'Tamaño', submenu: [['Chica', 's'], ['Mediana', 'm'], ['Grande', 'l']].map(([label, size]) => ({
+      label, type: 'radio', checked: p.size === size, click: () => setPrefs({ size }) })) },
+    { label: 'Que ronde sola', type: 'checkbox', checked: p.wander, click: (it) => setPrefs({ wander: it.checked }) },
+    { label: 'Sentarse en mis ventanas', type: 'checkbox', checked: p.sit, enabled: process.platform === 'win32',
+      click: (it) => setPrefs({ sit: it.checked }) },
+    { label: 'Poseer mis ventanas', type: 'checkbox', checked: p.possess, enabled: process.platform === 'win32',
+      click: (it) => setPrefs({ possess: it.checked }) },
     { type: 'separator' },
     { label: 'Iniciar con Windows', type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin,
       click: (it) => app.setLoginItemSettings({ openAtLogin: it.checked }) },
@@ -77,7 +113,13 @@ function createTray() {
     { type: 'separator' },
     { label: 'Salir', click: () => app.quit() },
   ]);
-  tray.setContextMenu(menu());
+  tray.setContextMenu(trayMenu);
+}
+
+function createTray() {
+  tray = new Tray(nativeImage.createFromPath(path.join(__dirname, 'icon.png')).resize({ width: 16, height: 16 }));
+  tray.setToolTip('Capri');
+  rebuildMenu();
   tray.on('click', () => run(mode === 'full' ? 'minimize()' : 'expand()'));
 }
 
@@ -85,6 +127,17 @@ ipcMain.on('hit', (e, on) => { if (win && mode === 'desk') win.setIgnoreMouseEve
 ipcMain.on('mode', (e, m) => {
   setMode(m);
   if (win && !ready) { ready = true; clearTimeout(readyT); win.showInactive(); }
+});
+// clic derecho sobre Capri: el mismo menú del icono junto al reloj
+ipcMain.on('menu', () => { if (trayMenu && win) trayMenu.popup({ window: win }); });
+ipcMain.handle('cfg:get', () => loadPrefs());
+ipcMain.handle('cfg:set', (e, patch) => setPrefs(patch || {}));
+ipcMain.handle('windows:get', () => lastWins);
+// dónde está el ratón, aunque esté sobre otra ventana (para que se asuste o despierte al acercarte)
+ipcMain.handle('cursor', () => {
+  if (!win) return null;
+  const p = screen.getCursorScreenPoint(), b = win.getBounds();
+  return { x: p.x - b.x, y: p.y - b.y };
 });
 ipcMain.on('retry', () => { if (win) { offline = false; ready = false; win.loadURL(deskURL()); } });
 
@@ -100,7 +153,11 @@ app.whenReady().then(() => {
   });
   createWindow();
   createTray();
+  watch = startWindowWatch({ win, onUpdate: (d) => { lastWins = d; send('desk:windows', d); } });
+  globalShortcut.register('Control+Alt+C', toggleStow);
 });
+
+app.on('will-quit', () => { globalShortcut.unregisterAll(); watch?.stop(); });
 
 app.on('second-instance', () => run('expand()'));
 app.on('window-all-closed', () => app.quit());
