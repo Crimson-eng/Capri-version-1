@@ -181,6 +181,31 @@ body.minimode #mini{display:flex}
 .orb{margin:0;cursor:pointer}
 .orb .vis{height:auto;aspect-ratio:16/9}
 #mini .ftag>span:first-child{font-size:11px}
+/* ---------- mini Capri: estrellita que ronda (como el video) ---------- */
+#mini[data-mode=LISTENING]{--fc:var(--cyan)}#mini[data-mode=THINKING]{--fc:var(--pur)}#mini[data-mode=TALKING]{--fc:var(--yel)}#mini[data-mode=DORMANT] .mchip{--fc:#ff5d7a}
+.mchip{display:none;flex-direction:column;align-items:center;gap:8px;padding:6px;cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none}
+.mchip:active{cursor:grabbing}
+#mini.star{width:auto;transition:left 4.2s cubic-bezier(.45,0,.3,1),top 4.2s cubic-bezier(.45,0,.3,1)}
+#mini.star .sb,#mini.star .tail,#mini.star .orb{display:none}
+#mini.star .mchip{display:flex}
+.mchip .bob{position:relative;animation:bob 2.6s ease-in-out infinite}
+.mchip .bob::after{content:"";position:absolute;left:50%;bottom:-12px;width:34px;height:6px;margin-left:-17px;border-radius:50%;background:radial-gradient(color-mix(in srgb,var(--fc) 45%,transparent),transparent 70%);animation:sh 2.6s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-7px)}}@keyframes sh{50%{transform:scale(.7);opacity:.6}}
+.mchip svg{display:block;width:58px;height:58px;filter:drop-shadow(0 0 10px var(--fc)) drop-shadow(0 0 2px #000);animation:spin 7s linear infinite;transition:filter .3s}
+#mini[data-mode=THINKING] .mchip svg{animation-duration:1.4s}#mini[data-mode=LISTENING] .mchip svg{animation-duration:3s}#mini[data-mode=TALKING] .mchip svg{animation-duration:2s}
+.mchip:hover svg{filter:drop-shadow(0 0 16px var(--fc)) drop-shadow(0 0 2px #000)}
+.mchip .crow{display:flex;align-items:center;gap:6px}
+.ctag{font:700 10px/1 var(--mono);letter-spacing:.12em;color:var(--fc);background:rgba(0,0,0,.72);border:1px solid var(--fc);padding:4px 7px;white-space:nowrap;transition:color .3s,border-color .3s}
+.mchip .eq{height:11px}.mchip .eq i{background:var(--fc)}
+#mini[data-mode=TALKING] .mchip .eq,#mini[data-mode=LISTENING] .mchip .eq{display:flex}
+.mchip .dots{display:none;font:700 10px/1 var(--mono);color:var(--fc);letter-spacing:.1em}.mchip .dots::after{content:"……";animation:b 1s steps(1) infinite}
+#mini[data-mode=THINKING] .mchip .dots{display:inline}
+.mchip .say{display:none;max-width:200px;background:#000;border:1px solid var(--fc);color:var(--ink);font:11px/1.4 var(--mono);padding:5px 8px;text-align:center}
+.mchip .say.show{display:block}
+/* app de escritorio: solo mini Capri sobre tu escritorio real */
+body.desk,html:has(body.desk){background:transparent!important}
+body.desk::before,body.desk #shards,body.desk .app,body.desk .sprite,body.desk .bubble,body.desk #boot{display:none!important}
+body.desk #mini{display:flex}
 /* en ventana flotante (PC) */
 body.pip{background:var(--bg);overflow:hidden}
 body.pip::before{display:none}
@@ -420,6 +445,8 @@ body[data-core=THINKING] .thk{display:flex}
  </div></div>
 </div>
 <div id="mini" class="collapsed" data-mode="DORMANT">
+ <div class="mchip" id="chip" title="Capri: tócala para hablar, arrástrala para moverla"><div class="say" id="chipSay"></div><div class="bob"><svg viewBox="-50 -50 100 100"><polygon points="0,-48 9,-9 48,0 9,9 0,48 -9,9 -48,0 -9,-9" fill="#ff1f55"/><polygon points="0,-30 6,-6 30,0 6,6 0,30 -6,6 -30,0 -6,-6" fill="#2dff8f" transform="rotate(45)"/><circle r="9" fill="#08050d"/><circle r="5" fill="#22e5f0"/></svg></div>
+  <div class="crow"><span class="ctag" id="chipTag">CAPRI // DORMANT</span><span class="eq"><i></i><i></i><i></i><i></i><i></i></span><span class="dots"></span></div></div>
  <div class="sb"><div class="in">
   <div class="mhead"><span>// capri.exe — mini</span><button id="mExpand" title="Abrir Capri completa">⤢</button><button id="mHide" title="Ocultar globo">—</button></div>
   <div id="miniPrev"></div><div class="mlbl">CAPRI &gt;</div><div id="miniTxt"></div>
@@ -790,17 +817,43 @@ btns();
 
 // ================= MODO MINI (burbuja / ventana flotante) =================
 const miniTagEl=$('miniTag');window.miniPrevEl=$('miniPrev');const miniEl=$('mini'),miniImg=$('miniImg'),miniTxt=$('miniTxt'),mq=$('mq'),mmic=$('mmic');let pipWin=null;
+const DESK=!!window.capriDesk||/[?&]desk=1/.test(location.search);
 async function minimize(){
+  if(DESK){document.body.classList.add('desk');window.capriDesk?.mode('desk');if(!miniEl.classList.contains('star')){miniEl.classList.add('collapsed','star');
+      const r=miniEl.getBoundingClientRect();placeMini(innerWidth-r.width-40,innerHeight-r.height-40,0);}fitMini();roam();window.deskHit?.();return;}
   if('documentPictureInPicture' in window&&!/Android|iPhone|iPad/i.test(navigator.userAgent)){
     try{pipWin=await documentPictureInPicture.requestWindow({width:380,height:520});
       [...document.querySelectorAll('link[rel=stylesheet],style')].forEach(n=>pipWin.document.head.appendChild(n.cloneNode(true)));
       pipWin.document.title='Capri';pipWin.document.body.className='pip';miniEl.classList.remove('collapsed');pipWin.document.body.appendChild(miniEl);
       pipWin.addEventListener('pagehide',()=>{document.body.appendChild(miniEl);miniEl.classList.add('collapsed');pipWin=null;});
       log('capri flotando encima de todo','y');return;}catch(e){}}
-  document.body.classList.add('minimode');miniEl.classList.add('collapsed');}
-function expand(){if(pipWin){pipWin.close();}document.body.classList.remove('minimode');window.focus();term.scrollTop=1e9;}
+  document.body.classList.add('minimode');miniEl.classList.add('collapsed','star');const r=miniEl.getBoundingClientRect();placeMini(innerWidth-r.width-24,innerHeight-r.height-90,0);roam();}
+function expand(){if(DESK){document.body.classList.remove('desk');window.capriDesk?.mode('full');}if(pipWin){pipWin.close();}document.body.classList.remove('minimode');window.focus();term.scrollTop=1e9;}
+
+// ---- mini Capri: estrellita que ronda y se abre cuando habla ----
+const chip=$('chip'),chipSay=$('chipSay');let roamT=0,drag=null,starT=0;
+const miniOn=()=>document.body.classList.contains('minimode')||document.body.classList.contains('desk');
+function placeMini(x,y,anim){miniEl.style.transition=anim?'':'none';miniEl.style.right=miniEl.style.bottom='auto';miniEl.style.left=Math.round(x)+'px';miniEl.style.top=Math.round(y)+'px';}
+function fitMini(){const r=miniEl.getBoundingClientRect();placeMini(Math.max(14,Math.min(r.left,innerWidth-r.width-14)),Math.max(14,Math.min(r.top,innerHeight-r.height-14)),0);}
+function openMini(focus){if(miniEl.classList.contains('star')){const r=miniEl.getBoundingClientRect();miniEl.classList.remove('star','collapsed');
+    const p=miniEl.getBoundingClientRect();placeMini(r.left+r.width/2-p.width/2,r.bottom-p.height+40,0);fitMini();window.deskHit?.();}if(focus)mq.focus();}
+function toStar(){if(pipWin||miniEl.classList.contains('star'))return;const p=miniEl.getBoundingClientRect();miniEl.classList.add('star','collapsed');
+  const r=miniEl.getBoundingClientRect();placeMini(p.left+p.width/2-r.width/2,p.bottom-r.height,0);fitMini();window.deskHit?.();}
+function roam(){clearTimeout(roamT);roamT=setTimeout(roam,rnd(6000,12000));if(!miniOn()||drag||!miniEl.classList.contains('star')||document.hidden||Math.random()<.25)return;
+  const r=miniEl.getBoundingClientRect(),W=innerWidth,H=innerHeight,nx=Math.max(10,Math.min(W-r.width-10,r.left+rnd(-.45,.45)*W)),ny=Math.max(10,Math.min(H-r.height-10,r.top+rnd(-.4,.4)*H));placeMini(nx,ny,1);}
+function chipSays(t,ms){chipSay.textContent=t;chipSay.classList.add('show');clearTimeout(chipSays.t);chipSays.t=setTimeout(()=>chipSay.classList.remove('show'),ms||2600);}
+chip.addEventListener('pointerdown',e=>{const r=miniEl.getBoundingClientRect();drag={dx:e.clientX-r.left,dy:e.clientY-r.top,x:e.clientX,y:e.clientY,moved:false};chip.setPointerCapture(e.pointerId);placeMini(r.left,r.top,0);});
+chip.addEventListener('pointermove',e=>{if(!drag)return;if(Math.abs(e.clientX-drag.x)+Math.abs(e.clientY-drag.y)>6)drag.moved=true;if(drag.moved)placeMini(e.clientX-drag.dx,e.clientY-drag.dy,0);});
+chip.addEventListener('pointerup',()=>{const d=drag;drag=null;bump();if(d&&!d.moved)openMini(true);else{fitMini();chipSays(pick(['¡wiii!','oye, ¿a dónde me llevas?','bájame~','así está mejor']));}roam();});
+addEventListener('resize',()=>{if(miniOn())fitMini();});
+const _coreMini=core;core=function(m){_coreMini(m);$('chipTag').textContent='CAPRI // '+m;clearTimeout(starT);if(!miniOn()||pipWin)return;
+  if(m==='TALKING')openMini();else if(m==='DORMANT')starT=setTimeout(function back(){if(document.activeElement===mq||mq.value||recording||busy||isSpeaking()){starT=setTimeout(back,5000);return;}toStar();},15000);};
+// en la app de escritorio, los clics atraviesan la pantalla salvo donde está Capri
+if(window.capriDesk){let deskLast=null,mx=-1,my=-1;const deskCheck=()=>{const el=mx<0?null:document.elementFromPoint(mx,my);
+    const on=!document.body.classList.contains('desk')||!!drag||!!(el&&el.closest('#mini,.modal.show'));if(on!==deskLast){deskLast=on;capriDesk.hit(on);}};
+  window.deskHit=()=>{deskLast=null;deskCheck();};addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;deskCheck();});}
 $('bMini').onclick=minimize;$('mExpand').onclick=expand;
-$('mHide').onclick=()=>{if(pipWin)pipWin.close();else miniEl.classList.add('collapsed');};
+$('mHide').onclick=()=>{if(pipWin)pipWin.close();else toStar();};
 $('orb').onclick=()=>{miniEl.classList.toggle('collapsed');if(!miniEl.classList.contains('collapsed'))mq.focus();};
 mq.addEventListener('keydown',e=>{if(e.key==='Enter'){const v=mq.value;mq.value='';send(v);}});
 mmic.onclick=()=>recording?stopRec():startRec();
@@ -882,7 +935,7 @@ camVis.addEventListener('click',e=>{ret.classList.add('flash');setTimeout(()=>re
 
 // ================= PANTALLA DE ARRANQUE (HUD) =================
 let bootDone;const bootP=new Promise(r=>bootDone=r);
-(function(){const B=$('boot');if(!B){bootDone();return;}const fast=matchMedia('(prefers-reduced-motion: reduce)').matches,T=fast?900:3400;
+(function(){const B=$('boot');if(!B||DESK){B?.remove();bootDone();return;}const fast=matchMedia('(prefers-reduced-motion: reduce)').matches,T=fast?900:3400;
   const C=$('btCells');C.innerHTML='<i></i>'.repeat(24);const cells=[...C.children],arc=$('btArc'),L=2*Math.PI*77;arc.style.strokeDasharray=L;arc.style.strokeDashoffset=L;
   const ok=cfg.key&&cfg.model,S=[[.06,'relic.sys','montando núcleo','OK'],[.2,'neural_link','sincronizando','ESTABLE'],[.36,'engramas',history.length+' recuerdos','OK'],
    [.5,'soulkiller','aislando ecos','CONTENIDO'],[.66,'voz / oído','calibrando','OK'],[.8,'cerebro',cfg.model||'sin modelo',ok?'EN LÍNEA':'SIN KEY ⚠']];
@@ -907,5 +960,6 @@ history.slice(-8).forEach(h=>{if(h.role==='user'){if(!/^\((Capri miró|silencio|
 bootP.then(()=>setTimeout(()=>{setState(cfg.key&&cfg.model?'presumida':'sonrisa_traviesa');line('c','CAPRI');
   line('t',cfg.key&&cfg.model?pick([`…sistema arriba. Ah, eres tú~`,`¡VOLVISTE! digo… hola. Normal. Tranqui.`,`la hermosa yo ha despertado. tiemblen, procesadores.`,`ehh ${cfg.name}, ¿me extrañaste? obvio sí.`]):"¡Sistema en línea~! Pero sin cerebro. Abre ⚙, pega tu API key de Google y dale «Conectar».");
   if(cfg.key&&cfg.model)setOnline(true);if(cfg.alive)setTimeout(wander,2500);},350));
+if(DESK){if(cfg.key&&cfg.model)minimize();else expand();}
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script></body></html>
