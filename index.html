@@ -2,11 +2,12 @@
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0a0410"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icons/icon-192.png"><link rel="apple-touch-icon" href="icons/apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Capri</title>
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@500;600;700&family=Silkscreen&display=swap" rel="stylesheet">
 <style>
+
 :root{--bg:#07070a;--ink:#f2f0f5;--mut:#8d8a99;--dim:#55525f;--panel:#0d0c11;--panel2:#15131b;
  --yel:#ffe600;--cyan:#2de2e6;--red:#ff2a4d;--grn:#39ff88;--pur:#8b5cf6;--fc:var(--yel);
- --mono:'JetBrains Mono','Share Tech Mono',Consolas,monospace;--sans:'Space Grotesk',system-ui,'Segoe UI',sans-serif;--cut:14px}
+ --pix:'Silkscreen','Press Start 2P',monospace;--mono:'JetBrains Mono','Share Tech Mono',Consolas,monospace;--sans:'Space Grotesk',system-ui,'Segoe UI',sans-serif;--cut:14px}
 body[data-core=LISTENING]{--fc:var(--cyan)}body[data-core=THINKING]{--fc:var(--pur)}body[data-core=TALKING]{--fc:var(--yel)}
 *{box-sizing:border-box}
 html,body{height:100%}
@@ -17,26 +18,57 @@ body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;bac
 #shards{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.14}
 #shards polygon{transform-box:fill-box;transform-origin:center}
 button{font:inherit;color:inherit}
-.app{height:100dvh;display:flex;position:relative;z-index:2}
-.main{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;padding:0 16px}
-.col{width:100%;max-width:860px;flex:1;min-height:0;display:flex;flex-direction:column}
-/* ---------- barra superior ---------- */
-header{display:flex;align-items:center;gap:8px;padding:14px 2px 10px}
-.logo{display:flex;align-items:center;gap:10px;margin-right:auto;font:700 18px/1 var(--mono);letter-spacing:.14em}
-.logo b{color:var(--red)}.logo .sl{color:var(--dim);font-weight:400}
-.logo .st{font:700 11px/1 var(--mono);letter-spacing:.14em;color:#03140a;background:var(--grn);padding:4px 8px;clip-path:polygon(6px 0,100% 0,100% 100%,0 100%,0 6px)}
+.app{height:100dvh;display:flex;flex-direction:column;position:relative;z-index:2}
+/* ---------- barra del sistema CAPRI-OS ---------- */
+.menubar{flex:0 0 auto;height:38px;display:flex;align-items:center;gap:14px;padding:0 14px;background:rgba(8,7,12,.92);border-bottom:2px solid #000;box-shadow:0 2px 0 #241f30;font:12px/1 var(--pix)}
+.logo{display:flex;align-items:center;gap:8px;font:14px/1 var(--pix);letter-spacing:.06em;color:var(--ink)}
+.logo b{color:var(--red);font-weight:400}.logo .sl{color:var(--dim)}
+#core{width:22px;height:22px;filter:drop-shadow(0 0 6px var(--red));animation:spin 9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ticker{flex:1;min-width:0;overflow:hidden;white-space:nowrap;color:var(--mut);mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent)}
+.ticker span{display:inline-block;padding-left:100%;animation:tick 28s linear infinite}
+@keyframes tick{to{transform:translateX(-100%)}}
+.logo .st{font:11px/1 var(--pix);color:#03140a;background:var(--grn);padding:4px 7px}
 body[data-core=DORMANT] .logo .st{background:#2a2833;color:var(--mut)}
 body[data-core=LISTENING] .logo .st{background:var(--cyan);color:#021416}
 body[data-core=THINKING] .logo .st{background:var(--pur);color:#fff}
-#core{width:28px;height:28px;filter:drop-shadow(0 0 6px var(--red));animation:spin 9s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-.tools{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
-.btn{display:inline-flex;align-items:center;gap:6px;background:var(--panel);border:1px solid #26232f;color:var(--mut);font:600 12px/1 var(--mono);letter-spacing:.06em;
- padding:8px 10px;cursor:pointer;white-space:nowrap;clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px);transition:color .15s,border-color .15s,background .15s}
-.btn:hover{color:var(--ink);border-color:var(--pur)}
-.btn.act{color:var(--grn);border-color:var(--grn);background:rgba(57,255,136,.08)}
-.btn.icon{width:34px;height:32px;justify-content:center;padding:0;font-size:14px}
-.con{font:700 10px/1 var(--mono);letter-spacing:.12em;color:var(--red)}.con.on{color:var(--grn)}
+.tray{display:flex;align-items:center;gap:12px;color:var(--mut)}
+#mclk{color:var(--ink);font:14px/1 var(--pix)}
+.con{font:11px/1 var(--pix);color:var(--red)}.con.on{color:var(--grn)}
+/* ---------- escritorio ---------- */
+.desk{flex:1;min-height:0;display:flex;gap:30px;padding:30px 30px 18px;position:relative;justify-content:center;overflow:hidden}
+.deskL{flex:0 1 380px;min-width:260px;display:flex;flex-direction:column;gap:26px}
+.deskC{flex:1 1 680px;max-width:760px;min-width:0;display:flex;flex-direction:column;padding-top:104px}
+.hello{height:104px;margin-bottom:-26px;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:22px}
+.hello b{font:400 26px/1.1 var(--pix);color:var(--ink);text-shadow:3px 3px 0 var(--red)}
+.hello span{font:12px/1.4 var(--mono);color:var(--mut);margin-top:6px}
+/* ventanas */
+.win{position:relative;display:flex;flex-direction:column;min-height:0;background:#0c0b12;border:2px solid #000;box-shadow:7px 7px 0 var(--pur),inset 0 0 0 1px #2e2a3a}
+.win>.tb{flex:0 0 auto;height:32px;display:flex;align-items:center;gap:10px;padding:0 6px 0 10px;border-bottom:2px solid #000;color:#fff;font:12px/1 var(--pix);letter-spacing:.04em;
+ background:linear-gradient(90deg,var(--red) 0,#a3123f 55%,transparent 55%),repeating-linear-gradient(90deg,#a3123f 0 6px,#5a0a24 6px 9px)}
+.win>.tb .ic{width:14px;height:14px;background:#fff;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}
+.win>.tb .tt{margin-right:auto;text-shadow:2px 2px 0 #000}
+.win>.tb .wb{width:22px;height:20px;display:grid;place-items:center;background:#0c0b12;border:2px solid #000;color:var(--ink);font:12px/1 var(--pix);cursor:pointer;box-shadow:inset -2px -2px 0 #2e2a3a}
+.win>.tb .wb:hover{background:var(--yel);color:#000}
+.win.cam>.tb{background:linear-gradient(90deg,var(--fc) 0,var(--fc) 55%,transparent 55%),repeating-linear-gradient(90deg,var(--fc) 0 6px,#000 6px 9px);color:#000;transition:background .3s}
+.win.cam>.tb .tt{text-shadow:none}.win.cam>.tb #mdl{background:#000;color:var(--fc);padding:3px 6px;max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.win.cam>.tb .ic{background:#000}
+.win.cam{padding:22px 16px 16px}
+.win.cam .frame{margin:0}
+.win.chat{flex:1}
+.win.chat>.in{flex:1;min-height:0;display:flex;flex-direction:column;padding:12px 16px 12px;background:
+ linear-gradient(rgba(45,226,230,.035) 1px,transparent 1px) 0 0/100% 24px,#0c0b12}
+/* ---------- dock ---------- */
+.dock{flex:0 0 auto;display:flex;justify-content:center;padding:0 12px 14px}
+.dock .tools{display:flex;gap:8px;padding:8px;background:rgba(10,9,15,.92);border:2px solid #000;box-shadow:5px 5px 0 var(--pur),inset 0 0 0 1px #2e2a3a}
+.btn{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:70px;height:58px;background:#14121b;border:2px solid #000;color:var(--mut);
+ font:10px/1 var(--pix);letter-spacing:.02em;cursor:pointer;box-shadow:inset -3px -3px 0 #0a0910,inset 3px 3px 0 #26222f;transition:transform .1s,color .15s}
+.btn .gl{font-size:20px;line-height:1;filter:saturate(.7)}
+.btn:hover{color:var(--ink);transform:translateY(-3px)}
+.btn:active{transform:translateY(1px);box-shadow:inset 3px 3px 0 #0a0910}
+.btn.act{color:var(--grn);background:#0f1f17}
+.btn.act::after{content:"";position:absolute;bottom:-8px;left:50%;width:6px;height:6px;margin-left:-3px;background:var(--grn);box-shadow:0 0 8px var(--grn)}
+.btn.icon{}
+
 /* ---------- marco de Capri (como en el video) ---------- */
 .frame{position:relative;flex:0 0 auto;margin:16px 6px 0;border:2px solid var(--fc);background:#000;transition:border-color .3s,box-shadow .3s;
  box-shadow:0 0 0 1px rgba(0,0,0,.6),0 0 28px -6px color-mix(in srgb,var(--fc) 55%,transparent)}
@@ -46,7 +78,7 @@ body[data-core=THINKING] .logo .st{background:var(--pur);color:#fff}
  linear-gradient(var(--fc),var(--fc)) bottom left/16px 4px no-repeat,linear-gradient(var(--fc),var(--fc)) bottom left/4px 16px no-repeat,
  linear-gradient(var(--fc),var(--fc)) bottom right/16px 4px no-repeat,linear-gradient(var(--fc),var(--fc)) bottom right/4px 16px no-repeat}
 .frame .vis{position:relative;height:clamp(150px,30vh,300px);overflow:hidden}
-.frame img{width:100%;height:100%;object-fit:cover;display:block}
+.frame .vis img{width:100%;height:100%;object-fit:cover;display:block}
 .ftag{position:absolute;top:-14px;left:22px;z-index:3;display:flex;align-items:center;gap:10px}
 .ftag>span:first-child{background:#000;border:2px solid var(--fc);color:var(--fc);font:700 12px/1 var(--mono);letter-spacing:.1em;padding:5px 9px;transition:color .3s,border-color .3s}
 .eq{display:none;align-items:flex-end;gap:2px;height:14px}
@@ -65,7 +97,7 @@ body[data-core=TALKING] .eq,body[data-core=LISTENING] .eq{display:flex}
 .glitch .burst{animation:rw .5s steps(4)}
 @keyframes rw{0%{opacity:1}60%{opacity:1;transform:translateX(-4px)}100%{opacity:0}}
 /* ---------- globo de terminal ---------- */
-.sb{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;margin:0 6px 14px;padding:2px;background:var(--cyan);
+.sb{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;margin:0;padding:2px;background:var(--cyan);
  clip-path:polygon(0 0,calc(100% - var(--cut)) 0,100% var(--cut),100% 100%,var(--cut) 100%,0 calc(100% - var(--cut)))}
 .sb>.in{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--panel);clip-path:inherit;padding:14px 16px 12px}
 .tail{position:relative;display:block;flex:0 0 auto;width:0;height:0;margin:12px 0 -2px 70px;border:13px solid transparent;border-top:0;border-bottom-color:var(--cyan);z-index:3}
@@ -94,14 +126,14 @@ body[data-core=TALKING] .eq,body[data-core=LISTENING] .eq{display:flex}
 #bars{display:none;flex:1;gap:3px;align-items:center;height:24px}
 #bars i{width:4px;background:var(--cyan);height:3px;transition:height .08s}
 .listening #bars{display:flex}.listening #q{display:none}
-.foot{display:flex;justify-content:space-between;font:11px/1 var(--mono);color:var(--dim);margin:-6px 8px 12px;letter-spacing:.06em}
+
 /* ---------- tarjetas tipo "pet" (como tus fotos) ---------- */
-.side{width:310px;flex:0 0 auto;display:flex;flex-direction:column;gap:18px;padding:18px 18px 18px 6px;overflow-y:auto;transition:margin .25s}
+.side{width:300px;flex:0 0 auto;display:flex;flex-direction:column;gap:22px;padding:104px 6px 10px 0;overflow-y:auto;transition:margin .25s}
 .side.hide{margin-right:-330px}
 .card{position:relative;isolation:isolate;padding:14px 14px 12px;filter:drop-shadow(5px 5px 0 var(--pur));flex:0 0 auto}
 .card::before,.card::after{content:"";position:absolute;z-index:-1;clip-path:polygon(var(--cut) 0,100% 0,100% calc(100% - var(--cut)),calc(100% - var(--cut)) 100%,0 100%,0 var(--cut))}
 .card::before{inset:0;background:#2e2a3a}.card::after{inset:1px;background:#0b0a0f}
-.card h4{margin:0 0 10px;display:flex;align-items:center;gap:8px;font:700 12px/1 var(--mono);letter-spacing:.14em;color:var(--ink)}
+.card h4{margin:0 0 10px;display:flex;align-items:center;gap:8px;font:12px/1 var(--pix);letter-spacing:.06em;color:var(--ink)}
 .card h4 .sl{color:var(--dim);font-weight:400}
 .card h4 .chip,.card h4>span:last-child:not(.sl){margin-left:auto}
 .chip{font:700 10px/1 var(--mono);letter-spacing:.14em;background:var(--grn);color:#03140a;padding:4px 7px}
@@ -117,10 +149,10 @@ body[data-core=TALKING] .eq,body[data-core=LISTENING] .eq{display:flex}
 .logout div::first-letter{color:var(--dim)}
 .logout .w{color:#ff8ab0}.logout .y{color:var(--grn)}.logout .g{color:var(--dim)}
 /* ---------- Capri suelta + su globo (estilo tarjeta de tus fotos) ---------- */
-.sprite{position:fixed;width:180px;z-index:40;pointer-events:none;opacity:0;transition:left 4.5s cubic-bezier(.6,0,.3,1),top 4.5s cubic-bezier(.6,0,.3,1),opacity .3s,transform 4.5s}
-.sprite .fr{border:2px solid var(--yel);box-shadow:0 0 22px -4px var(--yel)}
+.sprite{position:fixed;width:130px;z-index:40;pointer-events:none;opacity:0;transition:left 4.5s cubic-bezier(.6,0,.3,1),top 4.5s cubic-bezier(.6,0,.3,1),opacity .3s,transform 4.5s}
+.sprite .fr{border:0}
 .sprite img{width:100%;display:block}
-.sprite .tg{position:absolute;top:-13px;left:12px;background:#000;border:2px solid var(--yel);color:var(--yel);font:700 10px/1 var(--mono);letter-spacing:.1em;padding:3px 6px}
+.sprite .tg{display:none;position:absolute;top:-13px;left:12px;background:#000;border:2px solid var(--yel);color:var(--yel);font:700 10px/1 var(--mono);letter-spacing:.1em;padding:3px 6px}
 .bubble{position:fixed;z-index:41;width:300px;pointer-events:none;opacity:0;transition:opacity .25s;filter:drop-shadow(5px 5px 0 var(--pur))}
 .bubble>div{background:#0b0a0f;border:1px solid #2a2733;padding:12px 14px;font:600 14px/1.45 var(--sans);color:var(--ink);
  clip-path:polygon(var(--cut) 0,100% 0,100% calc(100% - var(--cut)),calc(100% - var(--cut)) 100%,0 100%,0 var(--cut))}
@@ -174,42 +206,73 @@ body.pip #mini .sb{flex:1;min-height:0}body.pip #miniTxt{max-height:none;flex:1}
 .doc button{background:none;border:0;color:var(--red);cursor:pointer;font-size:15px}
 .drop{border:2px dashed var(--pur);padding:18px;text-align:center;color:var(--mut);cursor:pointer;font-family:var(--mono)}
 .drop:hover,.drop.over{border-color:var(--grn);color:var(--grn)}
-@media (max-width:1100px){.side{position:fixed;right:0;top:0;bottom:0;z-index:50;background:rgba(7,7,10,.96);padding-left:18px;border-left:1px solid #2a2733}}
-@media (max-width:700px){.btn .tx{display:none}.logo .nm,.logo .sl,.logo .st{display:none}.tools{flex-wrap:nowrap;gap:4px}.btn{padding:7px 8px}.btn.icon{width:30px}.main{padding:0 12px}
- .frame .vis{height:clamp(120px,24vh,210px)}.out{font-size:13.5px}.foot{display:none}.sb{margin-bottom:12px}}
+/* ---------- Capri mascota (pixel) ---------- */
+.pet{position:absolute;right:46px;bottom:calc(100% - 4px);z-index:6;height:118px;cursor:pointer;user-select:none;-webkit-user-drag:none;image-rendering:pixelated;
+ filter:drop-shadow(3px 3px 0 #000);transform-origin:50% 100%;transition:filter .2s}
+.pet:hover{filter:drop-shadow(3px 3px 0 #000) drop-shadow(0 0 10px rgba(255,42,77,.6))}
+.pet.asomada{height:88px;bottom:calc(100% - 30px)}
+.pet.laptop{height:104px}.pet.voltereta{height:120px}.pet.bostezo{height:108px}
+.pet.hop{animation:hop .45s cubic-bezier(.3,1.6,.5,1)}
+@keyframes hop{0%{transform:translateY(0) scale(1,1)}25%{transform:translateY(0) scale(1.12,.86)}55%{transform:translateY(-26px) scale(.92,1.08)}100%{transform:translateY(0) scale(1,1)}}
+.pet.breathe{animation:br 3.2s ease-in-out infinite}
+@keyframes br{50%{transform:scale(1.015,.985)}}
+.petsay{position:absolute;right:190px;bottom:calc(100% + 46px);z-index:7;max-width:220px;background:#fff;color:#000;font:11px/1.4 var(--pix);padding:7px 9px;border:2px solid #000;box-shadow:3px 3px 0 var(--red);
+ opacity:0;transform:translateY(6px);transition:opacity .2s,transform .2s;pointer-events:none}
+.petsay.show{opacity:1;transform:none}
+.petsay::after{content:"";position:absolute;right:-11px;top:50%;margin-top:-7px;border:7px solid transparent;border-right:0;border-left-color:#000;border-left-width:9px}
+#miniPet{position:absolute;z-index:4;width:auto;right:auto;left:190px;bottom:calc(100% + 2px);height:84px;image-rendering:pixelated;filter:drop-shadow(2px 2px 0 #000);pointer-events:none}
+.sprite img.px{image-rendering:pixelated;filter:drop-shadow(3px 3px 0 #000)}
+@media (min-width:1400px){.side.hide{margin-right:0}}
+@media (max-width:1100px){.side{position:fixed;right:0;top:38px;bottom:0;z-index:50;background:rgba(7,7,10,.97);padding-left:18px;border-left:2px solid #000}
+ .desk{padding:24px 18px 14px;gap:22px}}
+@media (max-width:860px){.desk{flex-direction:column;padding:16px 12px 8px;gap:0}.deskL{flex:0 0 auto;min-width:0}.hello{display:none}.deskC{flex:1 1 auto;min-height:0;padding-top:74px}
+ .win.cam{padding:18px 12px 12px}.frame .vis{height:clamp(100px,19vh,180px)}.ticker{display:none}.logo .sl{display:none}
+ .dock .tools{gap:4px;padding:5px;overflow-x:auto;max-width:100%}.btn{width:44px;height:44px;gap:0}.btn .tx,#bVoice::before{display:none}.btn .gl{font-size:18px}
+ .pet{height:84px;right:22px}.side{padding-top:18px}.pet.asomada{height:70px;bottom:calc(100% - 24px)}.petsay{bottom:calc(100% + 30px);right:120px;max-width:180px}.out{font-size:13.5px}}
 </style></head><body>
 <svg id="shards" preserveAspectRatio="none"></svg>
 <div class="app">
- <div class="main"><div class="col">
- <header>
+ <div class="menubar">
   <div class="logo"><svg id="core" viewBox="-50 -50 100 100"><g id="coreG"><polygon points="0,-48 9,-9 48,0 9,9 0,48 -9,9 -48,0 -9,-9" fill="#ff1f55"/><polygon points="0,-30 6,-6 30,0 6,6 0,30 -6,6 -30,0 -6,-6" fill="#2dff8f" transform="rotate(45)"/><circle r="9" fill="#08050d"/><circle r="5" fill="#22e5f0"/></g></svg>
-   <span class="nm"><b>CAPRI</b></span><span class="sl">/ SYS</span><span class="st" id="core-st">DORMANT</span></div>
-  <div class="tools">
-   <button class="btn" id="bWatch" title="Que mire tu pantalla">👁<span class="tx">MIRAR</span></button>
-   <button class="btn" id="bHands" title="Platicar por voz sin tocar nada">🎙<span class="tx">MANOS LIBRES</span></button>
-   <button class="btn" id="bStudy" title="Biblioteca de estudio">📚<span class="tx">ESTUDIO</span></button>
-   <button class="btn" id="bVoice" title="Que hable en voz alta">🔇 Voz</button>
-   <button class="btn icon" id="bAlive" title="Vida propia">✦</button>
-   <button class="btn icon" id="bMini" title="Minimizar: Capri flotando">⤡</button>
-   <button class="btn icon" id="bMore" title="Panel lateral">☰</button>
-   <button class="btn icon" id="bCfg" title="Ajustes">⚙</button>
+   <span class="nm"><b>CAPRI</b>-OS</span><span class="sl">v3</span><span class="st" id="core-st">DORMANT</span></div>
+  <div class="ticker"><span id="ticker">sincronizando engramas · neural_link: estable · la hermosa yo está en línea</span></div>
+  <div class="tray"><span class="con" id="con">● OFFLINE</span><span id="mclk">--:--</span></div>
+ </div>
+ <div class="desk">
+  <div class="deskL">
+   <div class="hello"><b id="hello">HOLA, KIGA</b><span id="helloSub">capri está despierta</span></div>
+   <div class="win cam"><div class="tb" style="position:absolute;left:0;right:0;top:0"><span class="ic"></span><span class="tt">capri.cam</span><span id="mdl" style="font-size:10px">—</span></div>
+    <section class="frame" id="pAvatar" style="margin-top:22px"><div class="ftag"><span id="tag">CAPRI // BOOTING</span><span class="eq"><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
+     <div class="vis"><img id="gif" alt="Capri"><div class="burst"></div></div><span id="mood">MOOD: ???</span></section>
+   </div>
   </div>
- </header>
- <section class="frame" id="pAvatar"><div class="ftag"><span id="tag">CAPRI // BOOTING</span><span class="eq"><i></i><i></i><i></i><i></i><i></i><i></i></span></div>
-  <div class="vis"><img id="gif" alt="Capri"><div class="burst"></div></div><span id="mood">MOOD: ???</span></section>
- <span class="tail"></span><div class="sb"><div class="in">
-  <div class="out" id="term"></div>
-  <div class="inrow" id="inrow"><span class="pr">&gt;_</span><input id="q" placeholder="escríbele a capri…" autocomplete="off"><div id="bars"></div><button id="mic" title="Hablarle (Ctrl+Espacio)">🎤</button><button id="send" title="Enviar">➤</button></div>
+  <div class="deskC">
+   <div class="win chat"><img class="pet breathe" id="pet" alt="Capri" draggable="false"><div class="petsay" id="petSay"></div>
+    <div class="tb"><span class="ic"></span><span class="tt">capri.exe — terminal</span><button class="wb" id="bMini2" title="Minimizar">_</button><button class="wb" id="bMore2" title="Widgets">▣</button></div>
+    <div class="in">
+     <div class="out" id="term"></div>
+     <div class="inrow" id="inrow"><span class="pr">&gt;_</span><input id="q" placeholder="escríbele a capri…" autocomplete="off"><div id="bars"></div><button id="mic" title="Hablarle (Ctrl+Espacio)">🎤</button><button id="send" title="Enviar">➤</button></div>
+    </div>
+   </div>
+  </div>
+  <aside class="side hide" id="side">
+   <div class="card"><h4>CAPRI <span class="sl">/ RELOJ</span><span class="chip">LIVE</span></h4><div class="big" id="clk"></div><div class="date" id="dte"></div><div class="cal" id="cal"></div></div>
+   <div class="card" id="pEyes"><h4>CAPRI <span class="sl">/ OJOS</span></h4><div class="vis"><img id="eyeImg" alt=""></div></div>
+   <div class="card"><h4>CAPRI <span class="sl">/ PANTALLA</span><span id="feedSt">OFF</span></h4><div class="vis"><video id="vid" muted playsinline></video><div class="noise" id="noise">SIN SEÑAL</div></div></div>
+   <div class="card"><h4>CAPRI <span class="sl">/ SISTEMA</span><span>PID 0451</span></h4><div class="logout" id="log"></div></div>
+  </aside>
+ </div>
+ <div class="dock"><div class="tools">
+  <button class="btn" id="bWatch" title="Que mire tu pantalla"><span class="gl">👁</span><span class="tx">MIRAR</span></button>
+  <button class="btn" id="bHands" title="Platicar por voz sin tocar nada"><span class="gl">🎙</span><span class="tx">MANOS</span></button>
+  <button class="btn" id="bStudy" title="Biblioteca de estudio"><span class="gl">📚</span><span class="tx">ESTUDIO</span></button>
+  <button class="btn" id="bVoice" title="Que hable en voz alta">🔇 Voz</button>
+  <button class="btn" id="bAlive" title="Vida propia"><span class="gl">✦</span><span class="tx">VIDA</span></button>
+  <button class="btn" id="bMini" title="Minimizar: Capri flotando"><span class="gl">⤡</span><span class="tx">MINI</span></button>
+  <button class="btn" id="bMore" title="Widgets"><span class="gl">▣</span><span class="tx">WIDGETS</span></button>
+  <button class="btn" id="bFull" title="Pantalla completa"><span class="gl">⛶</span><span class="tx">FULL</span></button>
+  <button class="btn" id="bCfg" title="Ajustes"><span class="gl">⚙</span><span class="tx">AJUSTES</span></button>
  </div></div>
- <div class="foot"><span id="mdl">—</span><span class="con" id="con">● OFFLINE</span></div>
- </div></div>
- <aside class="side hide" id="side">
-  <div class="card"><h4>CAPRI <span class="sl">/ RELOJ</span><span class="chip">LIVE</span></h4><div class="big" id="clk"></div><div class="date" id="dte"></div><div class="cal" id="cal"></div></div>
-  <div class="card" id="pEyes"><h4>CAPRI <span class="sl">/ OJOS</span></h4><div class="vis"><img id="eyeImg" alt=""></div></div>
-  <div class="card"><h4>CAPRI <span class="sl">/ PANTALLA</span><span id="feedSt">OFF</span></h4><div class="vis"><video id="vid" muted playsinline></video><div class="noise" id="noise">SIN SEÑAL</div></div></div>
-  <div class="card"><h4>CAPRI <span class="sl">/ SISTEMA</span><span>PID 0451</span></h4><div class="logout" id="log"></div></div>
-  <button class="btn" id="bFull" style="align-self:flex-start">⛶ PANTALLA COMPLETA</button>
- </aside>
 </div>
 <div id="mini" class="collapsed" data-mode="DORMANT">
  <div class="sb"><div class="in">
@@ -217,7 +280,7 @@ body.pip #mini .sb{flex:1;min-height:0}body.pip #miniTxt{max-height:none;flex:1}
   <div id="miniPrev"></div><div class="mlbl">CAPRI &gt;</div><div id="miniTxt"></div>
   <div class="mrow"><span class="pr">&gt;_</span><input id="mq" placeholder="escríbele…" autocomplete="off"><button id="mmic" title="Hablarle">🎤</button></div>
  </div></div><span class="tail"></span>
- <section class="frame orb" id="orb" title="Capri"><div class="ftag"><span id="miniTag">CAPRI // IDLE</span><span class="eq"><i></i><i></i><i></i><i></i><i></i><i></i></span></div><div class="vis"><img id="miniImg" alt="Capri"></div></section>
+ <section class="frame orb" id="orb" title="Capri"><img id="miniPet" alt=""><div class="ftag"><span id="miniTag">CAPRI // IDLE</span><span class="eq"><i></i><i></i><i></i><i></i><i></i><i></i></span></div><div class="vis"><img id="miniImg" alt="Capri"></div></section>
 </div>
 <div class="sprite" id="sprite"><span class="tg" id="spriteTag">CAPRI // LOOSE</span><div class="fr"><img id="spriteImg" alt=""></div></div>
 <div class="bubble" id="bubble"><div><b>CAPRI //</b><span id="bubbleTxt"></span></div></div>
@@ -495,7 +558,7 @@ function showBubble(t){miniTxt.textContent=t.length>600?'…'+t.slice(-600):t;mi
 function hideBubble(){bubble.style.opacity=0;}
 function wander(){if(!cfg.alive)return;const w=210;const edge=()=>pick([[-w-20,rnd(0,innerHeight-140)],[innerWidth+20,rnd(0,innerHeight-140)],[rnd(0,innerWidth-w),-170],[rnd(0,innerWidth-w),innerHeight+20]]);
   const [x0,y0]=edge();sprite.style.transition='none';sprite.style.left=x0+'px';sprite.style.top=y0+'px';sprite.style.transform=`rotate(${rnd(-8,8)}deg)`;
-  const st=pick(['sonrisa_traviesa','risa_malvada','emocionada','presumida','glitch_entrada','sorpresa']);$('spriteImg').src=GIFS[st];$('spriteTag').textContent='CAPRI // '+LABEL[st];void sprite.offsetWidth;
+  const st=pick(['voltereta','pelota','risa_brazos','enamorada','cursor']);$('spriteImg').src='assets/pet/'+st+'.png';$('spriteImg').className='px';$('spriteTag').textContent='CAPRI // LOOSE';void sprite.offsetWidth;
   sprite.style.transition='';sprite.style.opacity=1;const hops=Math.floor(rnd(2,5));let k=0;log('capri.exe salió de su panel','w');
   const hop=()=>{if(k++<hops){sprite.style.left=rnd(20,innerWidth-w-20)+'px';sprite.style.top=rnd(70,innerHeight-180)+'px';sprite.style.transform=`rotate(${rnd(-10,10)}deg) scale(${rnd(.85,1.2)})`;setTimeout(hop,rnd(4800,6500));}
     else{const [x1,y1]=edge();sprite.style.left=x1+'px';sprite.style.top=y1+'px';setTimeout(()=>{sprite.style.opacity=0;hideBubble();},4300);}};setTimeout(hop,60);}
@@ -571,7 +634,7 @@ $('drop').onclick=()=>$('file').click();$('file').onchange=e=>{addFiles([...e.ta
 $('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('over');};$('drop').ondragleave=()=>$('drop').classList.remove('over');
 $('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('over');addFiles([...e.dataTransfer.files]);};
 $('bCfg').onclick=openCfg;$('bWatch').onclick=()=>watching?stopWatch():startWatch();
-function btns(){$('bVoice').textContent=cfg.voice?'🔊 Voz':'🔇 Voz';$('bVoice').classList.toggle('act',cfg.voice);$('bAlive').classList.toggle('act',cfg.alive);
+function btns(){$('bVoice').innerHTML=cfg.voice?'<span class="gl">🔊</span><span class="tx">VOZ</span>':'<span class="gl">🔇</span><span class="tx">VOZ</span>';$('bVoice').classList.toggle('act',cfg.voice);$('bAlive').classList.toggle('act',cfg.alive);
   $('bStudy').classList.toggle('act',cfg.study);$('bHands').classList.toggle('act',cfg.hands);}
 $('bVoice').onclick=()=>{cfg.voice=!cfg.voice;store.set('cfg',cfg);btns();if(!cfg.voice)window.speechSynthesis?.cancel();};
 $('bAlive').onclick=()=>{cfg.alive=!cfg.alive;store.set('cfg',cfg);btns();if(cfg.alive)wander();else{sprite.style.opacity=0;hideBubble();}};
@@ -598,6 +661,36 @@ mq.addEventListener('keydown',e=>{if(e.key==='Enter'){const v=mq.value;mq.value=
 mmic.onclick=()=>recording?stopRec():startRec();
 $('send').onclick=()=>{const v=q.value;q.value='';send(v);};
 $('bMore').onclick=()=>{$('side').classList.toggle('hide');$('bMore').classList.toggle('act');};
+
+// ================= CAPRI MASCOTA (pixel) =================
+const PET='assets/pet/',petEl=$('pet'),petSay=$('petSay'),miniPet=$('miniPet');let petPoseNow='',petLock=0,pokes=0,pokeT=0;
+const PET_IDLE=['sentada_pierna','sentada_mira','meditar','apoyada'];
+const PET_TALK={emocionada:'pelota',presumida:'enamorada',sonrisa_traviesa:'risa_brazos',risa_malvada:'risa_brazos',sorpresa:'confundida',glitch_entrada:'confundida',glitch_fuerte:'confundida',
+ hipnosis:'meditar',mirada_intensa:'apoyada',enojada:'cursor',observando:'sentada_mira',pensando:'laptop',escuchando:'asomada'};
+Object.keys(PET_TALK).concat(PET_IDLE,['bostezo','voltereta']).forEach(n=>{const i=new Image();i.src=PET+n+'.png';});
+function petPose(n,lockMs,force){if(force)petLock=0;else if(Date.now()<petLock&&!lockMs)return;if(lockMs)petLock=Date.now()+lockMs;if(n===petPoseNow)return;petPoseNow=n;
+  petEl.src=miniPet.src=PET+n+'.png';petEl.className='pet '+n+(['meditar','sentada_pierna','sentada_mira','apoyada','bostezo'].includes(n)?' breathe':'');}
+function petIdle(){const sleepy=new Date().getHours()<7||Date.now()-lastAct>6*60000;petPose(sleepy?'bostezo':pick(PET_IDLE));}
+function petSays(t,ms){petSay.textContent=t;petSay.classList.add('show');clearTimeout(petSays.t);petSays.t=setTimeout(()=>petSay.classList.remove('show'),ms||2600);}
+function petByCore(m){if(m==='THINKING')petPose('laptop',0,1);else if(m==='LISTENING')petPose('asomada',0,1);else if(m==='TALKING')petPose(PET_TALK[curState]||'risa_brazos',0,1);else petIdle();}
+const _core=core;core=function(m){_core(m);petByCore(m);};
+const POKE=[['enamorada','jeje~ eso se siente bonito'],['risa_brazos','¡oye! jajaja'],['confundida','¿¿qué haces??'],['enamorada','<3'],['cursor','te robo el cursor >:)']];
+petEl.addEventListener('click',()=>{const now=Date.now();pokes=now-pokeT<1500?pokes+1:1;pokeT=now;bump();
+  petEl.classList.remove('hop');void petEl.offsetWidth;petEl.classList.add('hop');
+  if(pokes>=4){petPose('confundida',2600);petSays('ya, ya, deja de picarme >:(');log('capri: demasiados toques','w');}
+  else{const [p,t]=pick(POKE);petPose(p,2200);petSays(t);log('capri recibió cariño','y');}
+  setTimeout(()=>{if(!busy&&!recording)petIdle();},2300);});
+setInterval(()=>{if(busy||recording||isSpeaking()||Date.now()<petLock)return;
+  if(cfg.alive&&Math.random()<.18){petPose('voltereta',1800);petEl.classList.remove('hop');void petEl.offsetWidth;petEl.classList.add('hop');setTimeout(petIdle,1900);}else petIdle();},22000);
+// reloj y cinta de la barra
+setInterval(()=>{const d=new Date();$('mclk').textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');},1000);
+function ticker(){$('ticker').textContent=[`estado → ${LABEL[curState]}`,`ánimo: ${MOOD[curState]}`,cfg.study?'modo estudio: ON':'modo estudio: off',cfg.alive?'vida propia: ON':'vida propia: off',pick(AMB),pick(AMB)].join('  ·  ');}
+setInterval(ticker,28000);setTimeout(ticker,1500);
+$('bMini2').onclick=()=>$('bMini').click();$('bMore2').onclick=()=>$('bMore').click();
+if(innerWidth>=1400){$('side').classList.remove('hide');$('bMore').classList.add('act');}
+{const hr=new Date().getHours(),n=(cfg.name||'Kiga').toUpperCase();$('hello').textContent=(hr<6?'¿DESVELADO, ':hr<12?'BUENOS DÍAS, ':hr<19?'BUENAS TARDES, ':'BUENAS NOCHES, ')+n+(hr<6?'?':'');
+ $('helloSub').textContent=pick(['la hermosa yo está en línea~','sistema estable. por ahora.','capri.exe lista para el caos','¿qué rompemos hoy?']);}
+petIdle();
 
 // ================= ARRANQUE =================
 (async()=>{await openDB();docs=await dbAll();})();
