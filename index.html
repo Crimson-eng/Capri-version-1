@@ -796,7 +796,7 @@ async function claudeStream(system,messages,onText,maxTokens=2048){
 function opBtn(question,answer){if(!question||!answer)return;const b=document.createElement('button');b.className='op';b.textContent='◆ 2ª opinión · Claude';
   b.onclick=()=>secondOpinion(question,answer,b);term.appendChild(b);term.scrollTop=1e9;}
 async function secondOpinion(question,answer,btn){
-  if(!cfg.claudeKey){line('s','(Para pedirle opinión a Claude, pega tu API key de console.anthropic.com en ⚙ → Segunda opinión.)');return;}
+  if(!cfg.claudeKey){line('s','(Para pedirle opinión a Claude, pega tu API key de console.anthropic.com en ⚙ → Claude.)');return;}
   btn.disabled=true;btn.textContent='◆ consultando a Claude…';log('enlace claude → '+cfg.claudeModel,'y');
   const lbl=document.createElement('div');lbl.className='c cl';lbl.textContent='CLAUDE // 2ª OPINIÓN';btn.after(lbl);
   const el=document.createElement('div');el.className='t cl';lbl.after(el);let txt='';
