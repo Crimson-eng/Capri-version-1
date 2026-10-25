@@ -16,7 +16,7 @@ Capri anda por tu pantalla como personaje (la Capri pixel), a la manera de [capr
 
 Solo atrapa el ratón donde está su cuerpo, pixel por pixel; el resto de la pantalla funciona normal. Para saber dónde están tus ventanas usa un pequeño script de PowerShell (`windows.ps1`) que lee solo posiciones, sin títulos ni contenido. En Mac y Linux ronda, se asoma, cae y duerme, pero no se sienta en ventanas.
 
-La app carga Capri desde https://crimson-eng.github.io/Capri-version-1/ (así se actualiza sola). Tu API key y la memoria se guardan dentro de la app, aparte del navegador, así que la primera vez hay que pegar la key en ⚙.
+La página de Capri viaja dentro de la app (`copy-web.js` la copia a `web/` antes de armar el .exe) y se sirve solo para tu PC en `http://127.0.0.1:47823`, así funciona aunque GitHub Pages tenga otra versión. Para tener lo nuevo hay que bajar el .exe nuevo. Tu API key y la memoria se guardan dentro de la app, aparte del navegador, así que la primera vez hay que pegar la key en ⚙. Para probar otra copia: `CAPRI_URL=https://… npm start`.
 
 El instalador lo genera GitHub Actions (`.github/workflows/desktop.yml`). Para probar en tu PC con Node: `npm install` y `npm start` en esta carpeta.
 

@@ -7,8 +7,8 @@
   "private": true,
   "main": "main.js",
   "scripts": {
-    "start": "electron .",
-    "dist": "electron-builder --win nsis portable --publish never"
+    "start": "node copy-web.js && electron .",
+    "dist": "node copy-web.js && electron-builder --win nsis portable --publish never"
   },
   "devDependencies": {
     "electron": "44.7.0",
@@ -27,7 +27,8 @@
       "windows.ps1",
       "icon.png",
       "offline.html",
-      "LICENSES/**"
+      "LICENSES/**",
+      "web/**"
     ],
     "win": {
       "target": [

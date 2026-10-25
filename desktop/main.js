@@ -3,9 +3,35 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain, screen, session, desktopCapturer, shell, nativeImage, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
 const { startWindowWatch } = require('./windows');
 
-const CAPRI_URL = process.env.CAPRI_URL || 'https://crimson-eng.github.io/Capri-version-1/';
+// Capri viaja dentro de la app (carpeta web/, copiada al armar el .exe) y se sirve solo para esta PC
+// en una dirección fija, para que su key y su memoria no se pierdan entre versiones.
+// CAPRI_URL permite probar otra copia (por ejemplo la publicada en GitHub Pages).
+const WEB = path.join(__dirname, 'web');
+const PORT = 47823;
+let CAPRI_URL = process.env.CAPRI_URL || 'https://crimson-eng.github.io/Capri-version-1/';
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.json': 'application/json',
+  '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+
+function serveWeb() {
+  return new Promise((resolve) => {
+    if (process.env.CAPRI_URL || !fs.existsSync(path.join(WEB, 'index.html'))) return resolve();
+    const server = http.createServer((req, res) => {
+      const rel = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+      let file = path.resolve(WEB, '.' + (rel.endsWith('/') ? rel + 'index.html' : rel));
+      if (file !== WEB && !file.startsWith(WEB + path.sep)) { res.writeHead(403); return res.end(); }
+      fs.readFile(file, (err, data) => {
+        if (err) { res.writeHead(404); return res.end(); }
+        res.writeHead(200, { 'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+        res.end(data);
+      });
+    });
+    server.once('error', (e) => { console.error('[capri] no pude abrir su copia local:', e.message); resolve(); });
+    server.listen(PORT, '127.0.0.1', () => { CAPRI_URL = `http://127.0.0.1:${PORT}/`; resolve(); });
+  });
+}
 let win = null, tray = null, trayMenu = null, mode = 'desk', offline = false, ready = false, readyT = null;
 let watch = null, lastWins = null;
 
@@ -141,7 +167,7 @@ ipcMain.handle('cursor', () => {
 });
 ipcMain.on('retry', () => { if (win) { offline = false; ready = false; win.loadURL(deskURL()); } });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   const ses = session.defaultSession;
   // micrófono, notificaciones y pantalla completa sí; lo demás no
   const ok = ['media', 'notifications', 'fullscreen', 'clipboard-sanitized-write', 'display-capture'];
@@ -151,6 +177,7 @@ app.whenReady().then(() => {
   ses.setDisplayMediaRequestHandler((req, cb) => {
     desktopCapturer.getSources({ types: ['screen'] }).then((s) => cb(s[0] ? { video: s[0] } : {})).catch(() => cb({}));
   });
+  await serveWeb();
   createWindow();
   createTray();
   watch = startWindowWatch({ win, onUpdate: (d) => { lastWins = d; send('desk:windows', d); } });
