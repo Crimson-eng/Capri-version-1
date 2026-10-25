@@ -123,6 +123,8 @@ function rebuildMenu() {
     { type: 'separator' },
     { label: 'Teletransportarse', click: () => cmd('teleport') },
     { label: 'Hacer un truco', click: () => cmd('flourish') },
+    { label: 'Mirar el satélite', click: () => cmd('satellite') },
+    { label: 'Celebrar', click: () => cmd('victory') },
     { label: 'Sentarse en una ventana', enabled: process.platform === 'win32', click: () => cmd('sit') },
     { label: p.stowed ? 'Sacar a Capri' : 'Guardar en su biochip', accelerator: 'Ctrl+Alt+C', click: toggleStow },
     { label: 'Tamaño', submenu: [['Chica', 's'], ['Mediana', 'm'], ['Grande', 'l']].map(([label, size]) => ({
