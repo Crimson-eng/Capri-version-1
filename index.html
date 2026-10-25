@@ -112,6 +112,10 @@ body[data-core=TALKING] .eq,body[data-core=LISTENING] .eq{display:flex}
 .out .s{color:var(--dim);font-style:italic;font-size:12.5px;white-space:pre-wrap;margin:8px 0}
 .out .s::before{content:"// "}
 .out .e{color:#ff7d95;white-space:pre-wrap;border-left:3px solid var(--red);padding-left:12px}
+.out .op{display:block;margin:2px 0 4px 15px;background:none;border:1px dashed #3a3546;color:var(--dim);font:11px var(--mono);letter-spacing:.06em;padding:2px 8px;cursor:pointer}
+.out .op:hover{color:var(--cyan);border-color:var(--cyan)}.out .op:disabled{opacity:.5;cursor:default}
+.out .c.cl{color:var(--cyan)}
+.out .t.cl{border-left-color:var(--cyan);color:#cfeff0}
 .cur{display:inline-block;width:8px;height:1.05em;vertical-align:-2px;margin-left:2px;background:var(--grn);animation:b 1s steps(1) infinite}@keyframes b{50%{opacity:0}}
 .inrow{display:flex;gap:8px;align-items:center;border-top:1px dashed #2a2733;padding-top:10px;margin-top:8px}
 .pr{font:700 14px/1 var(--mono);color:var(--red)}
@@ -466,6 +470,10 @@ body[data-core=THINKING] .thk{display:flex}
   <label>Modelo<select id="cModel"><option value="">— primero conecta tu key —</option></select></label>
   <small>Para que conteste rápido, usa un modelo "flash" o "flash-lite".</small>
   <label>¿Cómo te llama Capri?<input id="cName" placeholder="Kiga"></label>
+  <h3>Segunda opinión (Claude)</h3>
+  <label>API key de Claude (empieza con sk-ant-…)<input id="cClaude" type="password" placeholder="Opcional: pega aquí tu key de console.anthropic.com" autocomplete="off"></label>
+  <label>Modelo de Claude<select id="cClaudeModel"><option value="claude-opus-5-5">Opus 5.5 (el más listo)</option><option value="claude-sonnet-5-5">Sonnet 5.5 (equilibrado)</option><option value="claude-haiku-5-5">Haiku 5.5 (rápido y muy barato)</option></select></label>
+  <small>Con la key, cada respuesta de Capri trae un botón «◆ 2ª opinión» para que Claude la revise. Solo se usa cuando lo presionas. Se cobra por uso en tu cuenta de la API (aparte de la suscripción de Claude); ponle un límite de gasto en console.anthropic.com. Gastado hasta ahora: <b id="cClaudeSpent">$0.00</b></small>
   <h3>Voz de Capri</h3>
   <label>Voz<select id="cVoice"></select></label>
   <small>Las voces más naturales ("Natural" / "Online") salen si abres Capri en <b>Microsoft Edge</b>.</small>
@@ -605,7 +613,7 @@ const MOOD={observando:'CHILL',pensando:'PROCESSING',sonrisa_traviesa:'GREMLIN',
 const EYE={observando:'mirada_intensa',pensando:'hipnosis',sonrisa_traviesa:'presumida',sorpresa:'sorpresa',risa_malvada:'risa_malvada',glitch_entrada:'glitch_fuerte',glitch_fuerte:'hipnosis',enojada:'mirada_intensa',mirada_intensa:'escuchando',escuchando:'escuchando',hipnosis:'hipnosis',emocionada:'sorpresa',presumida:'presumida'};
 const CORE={DORMANT:['#ff1f55',9],LISTENING:['#2dff8f',2.5],THINKING:['#fff200',1.2],TALKING:['#22e5f0',4]};
 const store={get(k,d){try{const v=localStorage.getItem('capri_'+k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('capri_'+k,JSON.stringify(v))}catch(e){}}};
-let cfg=Object.assign({key:'',model:'',models:[],name:'Kiga',every:60,voice:false,voiceName:'',rate:1.1,pitch:1.4,idle:3,alive:true,noThink:{},sens:5,study:false,hands:false,notif:true},store.get('cfg',{}));
+let cfg=Object.assign({key:'',model:'',models:[],name:'Kiga',every:60,voice:false,voiceName:'',rate:1.1,pitch:1.4,idle:3,alive:true,noThink:{},sens:5,study:false,hands:false,notif:true,claudeKey:'',claudeModel:'claude-opus-5-5'},store.get('cfg',{}));
 if(!cfg.v3){cfg.v3=true;if(!cfg.idle||cfg.idle===6)cfg.idle=3;store.set('cfg',cfg);}
 let history=store.get('history',[]);
 // ================= FRAGMENTOS DEL MOSAICO =================
@@ -737,6 +745,51 @@ async function ask(parts,onText){if(!cfg.key||!cfg.model)throw new Error('NOKEY'
       try{const t=await streamModel(m,parts,onText);cfg.model=m;store.set('cfg',cfg);$('mdl').textContent=m;line('s','(✔ Ahora uso '+m+')');return t;}
       catch(e2){if(e2.status!==429&&e2.status!==404)throw e2;e=e2;}}throw e;}}
 
+// ================= SEGUNDA OPINIÓN (Claude) =================
+// Llama a la API de Claude directo desde el navegador con la key de console.anthropic.com (se guarda solo aquí).
+const CLAUDE_API='https://api.anthropic.com/v1/messages';
+const CLAUDE_PRICE={'claude-opus-5-5':[4,20],'claude-sonnet-5-5':[2,10],'claude-haiku-5-5':[.1,.5]}; // USD por millón de tokens (entrada, salida)
+let claudeSpent=store.get('claudeSpent',0);const usd=v=>'$'+v.toFixed(v<.1?4:2);
+const CLAUDE_SYS=n=>`Eres Claude. ${n} usa una asistente de IA llamada Capri (un personaje con actitud traviesa, estilo Cyberpunk Edgerunners) y te pide una segunda opinión sobre lo que Capri le respondió.
+Revisa la respuesta de Capri: di si es correcta, corrige lo que esté mal, añade lo importante que falte y sugiere un mejor enfoque si lo hay. Si la respuesta ya está bien, dilo en una línea.
+Ignora el estilo y la personalidad de Capri; juzga el contenido. Responde en español, directo y breve, en texto plano sin markdown.`;
+async function claudeOpinion(question,answer,onText){
+  const model=cfg.claudeModel||'claude-opus-5-5',body={model,max_tokens:2048,stream:true,system:CLAUDE_SYS(cfg.name||'Kiga'),output_config:{effort:'low'},
+    messages:[{role:'user',content:`Lo que pregunté:\n${question}\n\nLo que respondió Capri:\n${answer}`}]};
+  const headers={'content-type':'application/json','x-api-key':cfg.claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'};
+  if(model!=='claude-haiku-5-5'){headers['anthropic-beta']='server-side-fallback-2026-07-01';body.fallbacks='default';} // si un filtro rechaza, reintenta con otro modelo
+  const r=await fetch(CLAUDE_API,{method:'POST',headers,body:JSON.stringify(body)});
+  if(!r.ok){const j=await r.json().catch(()=>({}));const e=new Error(j.error?.message||('Error '+r.status));e.status=r.status;throw e;}
+  const reader=r.body.getReader(),dec=new TextDecoder();let buf='',full='',stop='',inT=0,outT=0;
+  while(true){const {value,done}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
+    while((i=buf.indexOf('\n'))>=0){const ln=buf.slice(0,i).trim();buf=buf.slice(i+1);if(!ln.startsWith('data:'))continue;
+      try{const j=JSON.parse(ln.slice(5));
+        if(j.type==='message_start'){const u=j.message?.usage||{};inT=(u.input_tokens||0)+(u.cache_read_input_tokens||0)+(u.cache_creation_input_tokens||0);}
+        else if(j.type==='content_block_delta'&&j.delta?.type==='text_delta'){full+=j.delta.text;onText(j.delta.text);}
+        else if(j.type==='message_delta'){if(j.delta?.stop_reason)stop=j.delta.stop_reason;if(j.usage?.output_tokens)outT=j.usage.output_tokens;}
+        else if(j.type==='error'){throw new Error(j.error?.message||'Error de Claude');}}catch(e){if(e.message&&!(e instanceof SyntaxError))throw e;}}}
+  const pr=CLAUDE_PRICE[model]||[0,0],cost=(inT*pr[0]+outT*pr[1])/1e6;claudeSpent+=cost;store.set('claudeSpent',claudeSpent);
+  if(stop==='refusal'&&!full.trim())throw new Error('REFUSAL');return {full,cost};}
+function opBtn(question,answer){if(!question||!answer)return;const b=document.createElement('button');b.className='op';b.textContent='◆ 2ª opinión · Claude';
+  b.onclick=()=>secondOpinion(question,answer,b);term.appendChild(b);term.scrollTop=1e9;}
+async function secondOpinion(question,answer,btn){
+  if(!cfg.claudeKey){line('s','(Para pedirle opinión a Claude, pega tu API key de console.anthropic.com en ⚙ → Segunda opinión.)');return;}
+  btn.disabled=true;btn.textContent='◆ consultando a Claude…';log('enlace claude → '+cfg.claudeModel,'y');
+  const lbl=document.createElement('div');lbl.className='c cl';lbl.textContent='CLAUDE // 2ª OPINIÓN';btn.after(lbl);
+  const el=document.createElement('div');el.className='t cl';lbl.after(el);let txt='';
+  try{const {full,cost}=await claudeOpinion(question,answer,t=>{txt+=t;el.textContent=txt.replace(/\*\*?/g,'').replace(/^#+\s*/gm,'');term.scrollTop=1e9;});
+    btn.remove();const n=document.createElement('div');n.className='s';n.textContent=`(${cfg.claudeModel} · ~${usd(cost)} · total ${usd(claudeSpent)})`;el.after(n);
+    history.push({role:'user',text:'(Claude le dio a '+(cfg.name||'Kiga')+' una segunda opinión sobre tu última respuesta: '+el.textContent.trim().slice(0,1500)+')'});store.set('history',history.slice(-60));
+    if(!busy)setState('mirada_intensa');}
+  catch(e){lbl.remove();el.remove();btn.disabled=false;btn.textContent='◆ 2ª opinión · Claude';let m;
+    if(e.message==='REFUSAL')m='Claude no quiso opinar sobre eso.';
+    else if(e.status===401)m='Esa key de Claude no funciona. Revísala en ⚙.';
+    else if(e.status===402||/credit|billing|balance/i.test(e.message))m='Tu cuenta de la API de Claude no tiene saldo. Recarga en console.anthropic.com.';
+    else if(e.status===429)m='Claude está saturado o llegaste a tu límite. Espera un poco.';
+    else if(e instanceof TypeError)m='No pude conectarme con Claude. Revisa tu conexión.';
+    else m='Claude falló: '+String(e.message).slice(0,200);
+    line('e',m);log('ERROR claude '+(e.status||''),'w');}}
+
 // ================= RESPONDER =================
 const TAGRE=new RegExp('\\[('+TAGS.join('|')+')\\]\\s*','gi');
 function clean(s){return s.replace(/<<[^>]*(>>|$)/g,'').replace(/<$/,'').replace(TAGRE,'').replace(/\*\*?/g,'').replace(/^#+\s*/gm,'');}
@@ -764,6 +817,7 @@ async function respond(userText,extra,mode){ // mode: user | watch | idle | voic
     if(speakBuf.trim())speakChunk(speakBuf);if(cur)cur.remove();
     const utext=mode==='watch'?'(Capri miró la pantalla automáticamente)':mode==='idle'?'(silencio)':mode==='voice'?(heard?heard+' (por voz)':'(mensaje de voz)'):(extra?userText+' (con captura de pantalla)':userText);
     history.push({role:'user',text:utext});history.push({role:'model',text:'['+curState+'] '+body});store.set('history',history.slice(-60));
+    if(body&&mode!=='watch')opBtn(mode==='idle'?'(Capri habló sola, sin que yo le preguntara nada)':utext,body);
     if(!body){setState('observando');log('nada interesante en pantalla','g');}
   }catch(e){if(cur)cur.remove();showError(e);}
   fragNow=null;busy=false;bump();setTimeout(hideBubble,5000);afterTalk();}
@@ -876,7 +930,8 @@ q.addEventListener('keydown',e=>{if(e.key==='Enter'){const v=q.value;q.value='';
 function syncLbl(){$('vRateV').textContent=(+$('cRate').value).toFixed(2);$('vPitchV').textContent=(+$('cPitch').value).toFixed(2);$('vSensV').textContent=$('cSens').value;}
 function openCfg(){$('cKey').value=cfg.key;$('cName').value=cfg.name;$('cEvery').value=String(cfg.every);$('cIdle').value=String(cfg.idle);$('cNotif').value=cfg.notif?'1':'0';
   $('cRate').value=cfg.rate;$('cPitch').value=cfg.pitch;$('cSens').value=cfg.sens;syncLbl();loadVoices();
-  const ms=cfg.models?.length?cfg.models:(cfg.model?[cfg.model]:[]);if(ms.length)$('cModel').innerHTML=ms.map(m=>`<option value="${m}">${m}</option>`).join('');$('cModel').value=cfg.model;renderFrags();$('modal').classList.add('show');}
+  const ms=cfg.models?.length?cfg.models:(cfg.model?[cfg.model]:[]);if(ms.length)$('cModel').innerHTML=ms.map(m=>`<option value="${m}">${m}</option>`).join('');$('cModel').value=cfg.model;renderFrags();
+  $('cClaude').value=cfg.claudeKey||'';$('cClaudeModel').value=cfg.claudeModel||'claude-opus-5-5';$('cClaudeSpent').textContent=usd(claudeSpent);$('modal').classList.add('show');}
 $('cRate').oninput=$('cPitch').oninput=$('cSens').oninput=syncLbl;
 $('cFrag').onclick=()=>$('fragFile').click();$('fragFile').onchange=async e=>{for(const f of e.target.files)await addFrag(f);e.target.value='';};
 $('cTest').onclick=()=>{window.speechSynthesis?.cancel();const keep={voiceName:cfg.voiceName,rate:cfg.rate,pitch:cfg.pitch};
@@ -886,7 +941,7 @@ $('cLoad').onclick=async()=>{const key=$('cKey').value.trim();if(!key)return;$('
     $('cModel').innerHTML=ms.map(m=>`<option value="${m}">${m}</option>`).join('');$('cModel').value=ms.includes(cfg.model)?cfg.model:rankForFree(ms)[0];$('cLoad').textContent='✔ Conectado';setOnline(true);}
   catch(e){$('cLoad').textContent='✖ '+(/key/i.test(e.message)?'Key inválida':e.message).slice(0,60);setOnline(false);}};
 $('cClose').onclick=()=>{cfg.key=$('cKey').value.trim();cfg.model=$('cModel').value;cfg.name=$('cName').value.trim()||'Kiga';cfg.every=+$('cEvery').value;cfg.idle=+$('cIdle').value;cfg.notif=$('cNotif').value==='1';askNotif();
-  cfg.voiceName=$('cVoice').value;cfg.rate=+$('cRate').value;cfg.pitch=+$('cPitch').value;cfg.sens=+$('cSens').value;store.set('cfg',cfg);$('modal').classList.remove('show');$('mdl').textContent=cfg.model||'—';
+  cfg.voiceName=$('cVoice').value;cfg.rate=+$('cRate').value;cfg.pitch=+$('cPitch').value;cfg.sens=+$('cSens').value;cfg.claudeKey=$('cClaude').value.trim();cfg.claudeModel=$('cClaudeModel').value;store.set('cfg',cfg);$('modal').classList.remove('show');$('mdl').textContent=cfg.model||'—';
   if(cfg.key&&cfg.model)setOnline(true);if(watching)schedule();bump();};
 $('cWipe').onclick=()=>{history=[];store.set('history',[]);term.innerHTML='';line('s','(Memoria borrada.)');};
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('show');}));
@@ -1048,7 +1103,7 @@ let bootDone;const bootP=new Promise(r=>bootDone=r);
 // ================= ARRANQUE =================
 (async()=>{await openDB();docs=await dbAll();})();
 $('mdl').textContent=cfg.model||'—';setState('glitch_entrada');core('DORMANT');ambient();setTimeout(aliveLoop,15000);bump();
-history.slice(-8).forEach(h=>{if(h.role==='user'){if(!/^\((Capri miró|silencio|mensaje de voz)/.test(h.text))line(/ \(por voz\)$/.test(h.text)?'u mic':'u',h.text.replace(/ \(por voz\)$/,''));}else{const b=clean(h.text).trim();if(b){line('c','CAPRI');line('t',b);}}});
+let lastQ='';history.slice(-8).forEach(h=>{if(h.role==='user'){const cm=h.text.match(/^\(Claude le dio .*? sobre tu última respuesta: ([\s\S]*)\)$/);if(cm){term.querySelector('.op:last-of-type')?.remove();line('c cl','CLAUDE // 2ª OPINIÓN');line('t cl',cm[1]);return;}lastQ=h.text;if(!/^\((Capri miró|silencio|mensaje de voz)/.test(h.text))line(/ \(por voz\)$/.test(h.text)?'u mic':'u',h.text.replace(/ \(por voz\)$/,''));}else{const b=clean(h.text).trim();if(b){line('c','CAPRI');line('t',b);if(!/^\((Capri miró|silencio)/.test(lastQ))opBtn(lastQ.replace(/ \(por voz\)$/,''),b);}}});
 const RETURN_PROMPT=(n,t)=>`(${n} acaba de abrir la app${t?' después de '+t+' sin hablarte':''}. Salúdale por tu cuenta como tú lo harías, 1 o 2 frases, según tu ánimo y lo que recuerdas de ${n}. Si te dejó mucho tiempo, que se note.)`;
 {const away=M().visto?Date.now()-mem.visto:0;if(cfg.key&&cfg.model&&(!mem.visto||away>2*36e5)){bootP.then(()=>setTimeout(()=>{if(!busy)respond(RETURN_PROMPT(cfg.name||'Kiga',mem.visto?ago(away):''),null,'idle');},800));}
 else bootP.then(()=>setTimeout(()=>{setState(cfg.key&&cfg.model?'presumida':'sonrisa_traviesa');line('c','CAPRI');
