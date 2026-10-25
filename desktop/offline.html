@@ -1,0 +1,6 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Capri</title>
+<style>html,body{margin:0;height:100%;background:transparent;font:13px/1.5 Consolas,monospace;color:#ff3b55}
+div{position:fixed;right:24px;bottom:24px;background:#050203;border:1px solid #ff3b55;padding:12px 14px;max-width:320px;cursor:pointer}
+b{color:#fff}</style></head><body>
+<div onclick="capriDesk.retry()"><b>CAPRI // SIN CONEXIÓN</b><br>No pude cargar a Capri (sin internet, o falta publicar su versión de escritorio). Toca aquí para reintentar. Para cerrarme usa el icono junto al reloj → Salir.</div>
+<script>capriDesk.hit(true);capriDesk.mode('desk');setTimeout(()=>capriDesk.retry(),60000);</script></body></html>
