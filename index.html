@@ -116,16 +116,26 @@ body[data-core=TALKING] .eq,body[data-core=LISTENING] .eq{display:flex}
 .out .op:hover{color:var(--cyan);border-color:var(--cyan)}.out .op:disabled{opacity:.5;cursor:default}
 .out .c.cl{color:var(--cyan)}
 .out .t.cl{border-left-color:var(--cyan);color:#cfeff0}
+.win.claude{width:min(760px,100%);height:min(640px,100%)}
+.win.claude>.tb{background:linear-gradient(90deg,var(--cyan) 0,var(--cyan) 55%,transparent 55%),repeating-linear-gradient(90deg,var(--cyan) 0 6px,#000 6px 9px);color:#000}
+.win.claude>.tb .tt{text-shadow:none}.win.claude>.tb .ic{background:#000}
+.win.claude>.in{flex:1;min-height:0;display:flex;flex-direction:column;padding:10px 16px 12px}
+.clacc{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font:11.5px var(--mono);color:var(--dim);border-bottom:1px dashed #2a2733;padding-bottom:8px;margin-bottom:6px}
+.clacc b{color:var(--cyan)}.clacc .off{color:#ff7d95}.clacc select{background:#0c0b12;color:var(--ink);border:1px solid #2e2a3a;font:11.5px var(--mono);padding:2px 4px}
+.clacc .sp{margin-left:auto}.clacc a,.clacc button{color:var(--cyan);background:none;border:1px dashed #2e5a5c;font:11px var(--mono);padding:2px 7px;cursor:pointer;text-decoration:none}
+.clacc a:hover,.clacc button:hover{border-color:var(--cyan)}
+#clOut .u::before{content:"> "}#clOut .c{color:var(--cyan)}#clOut .t{border-left-color:var(--cyan)}
 .cur{display:inline-block;width:8px;height:1.05em;vertical-align:-2px;margin-left:2px;background:var(--grn);animation:b 1s steps(1) infinite}@keyframes b{50%{opacity:0}}
 .inrow{display:flex;gap:8px;align-items:center;border-top:1px dashed #2a2733;padding-top:10px;margin-top:8px}
 .pr{font:700 14px/1 var(--mono);color:var(--red)}
-#q{flex:1;background:transparent;border:0;outline:0;color:var(--grn);font:15px/1.4 var(--mono);min-width:0;padding:8px 0;caret-color:var(--grn)}
-#q::placeholder{color:var(--dim)}
-#mic,#send{flex:0 0 auto;width:40px;height:36px;border:1px solid #2a2733;background:var(--panel2);cursor:pointer;font-size:15px;display:grid;place-items:center;
+#q,#clQ{flex:1;background:transparent;border:0;outline:0;color:var(--grn);font:15px/1.4 var(--mono);min-width:0;padding:8px 0;caret-color:var(--grn)}
+#q::placeholder,#clQ::placeholder{color:var(--dim)}
+#mic,#send,#clSend{flex:0 0 auto;width:40px;height:36px;border:1px solid #2a2733;background:var(--panel2);cursor:pointer;font-size:15px;display:grid;place-items:center;
  clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)}
-#mic:hover,#send:hover{border-color:var(--cyan)}
+#mic:hover,#send:hover,#clSend:hover{border-color:var(--cyan)}
 #mic.rec{background:var(--red);border-color:var(--red);color:#fff;animation:pulse 1s infinite}
 #send{background:var(--yel);border-color:var(--yel);color:#000;font-weight:700}
+#clSend{background:var(--cyan);border-color:var(--cyan);color:#000;font-weight:700}#clQ{color:var(--cyan);caret-color:var(--cyan)}
 @keyframes pulse{50%{background:#7a0c22}}
 #bars{display:none;flex:1;gap:3px;align-items:center;height:24px}
 #bars i{width:4px;background:var(--cyan);height:3px;transition:height .08s}
@@ -443,6 +453,7 @@ body[data-core=THINKING] .thk{display:flex}
   <button class="btn" id="bVoice" title="Que hable en voz alta">🔇 Voz</button>
   <button class="btn" id="bAlive" title="Vida propia"><span class="gl">✦</span><span class="tx">VIDA</span></button>
   <button class="btn" id="bMini" title="Minimizar: Capri flotando"><span class="gl">⤡</span><span class="tx">MINI</span></button>
+  <button class="btn" id="bClaude" title="Mi Claude: pregúntale directo"><span class="gl">◆</span><span class="tx">CLAUDE</span></button>
   <button class="btn" id="bMore" title="Widgets"><span class="gl">▣</span><span class="tx">WIDGETS</span></button>
   <button class="btn" id="bFull" title="Pantalla completa"><span class="gl">⛶</span><span class="tx">FULL</span></button>
   <button class="btn" id="bCfg" title="Ajustes"><span class="gl">⚙</span><span class="tx">AJUSTES</span></button>
@@ -461,6 +472,17 @@ body[data-core=THINKING] .thk{display:flex}
 <div class="sprite" id="sprite"><span class="tg" id="spriteTag">CAPRI // LOOSE</span><div class="fr"><img id="spriteImg" alt=""></div></div>
 <div class="bubble" id="bubble"><div><b>CAPRI //</b><span id="bubbleTxt"></span></div></div>
 
+<!-- MI CLAUDE -->
+<div class="modal" id="clModal"><div class="win claude">
+  <div class="tb"><span class="ic"></span><span class="tt">mi.claude — enlace</span><button class="wb" id="clClose" title="Cerrar">×</button></div>
+  <div class="in">
+   <div class="clacc"><span id="clSt"></span><select id="clModel"><option value="claude-opus-5-5">Opus 5.5</option><option value="claude-sonnet-5-5">Sonnet 5.5</option><option value="claude-haiku-5-5">Haiku 5.5</option></select>
+    <span>gastado: <b id="clSpent">$0</b></span><span class="sp"></span><button id="clNew" title="Empezar conversación nueva">+ nueva</button><a href="https://claude.ai/new" target="_blank" rel="noopener" title="Abre tu cuenta de claude.ai en el navegador">claude.ai ↗</a></div>
+   <div class="out" id="clOut"></div>
+   <div class="inrow"><span class="pr">&gt;_</span><input id="clQ" placeholder="pregúntale a claude…" autocomplete="off"><button id="clSend" title="Enviar">➤</button></div>
+  </div>
+</div></div>
+
 <!-- AJUSTES -->
 <div class="modal" id="modal"><div class="panel"><div>
   <h2>⚙ Ajustes de Capri</h2>
@@ -470,10 +492,10 @@ body[data-core=THINKING] .thk{display:flex}
   <label>Modelo<select id="cModel"><option value="">— primero conecta tu key —</option></select></label>
   <small>Para que conteste rápido, usa un modelo "flash" o "flash-lite".</small>
   <label>¿Cómo te llama Capri?<input id="cName" placeholder="Kiga"></label>
-  <h3>Segunda opinión (Claude)</h3>
+  <h3>Claude (2ª opinión y ventana ◆ CLAUDE)</h3>
   <label>API key de Claude (empieza con sk-ant-…)<input id="cClaude" type="password" placeholder="Opcional: pega aquí tu key de console.anthropic.com" autocomplete="off"></label>
   <label>Modelo de Claude<select id="cClaudeModel"><option value="claude-opus-5-5">Opus 5.5 (el más listo)</option><option value="claude-sonnet-5-5">Sonnet 5.5 (equilibrado)</option><option value="claude-haiku-5-5">Haiku 5.5 (rápido y muy barato)</option></select></label>
-  <small>Con la key, cada respuesta de Capri trae un botón «◆ 2ª opinión» para que Claude la revise. Solo se usa cuando lo presionas. Se cobra por uso en tu cuenta de la API (aparte de la suscripción de Claude); ponle un límite de gasto en console.anthropic.com. Gastado hasta ahora: <b id="cClaudeSpent">$0.00</b></small>
+  <small>Con la key, cada respuesta de Capri trae un botón «◆ 2ª opinión» para que Claude la revise, y el botón ◆ CLAUDE del dock abre un chat directo con Claude. Solo se usa cuando tú lo pides. Se cobra por uso en tu cuenta de la API (aparte de la suscripción de Claude); ponle un límite de gasto en console.anthropic.com. Gastado hasta ahora: <b id="cClaudeSpent">$0.00</b></small>
   <h3>Voz de Capri</h3>
   <label>Voz<select id="cVoice"></select></label>
   <small>Las voces más naturales ("Natural" / "Online") salen si abres Capri en <b>Microsoft Edge</b>.</small>
@@ -753,9 +775,10 @@ let claudeSpent=store.get('claudeSpent',0);const usd=v=>'$'+v.toFixed(v<.1?4:2);
 const CLAUDE_SYS=n=>`Eres Claude. ${n} usa una asistente de IA llamada Capri (un personaje con actitud traviesa, estilo Cyberpunk Edgerunners) y te pide una segunda opinión sobre lo que Capri le respondió.
 Revisa la respuesta de Capri: di si es correcta, corrige lo que esté mal, añade lo importante que falte y sugiere un mejor enfoque si lo hay. Si la respuesta ya está bien, dilo en una línea.
 Ignora el estilo y la personalidad de Capri; juzga el contenido. Responde en español, directo y breve, en texto plano sin markdown.`;
-async function claudeOpinion(question,answer,onText){
-  const model=cfg.claudeModel||'claude-opus-5-5',body={model,max_tokens:2048,stream:true,system:CLAUDE_SYS(cfg.name||'Kiga'),output_config:{effort:'low'},
-    messages:[{role:'user',content:`Lo que pregunté:\n${question}\n\nLo que respondió Capri:\n${answer}`}]};
+function claudeOpinion(question,answer,onText){
+  return claudeStream(CLAUDE_SYS(cfg.name||'Kiga'),[{role:'user',content:`Lo que pregunté:\n${question}\n\nLo que respondió Capri:\n${answer}`}],onText);}
+async function claudeStream(system,messages,onText,maxTokens=2048){
+  const model=cfg.claudeModel||'claude-opus-5-5',body={model,max_tokens:maxTokens,stream:true,system,output_config:{effort:'low'},messages};
   const headers={'content-type':'application/json','x-api-key':cfg.claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'};
   if(model!=='claude-haiku-5-5'){headers['anthropic-beta']='server-side-fallback-2026-07-01';body.fallbacks='default';} // si un filtro rechaza, reintenta con otro modelo
   const r=await fetch(CLAUDE_API,{method:'POST',headers,body:JSON.stringify(body)});
@@ -789,6 +812,30 @@ async function secondOpinion(question,answer,btn){
     else if(e instanceof TypeError)m='No pude conectarme con Claude. Revisa tu conexión.';
     else m='Claude falló: '+String(e.message).slice(0,200);
     line('e',m);log('ERROR claude '+(e.status||''),'w');}}
+
+// ================= MI CLAUDE (chat directo) =================
+let clChat=store.get('claudeChat',[]),clBusy=false;
+const clOut=$('clOut'),clLine=(cls,txt)=>{const d=document.createElement('div');d.className=cls;d.textContent=txt;clOut.appendChild(d);clOut.scrollTop=1e9;return d;};
+const CLAUDE_CHAT_SYS=n=>`Eres Claude, hablando directamente con ${n} desde una ventana dentro de su asistente personal Capri. Responde en español salvo que te pida otro idioma. Escribe en texto plano, sin markdown (no uses asteriscos ni #), porque la ventana no lo muestra con formato.`;
+function clStatus(){$('clSt').innerHTML=cfg.claudeKey?'cuenta API: <b>conectada</b>':'<span class="off">sin key</span>';$('clModel').value=cfg.claudeModel||'claude-opus-5-5';$('clSpent').textContent=usd(claudeSpent);}
+function clRender(){clOut.innerHTML='';
+  if(!clChat.length)clLine('s',cfg.claudeKey?'Pregúntale lo que quieras a Claude. La conversación se guarda en este navegador.':'Para usar esta ventana pega tu API key de console.anthropic.com en ⚙ → Claude. Tu suscripción de claude.ai no sirve aquí; para usarla toca «claude.ai ↗».');
+  for(const m of clChat){if(m.role==='user')clLine('u',m.content);else{clLine('c','CLAUDE');clLine('t',m.content);}}}
+function openClaude(){clStatus();clRender();$('clModal').classList.add('show');setTimeout(()=>$('clQ').focus(),50);}
+async function clSend(){const v=$('clQ').value.trim();if(!v||clBusy)return;
+  if(!cfg.claudeKey){clLine('e','Primero pega tu API key de Claude en ⚙ Ajustes.');return;}
+  $('clQ').value='';clBusy=true;clChat.push({role:'user',content:v});clLine('u',v);clLine('c','CLAUDE');const el=clLine('t','…');let txt='';
+  try{const {full,cost}=await claudeStream(CLAUDE_CHAT_SYS(cfg.name||'Kiga'),clChat.slice(-30),t=>{txt+=t;el.textContent=txt.replace(/\*\*?/g,'').replace(/^#+\s*/gm,'');clOut.scrollTop=1e9;},8192);
+    clChat.push({role:'assistant',content:el.textContent.trim()||full.trim()});store.set('claudeChat',clChat.slice(-60));
+    const n=clLine('s',`(${cfg.claudeModel} · ~${usd(cost)})`);clStatus();}
+  catch(e){clChat.pop();el.remove();clOut.lastChild?.remove();
+    clLine('e',e.message==='REFUSAL'?'Claude no quiso responder eso.':e.status===401?'Esa key de Claude no funciona. Revísala en ⚙.':e.status===402||/credit|billing|balance/i.test(e.message)?'Tu cuenta de la API de Claude no tiene saldo. Recarga en console.anthropic.com.':e.status===429?'Claude está saturado o llegaste a tu límite. Espera un poco.':e instanceof TypeError?'No pude conectarme con Claude.':'Claude falló: '+String(e.message).slice(0,200));}
+  clBusy=false;}
+$('bClaude').onclick=openClaude;$('clClose').onclick=()=>$('clModal').classList.remove('show');
+$('clModal').onclick=e=>{if(e.target.id==='clModal')$('clModal').classList.remove('show');};
+$('clSend').onclick=clSend;$('clQ').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();clSend();}else if(e.key==='Escape')$('clModal').classList.remove('show');};
+$('clModel').onchange=()=>{cfg.claudeModel=$('clModel').value;store.set('cfg',cfg);};
+$('clNew').onclick=()=>{if(clBusy)return;clChat=[];store.set('claudeChat',[]);clRender();};
 
 // ================= RESPONDER =================
 const TAGRE=new RegExp('\\[('+TAGS.join('|')+')\\]\\s*','gi');
