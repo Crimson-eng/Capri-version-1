@@ -3,4 +3,5 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('capriDesk', {
   hit: (on) => ipcRenderer.send('hit', !!on),        // ¿el ratón está encima de Capri?
   mode: (m) => ipcRenderer.send('mode', m === 'full' ? 'full' : 'desk'),
+  retry: () => ipcRenderer.send('retry'),
 });

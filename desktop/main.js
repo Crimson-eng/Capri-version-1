@@ -4,7 +4,7 @@ const { app, BrowserWindow, Tray, Menu, ipcMain, screen, session, desktopCapture
 const path = require('path');
 
 const CAPRI_URL = process.env.CAPRI_URL || 'https://crimson-eng.github.io/Capri-version-1/';
-let win = null, tray = null, mode = 'desk', offline = false;
+let win = null, tray = null, mode = 'desk', offline = false, ready = false, readyT = null;
 
 if (!app.requestSingleInstanceLock()) app.quit();
 app.setAppUserModelId('com.crimson.capri');
@@ -43,12 +43,17 @@ function createWindow() {
   });
   setMode('desk');
   win.loadURL(deskURL());
-  win.once('ready-to-show', () => win.showInactive());
+  // solo se muestra cuando la página confirma que sabe ser mini Capri de escritorio;
+  // si no (versión vieja o sin red), se muestra un aviso en vez de tapar la pantalla
+  win.webContents.on('did-finish-load', () => {
+    clearTimeout(readyT);
+    if (ready || offline) { if (offline) win.showInactive(); return; }
+    readyT = setTimeout(() => { if (!ready) { offline = true; win.loadFile(path.join(__dirname, 'offline.html')); } }, 12000);
+  });
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
   win.webContents.on('did-fail-load', (e, code, desc, url, isMain) => {
     if (isMain && !offline) { offline = true; win.loadFile(path.join(__dirname, 'offline.html')); }
   });
-  win.webContents.on('did-finish-load', () => { if (!win.webContents.getURL().startsWith('file:')) offline = false; });
   win.on('closed', () => { win = null; });
   // si cambia la pantalla (otra resolución, se conecta un monitor) se reacomoda
   const fit = () => { if (win) win.setBounds(screen.getPrimaryDisplay().workArea); };
@@ -68,7 +73,7 @@ function createTray() {
     { type: 'separator' },
     { label: 'Iniciar con Windows', type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin,
       click: (it) => app.setLoginItemSettings({ openAtLogin: it.checked }) },
-    { label: 'Recargar', click: () => win && win.loadURL(deskURL()) },
+    { label: 'Recargar', click: () => { if (win) { offline = false; ready = false; win.loadURL(deskURL()); } } },
     { type: 'separator' },
     { label: 'Salir', click: () => app.quit() },
   ]);
@@ -77,7 +82,11 @@ function createTray() {
 }
 
 ipcMain.on('hit', (e, on) => { if (win && mode === 'desk') win.setIgnoreMouseEvents(!on, { forward: true }); });
-ipcMain.on('mode', (e, m) => setMode(m));
+ipcMain.on('mode', (e, m) => {
+  setMode(m);
+  if (win && !ready) { ready = true; clearTimeout(readyT); win.showInactive(); }
+});
+ipcMain.on('retry', () => { if (win) { offline = false; ready = false; win.loadURL(deskURL()); } });
 
 app.whenReady().then(() => {
   const ses = session.defaultSession;
