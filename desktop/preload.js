@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('capriDesk', {
   hit: (on) => ipcRenderer.send('hit', !!on),        // ¿el ratón está encima de Capri?
   mode: (m) => ipcRenderer.send('mode', m === 'full' ? 'full' : 'desk'),
   retry: () => ipcRenderer.send('retry'),
+  openClaude: () => ipcRenderer.send('claude:open'),  // tu cuenta de claude.ai en una ventana de Capri
   // Capri rondando por el escritorio
   menu: () => ipcRenderer.send('menu'),               // clic derecho sobre ella
   getCfg: () => ipcRenderer.invoke('cfg:get'),

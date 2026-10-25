@@ -477,7 +477,7 @@ body[data-core=THINKING] .thk{display:flex}
   <div class="tb"><span class="ic"></span><span class="tt">mi.claude — enlace</span><button class="wb" id="clClose" title="Cerrar">×</button></div>
   <div class="in">
    <div class="clacc"><span id="clSt"></span><select id="clModel"><option value="claude-opus-5-5">Opus 5.5</option><option value="claude-sonnet-5-5">Sonnet 5.5</option><option value="claude-haiku-5-5">Haiku 5.5</option></select>
-    <span>gastado: <b id="clSpent">$0</b></span><span class="sp"></span><button id="clNew" title="Empezar conversación nueva">+ nueva</button><a href="https://claude.ai/new" target="_blank" rel="noopener" title="Abre tu cuenta de claude.ai en el navegador">claude.ai ↗</a></div>
+    <span>gastado: <b id="clSpent">$0</b></span><span class="sp"></span><button id="clNew" title="Empezar conversación nueva">+ nueva</button><a href="https://claude.ai/new" target="_blank" rel="noopener" id="clWeb" title="Abre tu cuenta de claude.ai">claude.ai ↗</a></div>
    <div class="out" id="clOut"></div>
    <div class="inrow"><span class="pr">&gt;_</span><input id="clQ" placeholder="pregúntale a claude…" autocomplete="off"><button id="clSend" title="Enviar">➤</button></div>
   </div>
@@ -835,6 +835,8 @@ $('bClaude').onclick=openClaude;$('clClose').onclick=()=>$('clModal').classList.
 $('clModal').onclick=e=>{if(e.target.id==='clModal')$('clModal').classList.remove('show');};
 $('clSend').onclick=clSend;$('clQ').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();clSend();}else if(e.key==='Escape')$('clModal').classList.remove('show');};
 $('clModel').onchange=()=>{cfg.claudeModel=$('clModel').value;store.set('cfg',cfg);};
+// en la app de escritorio, claude.ai se abre en una ventana de Capri con tu cuenta (sin tocar el navegador)
+if(window.capriDesk?.openClaude){$('clWeb').textContent='mi cuenta claude.ai ◆';$('clWeb').title='Abre tu cuenta de claude.ai dentro de Capri';$('clWeb').onclick=e=>{e.preventDefault();capriDesk.openClaude();};}
 $('clNew').onclick=()=>{if(clBusy)return;clChat=[];store.set('claudeChat',[]);clRender();};
 
 // ================= RESPONDER =================

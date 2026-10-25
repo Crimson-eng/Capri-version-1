@@ -109,6 +109,33 @@ function createWindow() {
   screen.on('display-removed', fit);
 }
 
+// «Mi Claude»: tu cuenta de claude.ai en una ventana propia de Capri, sin abrir el navegador.
+// Usa su propia sesión guardada en disco, así que solo inicias sesión la primera vez.
+// Capri no lee ni toca lo que pasa en esa ventana: es solo un navegador para ti.
+const CLAUDE_HOSTS = /(^|\.)(claude\.ai|anthropic\.com|claudeusercontent\.com|google\.com|googleusercontent\.com|gstatic\.com|apple\.com)$/;
+let claudeWin = null;
+function openClaude() {
+  if (claudeWin && !claudeWin.isDestroyed()) { if (claudeWin.isMinimized()) claudeWin.restore(); claudeWin.show(); claudeWin.focus(); return; }
+  const wa = screen.getPrimaryDisplay().workArea;
+  claudeWin = new BrowserWindow({
+    width: Math.min(1100, wa.width - 80), height: Math.min(860, wa.height - 60), minWidth: 420, minHeight: 500,
+    title: 'Capri // Claude', icon: path.join(__dirname, 'icon.png'), backgroundColor: '#0c0b12', autoHideMenuBar: true,
+    webPreferences: { partition: 'persist:claude', contextIsolation: true, nodeIntegration: false, sandbox: true },
+  });
+  const wc = claudeWin.webContents;
+  // sin la marca "Electron" en el agente, para que el inicio de sesión lo trate como un navegador normal
+  wc.setUserAgent(wc.getUserAgent().replace(/\s(Electron|capri-desktop|Capri)\/\S+/g, ''));
+  // ventanas emergentes de inicio de sesión (Google/Apple) se quedan dentro; cualquier otro enlace va al navegador
+  wc.setWindowOpenHandler(({ url }) => {
+    let host = ''; try { host = new URL(url).hostname; } catch {}
+    if (CLAUDE_HOSTS.test(host)) return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, icon: path.join(__dirname, 'icon.png') } };
+    shell.openExternal(url); return { action: 'deny' };
+  });
+  claudeWin.on('page-title-updated', (e, t) => { e.preventDefault(); claudeWin.setTitle('Capri // ' + (t || 'Claude')); });
+  claudeWin.on('closed', () => { claudeWin = null; });
+  claudeWin.loadURL('https://claude.ai/new');
+}
+
 function run(js) { if (win && !offline) win.webContents.executeJavaScript(js).catch(() => {}); }
 
 // Ctrl+Alt+C: se guarda en su biochip, o vuelve a salir
@@ -120,6 +147,7 @@ function rebuildMenu() {
   trayMenu = Menu.buildFromTemplate([
     { label: 'Abrir Capri completa', click: () => run('expand()') },
     { label: 'Mini Capri', click: () => run('minimize()') },
+    { label: 'Abrir mi Claude (claude.ai)', click: openClaude },
     { type: 'separator' },
     { label: 'Teletransportarse', click: () => cmd('teleport') },
     { label: 'Hacer un truco', click: () => cmd('flourish') },
@@ -167,6 +195,7 @@ ipcMain.handle('cursor', () => {
   const p = screen.getCursorScreenPoint(), b = win.getBounds();
   return { x: p.x - b.x, y: p.y - b.y };
 });
+ipcMain.on('claude:open', openClaude);
 ipcMain.on('retry', () => { if (win) { offline = false; ready = false; win.loadURL(deskURL()); } });
 
 app.whenReady().then(async () => {
@@ -179,6 +208,11 @@ app.whenReady().then(async () => {
   ses.setDisplayMediaRequestHandler((req, cb) => {
     desktopCapturer.getSources({ types: ['screen'] }).then((s) => cb(s[0] ? { video: s[0] } : {})).catch(() => cb({}));
   });
+  // la ventana de claude.ai: puede pedir notificaciones y portapapeles, nada más
+  const cses = session.fromPartition('persist:claude');
+  const cok = ['notifications', 'clipboard-sanitized-write', 'clipboard-read', 'fullscreen'];
+  cses.setPermissionRequestHandler((wc, perm, cb) => cb(cok.includes(perm)));
+  cses.setPermissionCheckHandler((wc, perm) => cok.includes(perm));
   await serveWeb();
   createWindow();
   createTray();
