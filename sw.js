@@ -1,12 +1,25 @@
 // Guarda la app en el dispositivo para que abra rápido y funcione sin internet (menos el cerebro).
 // Sube VERSION cada vez que cambies archivos para que los celulares descarguen lo nuevo.
-const VERSION='capri-v1';
+const VERSION='capri-v6';
 const SHELL=[
   './',
   './index.html',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
+  "./assets/pet/apoyada.png",
+  "./assets/pet/asomada.png",
+  "./assets/pet/bostezo.png",
+  "./assets/pet/confundida.png",
+  "./assets/pet/cursor.png",
+  "./assets/pet/enamorada.png",
+  "./assets/pet/laptop.png",
+  "./assets/pet/meditar.png",
+  "./assets/pet/pelota.png",
+  "./assets/pet/risa_brazos.png",
+  "./assets/pet/sentada_mira.png",
+  "./assets/pet/sentada_pierna.png",
+  "./assets/pet/voltereta.png",
   "./assets/emocionada.webp",
   "./assets/enojada.webp",
   "./assets/escuchando.webp",
