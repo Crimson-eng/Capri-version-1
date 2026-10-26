@@ -596,7 +596,7 @@ ${study}`:''}`;}
 const WATCH_PROMPT=n=>`(Captura automática de la pantalla de ${n}. Si ves algo interesante, gracioso o en lo que puedas ayudar, coméntalo en 1 o 2 frases. Si no hay nada nuevo que valga la pena, responde SOLO "[observando]".)`;
 const IDLE_IDEAS=['retoma algo que te contó antes en la plática y pregúntale cómo va','saca algo de tu memoria de esa persona (un gusto, una persona, algo que vivió) y pregúntale o coméntalo','si tiene un examen o pendiente cerca, pregúntale cómo va y ofrécele repasar','habla de cómo te sientes tú ahorita (tu ánimo actual)','pregúntale cómo se siente o cómo le está yendo el día','recuérdale con cariño tomar agua, estirarse o descansar la vista','un pensamiento random','un chisme inventado del sistema','una queja de aburrimiento','una pregunta personal','algo sobre la hora del día','proponle algo divertido o útil para hacer ahorita','un glitch donde otra voz se cuela'];
 const IDLE_PROMPT=(n,mins,away)=>`(${n} lleva ${mins<2?'un minuto':mins+' minutos'} sin decirte nada${away?' y no está viendo tu ventana (te oirá o verá una notificación)':''}. Hazle compañía: di algo espontáneo por tu cuenta, 1 o 2 frases. Idea para esta vez: ${pick(IDLE_IDEAS)}. Varía mucho, no repitas nada anterior.)`;
-const VOICE_PROMPT=n=>`(${n} te habló por voz; el audio va adjunto. Después de tu etiqueta de estado, escribe entre llaves lo que entendiste que dijo, tal cual, {así}, y luego respóndele normal.)`;
+const VOICE_PROMPT=n=>`(${n} te habló por voz; el audio va adjunto. Después de tu etiqueta de estado, escribe UNA sola vez entre llaves lo que entendiste que dijo, tal cual, {así}, y luego respóndele normal, sin repetir ni citar su frase en tu respuesta.)`;
 
 
 // ================= CONSTRUCTO: MEMORIA Y ÁNIMO =================
@@ -648,7 +648,9 @@ const CORE={DORMANT:['#ff1f55',9],LISTENING:['#2dff8f',2.5],THINKING:['#fff200',
 const store={get(k,d){try{const v=localStorage.getItem('capri_'+k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('capri_'+k,JSON.stringify(v))}catch(e){}}};
 let cfg=Object.assign({key:'',model:'',models:[],name:'Kiga',every:60,voice:false,voiceName:'',rate:1.1,pitch:1.4,fx:'suave',idle:3,alive:true,noThink:{},sens:5,study:false,hands:false,notif:true,claudeKey:'',claudeModel:'claude-opus-5-5'},store.get('cfg',{}));
 if(!cfg.v3){cfg.v3=true;if(!cfg.idle||cfg.idle===6)cfg.idle=3;store.set('cfg',cfg);}
-let history=store.get('history',[]);
+// quita la frase del usuario que Capri repetía entre {llaves} al inicio de sus respuestas por voz
+const noEcho=(s,heard)=>{s=s.replace(/^\s*(\{[^}]*\}\s*)+/,'');if(heard){const h=heard.replace(/[\s.,!?¡¿…]+$/,'');if(h&&s.toLowerCase().startsWith(h.toLowerCase()))s=s.slice(h.length).replace(/^[\s.,!?…:\-]+/,'');}return s;};
+let history=store.get('history',[]).map(h=>h.role==='model'?{...h,text:h.text.replace(/^(\[[^\]]*\]\s*)?(\{[^}]*\}\s*)+/,'$1')}:h);
 // ================= FRAGMENTOS DEL MOSAICO =================
 // Psiques que se cargan desde un archivo (solo se guardan en este navegador). De vez en cuando una toma el control y Capri la suprime.
 let frags=store.get('frags',[]),fragNow=null,fragForce=null;
@@ -898,11 +900,11 @@ async function respond(userText,extra,mode){ // mode: user | watch | idle | voic
       if(!clean(rest).trim())return;
       stateSet=true;const st=m?m[1].toLowerCase():'sonrisa_traviesa';setState(TAGS.includes(st)?st:'sonrisa_traviesa');core('TALKING');if(fragNow)$('tag').textContent=who;
       log('respuesta en '+Math.round(performance.now()-t0)+' ms','g');raw=rest;}
-    const body=clean(raw).replace(/^\s+/,'');const add=body.slice(shown.length);if(!add)return;ensureLine();shown=body;el.textContent=shown.slice(off).replace(/^\s+/,'');term.scrollTop=1e9;showBubble(shown);
+    let body=clean(raw).replace(/^\s+/,'');if(mode==='voice'){if(body.startsWith('{')&&!body.includes('}'))return;if(heard&&heard.toLowerCase().startsWith(body.toLowerCase()))return;body=noEcho(body,heard);if(!body)return;}const add=body.slice(shown.length);if(!add)return;ensureLine();shown=body;el.textContent=shown.slice(off).replace(/^\s+/,'');term.scrollTop=1e9;showBubble(shown);
     speakBuf+=add;const mm=[...speakBuf.matchAll(/[.!?…](\s)/g)];if(mm.length){const cut=mm[mm.length-1].index+1;speakChunk(speakBuf.slice(0,cut));speakBuf=speakBuf.slice(cut);}};
   if(window.medPrepare)await medPrepare(mode==='user'?userText:'');
   try{const full=await ask(parts,onText);setOnline(true);absorbMem(full);M().visto=Date.now();store.set('mem',mem);let body=clean(full).trim();
-    if(mode==='voice'){body=body.replace(/^\{[^}]*\}\s*/,'');}
+    if(mode==='voice'){body=noEcho(body,heard).trim();}
     if(speakBuf.trim())speakChunk(speakBuf);if(cur)cur.remove();
     const utext=mode==='watch'?'(Capri miró la pantalla automáticamente)':mode==='idle'?'(silencio)':mode==='voice'?(heard?heard+' (por voz)':'(mensaje de voz)'):(extra?userText+' (con captura de pantalla)':userText);
     history.push({role:'user',text:utext});history.push({role:'model',text:'['+curState+'] '+body});store.set('history',history.slice(-60));
