@@ -4,7 +4,7 @@
 // DIARIO: lo que Capri recuerda de ti, como lista de misiones, y las tarjetas de perfil.
 // Cambiar de sección pasa con rayas de glitch; la primera vez de cada sección, con la pantalla CONNECT.
 (()=>{
-if(typeof DESK!=='undefined'&&DESK)return;
+// también corre en el .exe: ahí Capri completa es la misma página en modo escritorio, expandida
 const css=document.createElement('style');css.textContent=`
 :root{--hr:#ff4d5e;--hr2:rgba(255,77,94,.35);--hr3:rgba(255,77,94,.1);--hc:#5ef6ff;--hc2:rgba(94,246,255,.35);--hg:#f3c84b}
 .hnav{flex:0 0 auto;display:flex;align-items:center;gap:18px;padding:0 18px;height:46px;background:linear-gradient(#0b0608,#07070a);border-bottom:1px solid var(--hr2);font:12px/1 var(--mono);position:relative;z-index:3}
@@ -16,7 +16,7 @@ const css=document.createElement('style');css.textContent=`
 .htabs button.t{background:none;border:0;border-bottom:2px solid transparent;color:var(--hr);font:600 13px/1 var(--sans);letter-spacing:.08em;padding:14px 12px 12px;cursor:pointer;white-space:nowrap;position:relative}
 .htabs button.t:hover{color:#ffc2c8}.htabs button.t.on{color:var(--hc);border-bottom-color:var(--hc);text-shadow:0 0 12px var(--hc2)}
 .htabs button.t::after{content:'';position:absolute;left:0;right:0;bottom:-2px;height:2px;background:var(--hr2)}.htabs button.t.on::after{background:var(--hc)}
-body:not([data-view=capri]) .desk>:not(.hview){visibility:hidden}body:not([data-view=capri]) .dock{display:none}
+body:not([data-view=capri]) .app .desk>:not(.hview){visibility:hidden}body:not([data-view=capri]) .dock{display:none}
 .hview{position:absolute;inset:0;display:none;padding:22px 30px;overflow:auto;color:#ffd9dc;font:13px/1.5 var(--mono);
  background:radial-gradient(ellipse at 50% 55%,rgba(255,77,94,.13),transparent 60%),repeating-linear-gradient(0deg,rgba(255,77,94,.035) 0 1px,transparent 1px 4px),#070406}
 .hview.on{display:block;animation:hvIn .35s ease-out}
@@ -142,7 +142,7 @@ nav.innerHTML=`<div class="st"><span><b id="hvEn">--</b> <small>Energía</small>
 <div class="htabs"><button class="k" id="hPrev" title="Anterior (Q)">Q</button>${VIEWS.map(([k,n])=>`<button class="t" data-v="${k}">${n}</button>`).join('')}<button class="k" id="hNext" title="Siguiente (E)">E</button></div>
 <div class="st r"><span><b id="hvRe">--</b><small>/100 Relic</small></span><span><small>Recuerdos</small> <b id="hvMem">0</b></span></div>`;
 document.querySelector('.menubar').after(nav);
-const desk=document.querySelector('.desk');
+const desk=document.querySelector('.app .desk');
 const mk=(id,html)=>{const v=document.createElement('section');v.className='hview';v.id=id;v.innerHTML=html;desk.appendChild(v);return v;};
 
 // CIBERWARE
