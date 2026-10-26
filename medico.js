@@ -20,7 +20,7 @@ async function mLoad(){libros=(await mAll('libros')).sort((a,b)=>a.added-b.added
 async function mDel(id){await mTx((L,T)=>{L.delete(id);const r=T.index('libro').openKeyCursor(IDBKeyRange.only(id));r.onsuccess=()=>{const c=r.result;if(c){T.delete(c.primaryKey);c.continue();}};});await mLoad();}
 
 // ---------- texto → palabras ----------
-const STOP=new Set(('de la que el en los del se las por un para con una su al lo como mas pero sus le ya o este si porque esta entre cuando muy sin sobre tambien me hasta hay donde quien desde todo nos durante todos uno les ni contra otros ese eso ante ellos e esto mi antes algunos que unos yo otro otras otra el tanto esa estos mucho quienes nada muchos cual poco ella estar estas algunas algo nosotros mis tu te ti tus ellas es son fue ser ha han era puede pueden tiene tienen hacer the of and to in is are for with on by as at from or an be this that which it its was were not no can may into than also has have been se le lo da dar dame dime explica explicame quiero saber sabes cual cuales como que es son porque sirve tengo tiene siento capri').split(' '));
+const STOP=new Set(('de la que el en los del se las por un para con una su al lo como mas pero sus le ya o este si porque esta entre cuando muy sin sobre tambien me hasta hay donde quien desde todo nos durante todos uno les ni contra otros ese eso ante ellos e esto mi antes algunos que unos yo otro otras otra el tanto esa estos mucho quienes nada muchos cual poco ella estar estas algunas algo nosotros mis tu te ti tus ellas es son fue ser ha han era puede pueden tiene tienen hacer the of and to in is are for with on by as at from or an be this that which it its was were not no can may into than also has have been se le lo da dar dame dime explica explicame quiero saber sabes cual cuales como que es son porque sirve tengo tiene siento capri trata tratan hace hacen pasa significa quiere dice dicen bueno malo cosa cosas').split(' '));
 function words(s){return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').match(/[a-zñ0-9]{3,}/g)?.filter(w=>!STOP.has(w)).map(stem)||[];}
 function stem(w){if(/^\d+$/.test(w))return w;if(w.length>5&&w.endsWith('es'))w=w.slice(0,-2);else if(w.length>4&&w.endsWith('s'))w=w.slice(0,-1);return w.length>6?w.slice(0,6):w;}
 
@@ -34,23 +34,41 @@ function search(q,k=TOPK){if(!idx)buildIdx();const qs=[...new Set(words(q))];if(
       const idf=Math.log(1+(idx.n-n+.5)/(n+.5));s+=idf*f*(K1+1)/(f+K1*(1-B+B*d.len/idx.avg));}
     if(s>0)out.push({t:d.t,s:s*(.6+.4*hit/qs.length)});}
   out.sort((a,b)=>b.s-a.s);const seen=new Set(),res=[];
-  for(const o of out){const key=o.t.libro+'|'+o.t.pag;if(seen.has(key))continue;seen.add(key);res.push(o);if(res.length>=k)break;}return res;}
+  for(const o of out){if(o.s<out[0].s*.35)break;const key=o.t.libro+'|'+o.t.pag;if(seen.has(key))continue;seen.add(key);res.push(o);if(res.length>=k)break;}return res;}
 
 // ---------- cargar libros ----------
 function partir(text){const out=[];const pages=text.split(/\n?\[Página (\d+)\]\n/);
-  const push=(txt,pag)=>{txt=txt.replace(/\s+/g,' ').trim();for(let i=0;i<txt.length;i+=CHUNK-OVER){const c=txt.slice(i,i+CHUNK);if(c.length>80)out.push({pag,text:c});if(i+CHUNK>=txt.length)break;}};
+  const push=(txt,pag)=>{txt=txt.replace(/\s+/g,' ').trim();for(let i=0;i<txt.length;i+=CHUNK-OVER){const c=txt.slice(i,i+CHUNK);if(c.length>30)out.push({pag,text:c});if(i+CHUNK>=txt.length)break;}};
   if(pages.length>1){for(let i=1;i<pages.length;i+=2)push(pages[i+1]||'',+pages[i]);}else push(text,null);return out;}
-async function addLibros(files){const box=$('medDocs');
-  for(const f of files){const id='m'+Date.now()+'_'+Math.random().toString(36).slice(2,7),ext=f.name.split('.').pop().toLowerCase();
-    const row=document.createElement('small');row.textContent='Leyendo '+f.name+'… (los libros grandes tardan un poco)';box.appendChild(row);
-    try{const buf=await f.arrayBuffer();let text='';
-      if(ext==='pdf')text=await pdfText(buf);else if(ext==='docx')text=await docxText(buf);else text=new TextDecoder().decode(buf);
-      const ps=partir(text);if(ps.reduce((s,p)=>s+p.text.length,0)<300)throw new Error('no trae texto que pueda leer. Si es un PDF escaneado (fotos de páginas), primero pásalo por un OCR.');
-      const nombre=f.name.replace(/\.[^.]+$/,'');
-      await mTx((L,T)=>{L.put({id,name:nombre,file:f.name,active:true,trozos:ps.length,pags:ps.length&&ps[ps.length-1].pag,chars:text.length,added:Date.now()});
-        ps.forEach((p,i)=>T.put({id:id+'_'+i,libro:id,nombre,pag:p.pag,text:p.text}));});
-      log('reservorio médico: '+f.name+' ('+ps.length+' trozos)','y');}
+const IMG=/^(jpe?g|png|webp|heic|heif)$/,MIME={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',heic:'image/heic',heif:'image/heif',pdf:'application/pdf'};
+// Apuntes a mano, fotos o PDF escaneado: Gemini los pasa a texto una sola vez y desde ahí se buscan sin gastar nada.
+async function transcribir(buf,mime,varias){if(!cfg.key||!cfg.model)throw new Error('para leer fotos o escaneos primero conecta tu API key en ⚙.');
+  const r=await fetch(API+'models/'+encodeURIComponent(cfg.model)+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':cfg.key},
+    body:JSON.stringify({contents:[{role:'user',parts:[{inlineData:{mimeType:mime,data:b64(buf)}},{text:'Transcribe fielmente el texto de estos apuntes o páginas (pueden ser a mano). No resumas ni corrijas el contenido; respeta términos médicos, dosis y abreviaturas. Describe en una línea entre corchetes los esquemas o dibujos. '+(varias?'Antes de cada página escribe [Página N] en su propia línea. ':'')+'Devuelve solo el texto.'}]}],generationConfig:{temperature:0,maxOutputTokens:32768}})});
+  const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error?.message||('Error '+r.status));
+  return (j.candidates?.[0]?.content?.parts||[]).filter(p=>!p.thought&&p.text).map(p=>p.text).join('').trim();}
+async function guardar(nombre,file,text){const id='m'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+  const ps=partir(text);if(ps.reduce((s,p)=>s+p.text.length,0)<80)throw new Error('no trae texto que pueda leer.');
+  await mTx((L,T)=>{L.put({id,name:nombre,file,active:true,trozos:ps.length,pags:ps.length&&ps[ps.length-1].pag,chars:text.length,added:Date.now()});
+    ps.forEach((p,i)=>T.put({id:id+'_'+i,libro:id,nombre,pag:p.pag,text:p.text}));});
+  log('reservorio médico: '+nombre+' ('+ps.length+' trozos)','y');}
+async function addLibros(files){const box=$('medDocs');const ext=f=>f.name.split('.').pop().toLowerCase();
+  const fotos=files.filter(f=>IMG.test(ext(f)));files=files.filter(f=>!IMG.test(ext(f)));
+  for(const f of files){const row=document.createElement('small');row.textContent='Leyendo '+f.name+'… (los libros grandes tardan un poco)';box.appendChild(row);
+    try{const buf=await f.arrayBuffer(),e=ext(f);let text='';
+      if(e==='pdf'){text=await pdfText(buf.slice(0));
+        if(text.replace(/\[Página \d+\]/g,'').trim().length<200){if(f.size>18e6)throw new Error('es un PDF escaneado de más de 18 MB; pártelo en pedazos más chicos.');
+          row.textContent='Pasando a texto '+f.name+' (escaneado)…';text=await transcribir(buf,MIME.pdf,true);}}
+      else if(e==='docx')text=await docxText(buf);else text=new TextDecoder().decode(buf);
+      await guardar(f.name.replace(/\.[^.]+$/,''),f.name,text);}
     catch(e){alert('No pude leer '+f.name+': '+e.message);}row.remove();}
+  if(fotos.length){ // varias fotos juntas = un cuaderno, cada foto es una página
+    fotos.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));const row=document.createElement('small');box.appendChild(row);let text='';
+    try{for(let i=0;i<fotos.length;i++){row.textContent=`Pasando tus apuntes a texto… foto ${i+1} de ${fotos.length}`;
+        text+=`\n[Página ${i+1}]\n`+await transcribir(await fotos[i].arrayBuffer(),MIME[ext(fotos[i])],false);}
+      const nombre=fotos.length>1?'Apuntes '+new Date().toLocaleDateString('es-MX',{day:'numeric',month:'short'}):fotos[0].name.replace(/\.[^.]+$/,'');
+      await guardar(nombre,fotos.map(f=>f.name).join(', '),text);}
+    catch(e){alert('No pude leer tus fotos: '+e.message);}row.remove();}
   await mLoad();render();}
 
 // ---------- fuentes en línea (solo verificadas) ----------
@@ -95,9 +113,9 @@ const css=document.createElement('style');css.textContent=`#medModal .src{displa
 #medModal .src a:hover{border-color:var(--grn)}div.s.med{color:var(--grn);opacity:.85}`;document.head.appendChild(css);
 const modal=document.createElement('div');modal.className='modal';modal.id='medModal';modal.innerHTML=`<div class="panel"><div>
   <h2>⚕ Reservorio médico</h2>
-  <small>Sube tus libros, guías y apuntes de medicina (PDF con texto, Word, TXT). Se quedan <b>solo en este navegador</b>. Capri busca en ellos los pedazos que tienen que ver con lo que preguntas y te cita libro y página.</small>
-  <div class="drop" id="medDrop">Arrastra libros aquí o haz clic para elegir<br><small>PDF · DOCX · TXT · MD</small></div>
-  <input type="file" id="medFile" multiple accept=".pdf,.docx,.txt,.md" style="display:none">
+  <small>Sube tus apuntes, guías y libros de medicina: PDF, Word, TXT o fotos de tus apuntes a mano (Capri las pasa a texto una vez con tu key de Google; varias fotos juntas quedan como un cuaderno). Se quedan <b>solo en este navegador</b>. Capri busca en ellos los pedazos que tienen que ver con lo que preguntas y te cita libro y página.</small>
+  <div class="drop" id="medDrop">Arrastra apuntes o libros aquí, o haz clic para elegir<br><small>PDF · DOCX · TXT · MD · fotos de tus apuntes (JPG/PNG)</small></div>
+  <input type="file" id="medFile" multiple accept=".pdf,.docx,.txt,.md,.jpg,.jpeg,.png,.webp,.heic,.heif,image/*" style="display:none">
   <div id="medDocs"></div><small id="medTotal"></small>
   <label class="ck"><input type="checkbox" id="medOn"> Reservorio activo (Capri lo consulta en temas de salud)</label>
   <label class="ck"><input type="checkbox" id="medOnline"> Si no viene en mis libros, buscar en MedlinePlus y PubMed</label>
@@ -111,7 +129,7 @@ const modal=document.createElement('div');modal.className='modal';modal.id='medM
    <a href="https://www.cdc.gov/spanish/" target="_blank" rel="noopener">CDC en español</a>
    <a href="https://www.ncbi.nlm.nih.gov/books/" target="_blank" rel="noopener">NCBI Bookshelf (StatPearls)</a>
   </div>
-  <small>Ideas: «¿qué dice el Harrison del manejo de la cetoacidosis?», «compara lo que dicen mis libros sobre hipertensión», «hazme un caso clínico con lo del tema de tiroides». Capri explica y te ayuda a estudiar; no sustituye a tu médico.</small>
+  <small>Ideas: «según mis apuntes, ¿cómo se maneja la cetoacidosis?», «hazme un quiz de mis apuntes de tiroides», «tengo gripa desde hace 3 días, ¿qué me conviene?». Capri explica y te ayuda a estudiar; no sustituye a tu médico.</small>
   <div class="row"><button class="btn" id="medClose">Listo</button></div>
 </div></div>`;document.body.appendChild(modal);
 modal.addEventListener('click',e=>{if(e.target===modal)modal.classList.remove('show');});
