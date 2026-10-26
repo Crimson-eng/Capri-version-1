@@ -53,7 +53,12 @@ function setPrefs(patch) {
 const send = (ch, data) => { if (win && !win.isDestroyed()) win.webContents.send(ch, data); };
 const cmd = (name, extra = {}) => send('desk:cmd', { name, ...extra });
 
-if (!app.requestSingleInstanceLock()) app.quit();
+// el .exe portable se desempaca en una carpeta temporal; este es el archivo que abriste de verdad
+const EXE = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
+const newer = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number);
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+// si ya hay una Capri abierta, le avisamos qué versión somos: si somos más nuevas, ella se cierra y nos abre a nosotras
+if (!app.requestSingleInstanceLock({ version: app.getVersion(), exe: EXE })) app.quit();
 app.setAppUserModelId('com.crimson.capri');
 
 function deskURL() {
@@ -163,8 +168,8 @@ function rebuildMenu() {
     { label: 'Poseer mis ventanas', type: 'checkbox', checked: p.possess, enabled: process.platform === 'win32',
       click: (it) => setPrefs({ possess: it.checked }) },
     { type: 'separator' },
-    { label: 'Iniciar con Windows', type: 'checkbox', checked: app.getLoginItemSettings().openAtLogin,
-      click: (it) => app.setLoginItemSettings({ openAtLogin: it.checked }) },
+    { label: 'Iniciar con Windows', type: 'checkbox', checked: app.getLoginItemSettings({ path: EXE }).openAtLogin,
+      click: (it) => app.setLoginItemSettings({ openAtLogin: it.checked, path: EXE }) },
     { label: 'Recargar', click: () => { if (win) { offline = false; ready = false; win.loadURL(deskURL()); } } },
     { type: 'separator' },
     { label: 'Salir', click: () => app.quit() },
@@ -199,6 +204,9 @@ ipcMain.on('claude:open', openClaude);
 ipcMain.on('retry', () => { if (win) { offline = false; ready = false; win.loadURL(deskURL()); } });
 
 app.whenReady().then(async () => {
+  // que al prender la PC se abra esta versión y no una vieja
+  if (process.platform === 'win32' && EXE !== process.execPath && app.getLoginItemSettings().openAtLogin) {
+    app.setLoginItemSettings({ openAtLogin: false }); app.setLoginItemSettings({ openAtLogin: true, path: EXE }); }
   const ses = session.defaultSession;
   // micrófono, notificaciones y pantalla completa sí; lo demás no
   const ok = ['media', 'notifications', 'fullscreen', 'clipboard-sanitized-write', 'display-capture'];
@@ -222,5 +230,8 @@ app.whenReady().then(async () => {
 
 app.on('will-quit', () => { globalShortcut.unregisterAll(); watch?.stop(); });
 
-app.on('second-instance', () => run('expand()'));
+app.on('second-instance', (_e, _argv, _cwd, data) => {
+  if (data && data.version && newer(data.version, app.getVersion())) { app.relaunch({ execPath: data.exe, args: [] }); app.exit(0); return; }
+  run('expand()');
+});
 app.on('window-all-closed', () => app.quit());
