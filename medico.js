@@ -147,7 +147,7 @@ $('medOn').onchange=()=>{med.on=$('medOn').checked;saveMed();render();};$('medOn
 $('medClose').onclick=()=>{modal.classList.remove('show');if(med.on){line('s','(⚕ Reservorio médico activo: '+libros.filter(l=>l.active).length+' libro(s)'+(med.online?' + MedlinePlus/PubMed':'')+'.)');setState('emocionada');}};
 
 // botón en el dock, junto a ESTUDIO
-const b=document.createElement('button');b.className='btn';b.id='bMed';b.title='Reservorio médico';b.innerHTML='<span class="gl">⚕</span><span class="tx">MÉDICO</span>';
+const b=document.createElement('button');b.className='btn';b.id='bMed';b.title='Reservorio médico';b.innerHTML='<span class="gl">'+(typeof ico==='function'?ico('medico'):'⚕')+'</span><span class="tx">MÉDICO</span>';
 $('bStudy').after(b);b.onclick=openMed;b.classList.toggle('act',med.on);
 mOpen().then(mLoad);
 })();

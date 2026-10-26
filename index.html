@@ -62,7 +62,13 @@ body[data-core=THINKING] .logo .st{background:var(--pur);color:#fff}
 .dock .tools{display:flex;gap:8px;padding:8px;background:rgba(10,9,15,.92);border:2px solid #000;box-shadow:5px 5px 0 var(--pur),inset 0 0 0 1px #2e2a3a}
 .btn{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:70px;height:58px;background:#14121b;border:2px solid #000;color:var(--mut);
  font:10px/1 var(--pix);letter-spacing:.02em;cursor:pointer;box-shadow:inset -3px -3px 0 #0a0910,inset 3px 3px 0 #26222f;transition:transform .1s,color .15s}
-.btn .gl{font-size:20px;line-height:1;filter:saturate(.7)}
+.btn .gl{font-size:20px;line-height:1}
+.ci{width:1em;height:1em;overflow:visible;vertical-align:middle;filter:drop-shadow(1.5px 1.5px 0 var(--pur,#7b3dff))}
+.ci .k{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:square;stroke-linejoin:miter}.ci .f{fill:currentColor}.ci .a{fill:#2dff8f}.ci .a2{stroke:#2dff8f}
+.btn .gl .ci{width:22px;height:22px;color:var(--red)}.btn.act .gl .ci{color:var(--grn)}.btn.act .ci .a{fill:#fff}.btn.act .ci .a2{stroke:#fff}
+#mic .ci,#send .ci,#clSend .ci,#mmic .ci{width:18px;height:18px;filter:none}#send .ci .a,#clSend .ci .a,#mmic .ci .a,#mic.rec .ci .a{fill:currentColor}#mmic .ci .a2,#mic .ci .a2{stroke:currentColor}
+.mhead button .ci,#clClose .ci{width:14px;height:14px}
+
 .btn:hover{color:var(--ink);transform:translateY(-3px)}
 .btn:active{transform:translateY(1px);box-shadow:inset 3px 3px 0 #0a0910}
 .btn.act{color:var(--grn);background:#0f1f17}
@@ -434,7 +440,7 @@ body[data-core=THINKING] .thk{display:flex}
     <div class="in">
      <div class="out" id="term"></div>
      <div class="thk" id="thk"><span>PROCESANDO</span><div class="cl"></div><b id="thkV">0</b></div>
-     <div class="inrow" id="inrow"><span class="pr">&gt;_</span><input id="q" placeholder="escríbele a capri…" autocomplete="off"><div id="bars"></div><button id="mic" title="Hablarle (Ctrl+Espacio)">🎤</button><button id="send" title="Enviar">➤</button></div>
+     <div class="inrow" id="inrow"><span class="pr">&gt;_</span><input id="q" placeholder="escríbele a capri…" autocomplete="off"><div id="bars"></div><button id="mic" title="Hablarle (Ctrl+Espacio)"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M9 3 H15 V13 H9 Z"/><path class="k" d="M6 10 V13 L9 17 H15 L18 13 V10 M12 17 V21"/><path class="a" d="M10.5 6 H13.5 V7.5 H10.5 Z M10.5 9 H13.5 V10.5 H10.5 Z"/></svg></button><button id="send" title="Enviar"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="f" d="M2 3 L22 12 L2 21 L5 12 Z"/><path class="a" d="M5 12 H13 L5 13.5 Z"/></svg></button></div>
     </div>
    </div>
   </div>
@@ -447,25 +453,25 @@ body[data-core=THINKING] .thk{display:flex}
   <div class="deco" aria-hidden="true"><span>+ SYS.0451 ── ▸▸▸▸</span><span>◢◤ RELIC-OS · BUILD 2077.10</span></div>
  </div>
  <div class="dock"><div class="tools">
-  <button class="btn" id="bWatch" title="Que mire tu pantalla"><span class="gl">👁</span><span class="tx">MIRAR</span></button>
-  <button class="btn" id="bHands" title="Platicar por voz sin tocar nada"><span class="gl">🎙</span><span class="tx">MANOS</span></button>
-  <button class="btn" id="bStudy" title="Biblioteca de estudio"><span class="gl">📚</span><span class="tx">ESTUDIO</span></button>
-  <button class="btn" id="bVoice" title="Que hable en voz alta">🔇 Voz</button>
-  <button class="btn" id="bAlive" title="Vida propia"><span class="gl">✦</span><span class="tx">VIDA</span></button>
-  <button class="btn" id="bMini" title="Minimizar: Capri flotando"><span class="gl">⤡</span><span class="tx">MINI</span></button>
-  <button class="btn" id="bClaude" title="Mi Claude: pregúntale directo"><span class="gl">◆</span><span class="tx">CLAUDE</span></button>
-  <button class="btn" id="bMore" title="Widgets"><span class="gl">▣</span><span class="tx">WIDGETS</span></button>
-  <button class="btn" id="bFull" title="Pantalla completa"><span class="gl">⛶</span><span class="tx">FULL</span></button>
-  <button class="btn" id="bCfg" title="Ajustes"><span class="gl">⚙</span><span class="tx">AJUSTES</span></button>
+  <button class="btn" id="bWatch" title="Que mire tu pantalla"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M2 12 L7 6 H17 L22 12 L17 18 H7 Z"/><circle class="a" cx="12" cy="12" r="3.2"/><path class="k" d="M12 6 V3 M12 21 V18"/></svg></span><span class="tx">MIRAR</span></button>
+  <button class="btn" id="bHands" title="Platicar por voz sin tocar nada"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M9 3 H15 V12 H9 Z"/><path class="k" d="M6 10 V12 L9 16 H15 L18 12 V10"/><path class="k" d="M12 16 V21 M8 21 H16"/><path class="k a2" d="M2 8 L4 10 L2 12 M22 8 L20 10 L22 12"/></svg></span><span class="tx">MANOS</span></button>
+  <button class="btn" id="bStudy" title="Biblioteca de estudio"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M3 5 L12 3 L21 5 V19 L12 21 L3 19 Z"/><path class="k" d="M12 3 V21"/><path class="a" d="M14.5 8 H18.5 V9.6 H14.5 Z M14.5 11.5 H18.5 V13.1 H14.5 Z"/><path class="k" d="M5.5 8 L9.5 7.3 M5.5 11.5 L9.5 10.8"/></svg></span><span class="tx">ESTUDIO</span></button>
+  <button class="btn" id="bVoice" title="Que hable en voz alta"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="f" d="M3 9 H7 L12 4 V20 L7 15 H3 Z"/><path class="k" d="M15 9 L21 15 M21 9 L15 15"/></svg></span><span class="tx">VOZ</span></button>
+  <button class="btn" id="bAlive" title="Vida propia"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="f" d="M12 2 L14 10 L22 12 L14 14 L12 22 L10 14 L2 12 L10 10 Z"/><path class="a" d="M12 8.5 L13 11 L15.5 12 L13 13 L12 15.5 L11 13 L8.5 12 L11 11 Z"/></svg></span><span class="tx">VIDA</span></button>
+  <button class="btn" id="bMini" title="Minimizar: Capri flotando"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M3 3 H21 V21 H3 Z"/><path class="k" d="M10 14 H14 V18"/><path class="a" d="M13 8 L16 5 L19 8 L16 11 Z"/><path class="k" d="M7 7 L13 13"/></svg></span><span class="tx">MINI</span></button>
+  <button class="btn" id="bClaude" title="Mi Claude: pregúntale directo"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M12 2 L22 12 L12 22 L2 12 Z"/><path class="a" d="M12 7 L17 12 L12 17 L7 12 Z"/></svg></span><span class="tx">CLAUDE</span></button>
+  <button class="btn" id="bMore" title="Widgets"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M3 3 H10 V10 H3 Z M14 3 H21 V10 H14 Z M3 14 H10 V21 H3 Z"/><path class="a" d="M14 14 H21 V21 H14 Z"/></svg></span><span class="tx">WIDGETS</span></button>
+  <button class="btn" id="bFull" title="Pantalla completa"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M3 9 V3 H9 M15 3 H21 V9 M21 15 V21 H15 M9 21 H3 V15"/><path class="a" d="M10 10 H14 V14 H10 Z"/></svg></span><span class="tx">FULL</span></button>
+  <button class="btn" id="bCfg" title="Ajustes"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M10 2 H14 L15 5 L18 4 L20 6 L19 9 L22 10 V14 L19 15 L20 18 L18 20 L15 19 L14 22 H10 L9 19 L6 20 L4 18 L5 15 L2 14 V10 L5 9 L4 6 L6 4 L9 5 Z"/><path class="a" d="M10 10 H14 V14 H10 Z"/></svg></span><span class="tx">AJUSTES</span></button>
  </div></div>
 </div>
 <div id="mini" class="collapsed" data-mode="DORMANT">
  <div class="mchip" id="chip" title="Capri: tócala para hablar, arrástrala para moverla"><div class="say" id="chipSay"></div><div class="bob"><svg viewBox="-50 -50 100 100"><polygon points="0,-48 9,-9 48,0 9,9 0,48 -9,9 -48,0 -9,-9" fill="#ff1f55"/><polygon points="0,-30 6,-6 30,0 6,6 0,30 -6,6 -30,0 -6,-6" fill="#2dff8f" transform="rotate(45)"/><circle r="9" fill="#08050d"/><circle r="5" fill="#22e5f0"/></svg></div>
   <div class="crow"><span class="ctag" id="chipTag">CAPRI // DORMANT</span><span class="eq"><i></i><i></i><i></i><i></i><i></i></span><span class="dots"></span></div></div>
  <div class="sb"><div class="in">
-  <div class="mhead"><span>// capri.exe — mini</span><button id="mExpand" title="Abrir Capri completa">⤢</button><button id="mHide" title="Ocultar globo">—</button></div>
+  <div class="mhead"><span>// capri.exe — mini</span><button id="mExpand" title="Abrir Capri completa"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M14 3 H21 V10 M21 3 L12 12 M10 5 H3 V21 H19 V14"/></svg></button><button id="mHide" title="Ocultar globo"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M4 16 H20"/><path class="a" d="M4 19 H12 V21 H4 Z"/></svg></button></div>
   <div id="miniPrev"></div><div class="mlbl">CAPRI &gt;</div><div id="miniTxt"></div>
-  <div class="mrow"><span class="pr">&gt;_</span><input id="mq" placeholder="escríbele…" autocomplete="off"><button id="mmic" title="Hablarle">🎤</button></div>
+  <div class="mrow"><span class="pr">&gt;_</span><input id="mq" placeholder="escríbele…" autocomplete="off"><button id="mmic" title="Hablarle"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M9 3 H15 V13 H9 Z"/><path class="k" d="M6 10 V13 L9 17 H15 L18 13 V10 M12 17 V21"/><path class="a" d="M10.5 6 H13.5 V7.5 H10.5 Z M10.5 9 H13.5 V10.5 H10.5 Z"/></svg></button></div>
  </div></div><span class="tail"></span>
  <section class="frame orb" id="orb" title="Capri"><img id="miniPet" alt=""><div class="ftag"><span id="miniTag">CAPRI // IDLE</span><span class="eq"><i></i><i></i><i></i><i></i><i></i><i></i></span></div><div class="vis"><img id="miniImg" alt="Capri"></div></section>
 </div>
@@ -474,12 +480,12 @@ body[data-core=THINKING] .thk{display:flex}
 
 <!-- MI CLAUDE -->
 <div class="modal" id="clModal"><div class="win claude">
-  <div class="tb"><span class="ic"></span><span class="tt">mi.claude — enlace</span><button class="wb" id="clClose" title="Cerrar">×</button></div>
+  <div class="tb"><span class="ic"></span><span class="tt">mi.claude — enlace</span><button class="wb" id="clClose" title="Cerrar"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M5 5 L19 19 M19 5 L5 19"/><path class="a" d="M10.5 10.5 H13.5 V13.5 H10.5 Z"/></svg></button></div>
   <div class="in">
    <div class="clacc"><span id="clSt"></span><select id="clModel"><option value="claude-opus-5-5">Opus 5.5</option><option value="claude-sonnet-5-5">Sonnet 5.5</option><option value="claude-haiku-5-5">Haiku 5.5</option></select>
     <span>gastado: <b id="clSpent">$0</b></span><span class="sp"></span><button id="clNew" title="Empezar conversación nueva">+ nueva</button><a href="https://claude.ai/new" target="_blank" rel="noopener" id="clWeb" title="Abre tu cuenta de claude.ai">claude.ai ↗</a></div>
    <div class="out" id="clOut"></div>
-   <div class="inrow"><span class="pr">&gt;_</span><input id="clQ" placeholder="pregúntale a claude…" autocomplete="off"><button id="clSend" title="Enviar">➤</button></div>
+   <div class="inrow"><span class="pr">&gt;_</span><input id="clQ" placeholder="pregúntale a claude…" autocomplete="off"><button id="clSend" title="Enviar"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="f" d="M2 3 L22 12 L2 21 L5 12 Z"/><path class="a" d="M5 12 H13 L5 13.5 Z"/></svg></button></div>
   </div>
 </div></div>
 
@@ -535,6 +541,9 @@ body[data-core=THINKING] .thk{display:flex}
 </div></div></div>
 
 <script>
+// iconos de Capri (SVG 24x24): .k trazo, .f relleno, .a acento verde
+const ICO={medico:'<path class="k" d="M9 3 H15 V9 H21 V15 H15 V21 H9 V15 H3 V9 H9 Z"/><path class="k a2" d="M6 12 H9 L10.5 9.5 L13 14.5 L14.5 12 H18"/>',mirar:'<path class="k" d="M2 12 L7 6 H17 L22 12 L17 18 H7 Z"/><circle class="a" cx="12" cy="12" r="3.2"/><path class="k" d="M12 6 V3 M12 21 V18"/>',manos:'<path class="k" d="M9 3 H15 V12 H9 Z"/><path class="k" d="M6 10 V12 L9 16 H15 L18 12 V10"/><path class="k" d="M12 16 V21 M8 21 H16"/><path class="k a2" d="M2 8 L4 10 L2 12 M22 8 L20 10 L22 12"/>',estudio:'<path class="k" d="M3 5 L12 3 L21 5 V19 L12 21 L3 19 Z"/><path class="k" d="M12 3 V21"/><path class="a" d="M14.5 8 H18.5 V9.6 H14.5 Z M14.5 11.5 H18.5 V13.1 H14.5 Z"/><path class="k" d="M5.5 8 L9.5 7.3 M5.5 11.5 L9.5 10.8"/>',voz:'<path class="f" d="M3 9 H7 L12 4 V20 L7 15 H3 Z"/><path class="k a2" d="M15 9 L17 12 L15 15 M18 6 L21 12 L18 18"/>',silencio:'<path class="f" d="M3 9 H7 L12 4 V20 L7 15 H3 Z"/><path class="k" d="M15 9 L21 15 M21 9 L15 15"/>',vida:'<path class="f" d="M12 2 L14 10 L22 12 L14 14 L12 22 L10 14 L2 12 L10 10 Z"/><path class="a" d="M12 8.5 L13 11 L15.5 12 L13 13 L12 15.5 L11 13 L8.5 12 L11 11 Z"/>',mini:'<path class="k" d="M3 3 H21 V21 H3 Z"/><path class="k" d="M10 14 H14 V18"/><path class="a" d="M13 8 L16 5 L19 8 L16 11 Z"/><path class="k" d="M7 7 L13 13"/>',claude:'<path class="k" d="M12 2 L22 12 L12 22 L2 12 Z"/><path class="a" d="M12 7 L17 12 L12 17 L7 12 Z"/>',widgets:'<path class="k" d="M3 3 H10 V10 H3 Z M14 3 H21 V10 H14 Z M3 14 H10 V21 H3 Z"/><path class="a" d="M14 14 H21 V21 H14 Z"/>',full:'<path class="k" d="M3 9 V3 H9 M15 3 H21 V9 M21 15 V21 H15 M9 21 H3 V15"/><path class="a" d="M10 10 H14 V14 H10 Z"/>',ajustes:'<path class="k" d="M10 2 H14 L15 5 L18 4 L20 6 L19 9 L22 10 V14 L19 15 L20 18 L18 20 L15 19 L14 22 H10 L9 19 L6 20 L4 18 L5 15 L2 14 V10 L5 9 L4 6 L6 4 L9 5 Z"/><path class="a" d="M10 10 H14 V14 H10 Z"/>',mic:'<path class="k" d="M9 3 H15 V13 H9 Z"/><path class="k" d="M6 10 V13 L9 17 H15 L18 13 V10 M12 17 V21"/><path class="a" d="M10.5 6 H13.5 V7.5 H10.5 Z M10.5 9 H13.5 V10.5 H10.5 Z"/>',enviar:'<path class="f" d="M2 3 L22 12 L2 21 L5 12 Z"/><path class="a" d="M5 12 H13 L5 13.5 Z"/>',abrir:'<path class="k" d="M14 3 H21 V10 M21 3 L12 12 M10 5 H3 V21 H19 V14"/>',cerrar:'<path class="k" d="M5 5 L19 19 M19 5 L5 19"/><path class="a" d="M10.5 10.5 H13.5 V13.5 H10.5 Z"/>',ocultar:'<path class="k" d="M4 16 H20"/><path class="a" d="M4 19 H12 V21 H4 Z"/>',nueva:'<path class="k" d="M12 4 V20 M4 12 H20"/><path class="a" d="M10 10 H14 V14 H10 Z"/>',biochip:'<path class="k" d="M6 4 H18 L20 6 V18 L18 20 H6 L4 18 V6 Z"/><path class="k" d="M8 1 V4 M12 1 V4 M16 1 V4 M8 20 V23 M12 20 V23 M16 20 V23"/><path class="a" d="M9 9 H15 V15 H9 Z"/>',stop:'<path class="f" d="M6 6 H18 V18 H6 Z"/><path class="a" d="M10 10 H14 V14 H10 Z"/>'};
+const ico=k=>'<svg class="ci" viewBox="0 0 24 24" aria-hidden="true">'+ICO[k]+'</svg>';
 const GIFS={"emocionada": "assets/emocionada.webp", "enojada": "assets/enojada.webp", "escuchando": "assets/escuchando.webp", "glitch_entrada": "assets/glitch_entrada.webp", "glitch_fuerte": "assets/glitch_fuerte.webp", "hipnosis": "assets/hipnosis.webp", "mirada_intensa": "assets/mirada_intensa.webp", "observando": "assets/observando.webp", "pensando": "assets/pensando.webp", "presumida": "assets/presumida.webp", "risa_malvada": "assets/risa_malvada.webp", "sonrisa_traviesa": "assets/sonrisa_traviesa.webp", "sorpresa": "assets/sorpresa.webp"};
 // ================= PERSONALIDAD =================
 const TAGS=['observando','pensando','sonrisa_traviesa','sorpresa','risa_malvada','glitch_entrada','enojada','mirada_intensa','escuchando','hipnosis','glitch_fuerte','emocionada','presumida'];
@@ -920,7 +929,7 @@ async function startRec(auto){if(recording||busy)return;window.speechSynthesis?.
   try{micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});}
   catch(e){line('s','(No me diste permiso del micrófono. Revisa el candado 🔒 junto a la dirección.)');cfg.hands=false;btns();return;}
   recording=true;chunks=[];mediaRec=new MediaRecorder(micStream);mediaRec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};mediaRec.onstop=onRecStop;mediaRec.start(250);
-  $('mic').classList.add('rec');$('mic').textContent='■';mmic.textContent='■';$('inrow').classList.add('listening');setState('escuchando');core('LISTENING');log('micrófono abierto','y');bump();
+  $('mic').classList.add('rec');$('mic').innerHTML=ico('stop');mmic.innerHTML=ico('stop');$('inrow').classList.add('listening');setState('escuchando');core('LISTENING');log('micrófono abierto','y');bump();
   actx=actx||new (window.AudioContext||window.webkitAudioContext)();const src=actx.createMediaStreamSource(micStream);anal=actx.createAnalyser();anal.fftSize=512;src.connect(anal);
   const data=new Uint8Array(anal.fftSize);let spoke=false,lastLoud=performance.now(),t0=performance.now();const bars=[...$('bars').children];
   const thr=0.06-cfg.sens*0.005; // sensibilidad
@@ -931,7 +940,7 @@ async function startRec(auto){if(recording||busy)return;window.speechSynthesis?.
     else if(!spoke&&now-t0>(auto?12000:8000))stopRec(true);  // nunca habló
     else if(now-t0>45000)stopRec();},60);}
 function stopRec(discard){if(!recording)return;recording=false;clearInterval(vadTimer);mediaRec.discard=!!discard;try{mediaRec.stop();}catch(e){}micStream.getTracks().forEach(t=>t.stop());
-  $('mic').classList.remove('rec');$('mic').textContent='🎤';mmic.textContent='🎤';$('inrow').classList.remove('listening');log('micrófono cerrado','g');}
+  $('mic').classList.remove('rec');$('mic').innerHTML=ico('mic');mmic.innerHTML=ico('mic');$('inrow').classList.remove('listening');log('micrófono cerrado','g');}
 async function onRecStop(){const discard=mediaRec.discard;if(discard||!chunks.length){setState('observando');core('DORMANT');if(cfg.hands)line('s','(No te escuché… dale al 🎤 o vuelve a activar 🎙 cuando quieras.)');cfg.hands=false;btns();return;}
   try{const blob=new Blob(chunks,{type:mediaRec.mimeType||'audio/webm'});const wav=await toWav16k(await blob.arrayBuffer());
     await respond(VOICE_PROMPT(cfg.name||'Kiga'),{inlineData:{mimeType:'audio/wav',data:b64(wav)}},'voice');}
@@ -1036,7 +1045,7 @@ $('drop').onclick=()=>$('file').click();$('file').onchange=e=>{addFiles([...e.ta
 $('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('over');};$('drop').ondragleave=()=>$('drop').classList.remove('over');
 $('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('over');addFiles([...e.dataTransfer.files]);};
 $('bCfg').onclick=openCfg;$('bWatch').onclick=()=>watching?stopWatch():startWatch();
-function btns(){$('bVoice').innerHTML=cfg.voice?'<span class="gl">🔊</span><span class="tx">VOZ</span>':'<span class="gl">🔇</span><span class="tx">VOZ</span>';$('bVoice').classList.toggle('act',cfg.voice);$('bAlive').classList.toggle('act',cfg.alive);
+function btns(){$('bVoice').innerHTML=cfg.voice?'<span class="gl">'+ico('voz')+'</span><span class="tx">VOZ</span>':'<span class="gl">'+ico('silencio')+'</span><span class="tx">VOZ</span>';$('bVoice').classList.toggle('act',cfg.voice);$('bAlive').classList.toggle('act',cfg.alive);
   $('bStudy').classList.toggle('act',cfg.study);$('bHands').classList.toggle('act',cfg.hands);}
 $('bVoice').onclick=()=>{cfg.voice=!cfg.voice;store.set('cfg',cfg);btns();if(!cfg.voice)window.speechSynthesis?.cancel();};
 $('bAlive').onclick=()=>{cfg.alive=!cfg.alive;store.set('cfg',cfg);btns();if(cfg.alive)wander();else{sprite.style.opacity=0;hideBubble();}};
