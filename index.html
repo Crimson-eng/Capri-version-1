@@ -938,7 +938,7 @@ async function startRec(auto){if(recording||busy)return;window.speechSynthesis?.
   clearInterval(vadTimer);vadTimer=setInterval(()=>{anal.getByteTimeDomainData(data);let s=0;for(const v of data){const x=(v-128)/128;s+=x*x;}const rms=Math.sqrt(s/data.length);
     bars.forEach((b,i)=>b.style.height=Math.min(20,3+rms*400*rnd(.5,1.2))+'px');
     const now=performance.now();if(rms>thr){spoke=true;lastLoud=now;}
-    if(spoke&&now-lastLoud>1400)stopRec();                // dejó de hablar
+    if(spoke&&now-lastLoud>1000)stopRec();                // dejó de hablar
     else if(!spoke&&now-t0>(auto?12000:8000))stopRec(true);  // nunca habló
     else if(now-t0>45000)stopRec();},60);}
 function stopRec(discard){if(!recording)return;recording=false;clearInterval(vadTimer);mediaRec.discard=!!discard;try{mediaRec.stop();}catch(e){}micStream.getTracks().forEach(t=>t.stop());
@@ -1206,4 +1206,4 @@ else bootP.then(()=>setTimeout(()=>{setState(cfg.key&&cfg.model?'presumida':'son
 if(DESK){if(cfg.key&&cfg.model)minimize();else expand();}
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
-<script src="medico.js"></script><script src="ingles.js"></script><script src="desk.js"></script></body></html>
+<script src="medico.js"></script><script src="ingles.js"></script><script src="hud.js"></script><script src="desk.js"></script></body></html>

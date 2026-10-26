@@ -4,7 +4,8 @@
 // a Gemini, con libro y página para que los cite. Si está activado, también consulta MedlinePlus y PubMed en línea.
 // Nada de esto se sube al repo: el repo es público y los libros tienen derechos de autor.
 (()=>{
-const MED_DB='capri-medico',CHUNK=1100,OVER=180,TOPK=6,ONLINE_MS=4500;
+const MED_DB='capri-medico',CHUNK=1100,OVER=180,TOPK=6,ONLINE_MS=2500;
+const SALUD=/salud|m[eé]dic|enferm|s[ií]ntom|dolor|duele|fiebre|tos\b|gripa|gripe|infecci|presi[oó]n|az[uú]car|diabet|coraz[oó]n|pulm[oó]n|est[oó]mago|h[ií]gado|ri[ñn][oó]n|cerebr|nervi|hueso|m[uú]scul|piel|sangr|herida|quemad|alergi|medicament|pastilla|dosis|tratamiento|diagn[oó]st|v[oó]mit|diarrea|mareo|embaraz|vacun|virus|bacteri|c[aá]ncer|tumor|ansiedad|depresi|sue[ñn]o|insomnio|nutrici|dieta|anatom|fisiolog|patolog|farmac|cl[ií]nic|hospital|urgenci|sistema|[oó]rgano|c[eé]lula|hormona|tiroides|sindrome|síndrome/i;
 let mdb=null,libros=[],trozos=[],idx=null,ctx=null,fuentes=[];
 const med=Object.assign({on:false,online:true},store.get('med',{}));
 const saveMed=()=>store.set('med',med);
@@ -90,7 +91,8 @@ async function enLinea(q){const got=await Promise.allSettled([withTimeout(medlin
 // ---------- lo que se le manda a Capri ----------
 window.medPrepare=async(q)=>{ctx=null;fuentes=[];if(!med.on||!q||q.length<4)return;const t0=performance.now();
   const loc=search(q);const fuerte=loc.length&&loc[0].s>4;
-  const onl=med.online&&!fuerte?await enLinea(q).catch(()=>[]):[];
+  // solo busca en línea si la pregunta suena a salud: así un "hola" no espera a MedlinePlus/PubMed
+  const onl=med.online&&!fuerte&&SALUD.test(q)?await enLinea(q).catch(()=>[]):[];
   fuentes=[...loc.map(o=>({nombre:o.t.nombre,pag:o.t.pag,text:o.t.text})),...onl];
   if(fuentes.length)log('reservorio: '+fuentes.length+' fuente(s) en '+Math.round(performance.now()-t0)+' ms','g');
   ctx=fuentes.map((f,i)=>`[F${i+1}] ${f.nombre}${f.pag?', p. '+f.pag:''}${f.url?' ('+f.url+')':''}\n${f.text}`).join('\n\n');};
