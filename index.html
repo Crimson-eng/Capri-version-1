@@ -501,7 +501,9 @@ body[data-core=THINKING] .thk{display:flex}
   <small>Las voces más naturales ("Natural" / "Online") salen si abres Capri en <b>Microsoft Edge</b>.</small>
   <label>Velocidad: <span id="vRateV"></span><input id="cRate" type="range" min="0.6" max="1.8" step="0.05"></label>
   <label>Tono (más alto = más traviesa): <span id="vPitchV"></span><input id="cPitch" type="range" min="0" max="2" step="0.05"></label>
-  <div class="row" style="justify-content:flex-start"><button class="btn" id="cTest">▶ Probar voz</button></div>
+  <label>Efectos cyber<select id="cFx"><option value="off">Apagados (voz limpia)</option><option value="suave">Suaves (chip encendiendo, entonación viva)</option><option value="glitch">Glitch (estática, tartamudeos del constructo)</option></select></label>
+  <small>Los efectos suenan aparte de la voz: el navegador no deja meterle eco a su propia voz. El eco metálico de verdad llega con la voz en la nube.</small>
+  <div class="row" style="justify-content:flex-start"><button class="btn" id="cTest">▶ Probar voz</button><button class="btn" id="cPreset">✦ Voz Capri</button></div>
   <h3>Oído</h3>
   <label>Sensibilidad del micrófono: <span id="vSensV"></span><input id="cSens" type="range" min="1" max="10" step="1"></label>
   <small>Si corta antes de que termines de hablar, súbela. Si nunca se detiene sola, bájala.</small>
@@ -635,7 +637,7 @@ const MOOD={observando:'CHILL',pensando:'PROCESSING',sonrisa_traviesa:'GREMLIN',
 const EYE={observando:'mirada_intensa',pensando:'hipnosis',sonrisa_traviesa:'presumida',sorpresa:'sorpresa',risa_malvada:'risa_malvada',glitch_entrada:'glitch_fuerte',glitch_fuerte:'hipnosis',enojada:'mirada_intensa',mirada_intensa:'escuchando',escuchando:'escuchando',hipnosis:'hipnosis',emocionada:'sorpresa',presumida:'presumida'};
 const CORE={DORMANT:['#ff1f55',9],LISTENING:['#2dff8f',2.5],THINKING:['#fff200',1.2],TALKING:['#22e5f0',4]};
 const store={get(k,d){try{const v=localStorage.getItem('capri_'+k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('capri_'+k,JSON.stringify(v))}catch(e){}}};
-let cfg=Object.assign({key:'',model:'',models:[],name:'Kiga',every:60,voice:false,voiceName:'',rate:1.1,pitch:1.4,idle:3,alive:true,noThink:{},sens:5,study:false,hands:false,notif:true,claudeKey:'',claudeModel:'claude-opus-5-5'},store.get('cfg',{}));
+let cfg=Object.assign({key:'',model:'',models:[],name:'Kiga',every:60,voice:false,voiceName:'',rate:1.1,pitch:1.4,fx:'suave',idle:3,alive:true,noThink:{},sens:5,study:false,hands:false,notif:true,claudeKey:'',claudeModel:'claude-opus-5-5'},store.get('cfg',{}));
 if(!cfg.v3){cfg.v3=true;if(!cfg.idle||cfg.idle===6)cfg.idle=3;store.set('cfg',cfg);}
 let history=store.get('history',[]);
 // ================= FRAGMENTOS DEL MOSAICO =================
@@ -695,10 +697,38 @@ function loadVoices(){if(!('speechSynthesis' in window))return;voices=speechSynt
   const nat=v=>/natural|online|neural/i.test(v.name)?0:1;es.sort((a,b)=>nat(a)-nat(b)||(/MX/.test(b.lang)-/MX/.test(a.lang)));
   $('cVoice').innerHTML='<option value="">(automática)</option>'+[...es,...rest].map(v=>`<option value="${v.name.replace(/"/g,'&quot;')}">${v.name} — ${v.lang}</option>`).join('');$('cVoice').value=cfg.voiceName||'';}
 if('speechSynthesis' in window){speechSynthesis.onvoiceschanged=loadVoices;loadVoices();}
-function getVoice(){return voices.find(v=>v.name===cfg.voiceName)||voices.find(v=>/es[-_]MX/i.test(v.lang)&&/natural|online/i.test(v.name))||voices.find(v=>/es[-_](MX|US|419)/i.test(v.lang))||voices.find(v=>/^es/i.test(v.lang));}
+// Voces femeninas en español que mejor le quedan a Capri (Edge "Natural", Google, Apple), en orden de preferencia
+const GOOD_VOICES=/dalia|ximena|elvira|paloma|larissa|marina|beatriz|renata|camila|sabina|paulina|m[oó]nica|helena|elena|luc[ií]a|google espa|female|mujer/i;
+function voiceScore(v){return (/natural|online|neural/i.test(v.name)?4:0)+(GOOD_VOICES.test(v.name)?3:0)+(/es[-_]MX/i.test(v.lang)?2:/es[-_](US|419)/i.test(v.lang)?1:0)+(/^es/i.test(v.lang)?5:-99);}
+function bestVoice(){return [...voices].sort((a,b)=>voiceScore(b)-voiceScore(a))[0];}
+function getVoice(){const b=bestVoice();return voices.find(v=>v.name===cfg.voiceName)||(b&&/^es/i.test(b.lang)?b:undefined);}
+
+// Efectos cyber: el audio de speechSynthesis no se puede pasar por Web Audio, así que el "chip" suena a su lado
+let vctx=null;
+function sfx(kind,mode){if(!mode||mode==='off')return;try{
+  vctx=vctx||new (window.AudioContext||window.webkitAudioContext)();if(vctx.state==='suspended')vctx.resume();
+  const t=vctx.currentTime,out=vctx.createGain();out.gain.value=.08;out.connect(vctx.destination);
+  const beep=(f0,f1,d,type='square',at=0)=>{const o=vctx.createOscillator(),g=vctx.createGain();o.type=type;o.frequency.setValueAtTime(f0,t+at);o.frequency.exponentialRampToValueAtTime(f1,t+at+d);
+    g.gain.setValueAtTime(1,t+at);g.gain.exponentialRampToValueAtTime(.001,t+at+d);o.connect(g).connect(out);o.start(t+at);o.stop(t+at+d+.02);};
+  const noise=(d,at=0,hp=2500)=>{const n=Math.floor(vctx.sampleRate*d),b=vctx.createBuffer(1,n,vctx.sampleRate),c=b.getChannelData(0);
+    for(let i=0,h=0;i<n;i++){if(i%6===0)h=Math.random()*2-1;c[i]=h*(1-i/n);} // ruido "bitcrush" (muestras retenidas)
+    const src=vctx.createBufferSource(),f=vctx.createBiquadFilter();f.type='highpass';f.frequency.value=hp;src.buffer=b;src.connect(f).connect(out);src.start(t+at);};
+  if(kind==='on'){beep(320,1800,.09,'sine');beep(1800,900,.05,'square',.08);if(mode==='glitch')noise(.07,.02);}
+  else if(kind==='off')beep(1200,180,.12,'sine');
+  else{noise(.05+Math.random()*.06,0,1500+Math.random()*3000);if(Math.random()<.5)beep(2400,600,.03,'sawtooth',.03);}
+}catch(e){}}
+// Tartamudeo del constructo: "c-choom", solo en modo glitch y de vez en cuando
+function glitchText(t,mode){if(mode!=='glitch'||Math.random()>.18)return t;
+  return t.replace(/(^|\s)([A-Za-zÁÉÍÓÚáéíóúñÑ])([a-záéíóúñ]{2,})/,(m,sp,a,b)=>sp+a+'-'+a.toLowerCase()+b);}
+let fxOn=false;
 function speakChunk(text,force){if((!cfg.voice&&!force)||!('speechSynthesis' in window)||!text.trim())return;
-  const u=new SpeechSynthesisUtterance(text.replace(/[~:;]\)|:3|>:\)|~/g,''));const v=getVoice();if(v){u.voice=v;u.lang=v.lang;}else u.lang='es-MX';
-  u.rate=cfg.rate;u.pitch=cfg.pitch;speechSynthesis.speak(u);}
+  const mode=cfg.fx||'off',fx=mode!=='off';
+  const u=new SpeechSynthesisUtterance(glitchText(text.replace(/[~:;]\)|:3|>:\)|~/g,''),mode));const v=getVoice();if(v){u.voice=v;u.lang=v.lang;}else u.lang='es-MX';
+  // Con efectos, cada frase varía un poquito de tono y ritmo, como alguien vivo y no un lector de pantalla
+  const j=fx?(Math.random()-.5):0;u.rate=Math.max(.5,cfg.rate+j*.08);u.pitch=Math.min(2,Math.max(0,cfg.pitch+j*.14));
+  u.onstart=()=>{if(!fxOn){fxOn=true;sfx('on',mode);}else if(mode==='glitch'&&Math.random()<.3)sfx('glitch',mode);};
+  u.onend=u.onerror=()=>setTimeout(()=>{if(fxOn&&!speechSynthesis.speaking&&!speechSynthesis.pending){fxOn=false;sfx('off',mode);}},250);
+  speechSynthesis.speak(u);}
 const isSpeaking=()=>'speechSynthesis' in window&&(speechSynthesis.speaking||speechSynthesis.pending);
 
 // ================= DOCUMENTOS (IndexedDB) =================
@@ -980,19 +1010,21 @@ q.addEventListener('keydown',e=>{if(e.key==='Enter'){const v=q.value;q.value='';
 // ================= AJUSTES Y BOTONES =================
 function syncLbl(){$('vRateV').textContent=(+$('cRate').value).toFixed(2);$('vPitchV').textContent=(+$('cPitch').value).toFixed(2);$('vSensV').textContent=$('cSens').value;}
 function openCfg(){$('cKey').value=cfg.key;$('cName').value=cfg.name;$('cEvery').value=String(cfg.every);$('cIdle').value=String(cfg.idle);$('cNotif').value=cfg.notif?'1':'0';
-  $('cRate').value=cfg.rate;$('cPitch').value=cfg.pitch;$('cSens').value=cfg.sens;syncLbl();loadVoices();
+  $('cRate').value=cfg.rate;$('cPitch').value=cfg.pitch;$('cFx').value=cfg.fx||'off';$('cSens').value=cfg.sens;syncLbl();loadVoices();
   const ms=cfg.models?.length?cfg.models:(cfg.model?[cfg.model]:[]);if(ms.length)$('cModel').innerHTML=ms.map(m=>`<option value="${m}">${m}</option>`).join('');$('cModel').value=cfg.model;renderFrags();
   $('cClaude').value=cfg.claudeKey||'';$('cClaudeModel').value=cfg.claudeModel||'claude-opus-5-5';$('cClaudeSpent').textContent=usd(claudeSpent);$('modal').classList.add('show');}
 $('cRate').oninput=$('cPitch').oninput=$('cSens').oninput=syncLbl;
 $('cFrag').onclick=()=>$('fragFile').click();$('fragFile').onchange=async e=>{for(const f of e.target.files)await addFrag(f);e.target.value='';};
-$('cTest').onclick=()=>{window.speechSynthesis?.cancel();const keep={voiceName:cfg.voiceName,rate:cfg.rate,pitch:cfg.pitch};
-  cfg.voiceName=$('cVoice').value;cfg.rate=+$('cRate').value;cfg.pitch=+$('cPitch').value;speakChunk('¡Ehhh, choom! La hermosa yo estrenando voz. ¿Verdad que suena preciosa?',true);Object.assign(cfg,keep);};
+$('cTest').onclick=()=>{window.speechSynthesis?.cancel();fxOn=false;const keep={voiceName:cfg.voiceName,rate:cfg.rate,pitch:cfg.pitch,fx:cfg.fx};
+  cfg.voiceName=$('cVoice').value;cfg.rate=+$('cRate').value;cfg.pitch=+$('cPitch').value;cfg.fx=$('cFx').value;speakChunk('¡Ehhh, choom! La hermosa yo estrenando voz.',true);speakChunk('¿Damos un paseo? Vamos a divertirnos un rato.',true);Object.assign(cfg,keep);};
+// Preset: la mejor voz femenina en español del equipo, aguda y con un pelín de prisa, con efectos suaves
+$('cPreset').onclick=()=>{const v=bestVoice();$('cVoice').value=v&&/^es/i.test(v.lang)?v.name:'';$('cRate').value=1.05;$('cPitch').value=1.35;$('cFx').value='suave';syncLbl();$('cTest').click();};
 $('cLoad').onclick=async()=>{const key=$('cKey').value.trim();if(!key)return;$('cLoad').textContent='Conectando…';
   try{const ms=await listModels(key);if(!ms.length)throw new Error('No encontré modelos.');cfg.models=ms;
     $('cModel').innerHTML=ms.map(m=>`<option value="${m}">${m}</option>`).join('');$('cModel').value=ms.includes(cfg.model)?cfg.model:rankForFree(ms)[0];$('cLoad').textContent='✔ Conectado';setOnline(true);}
   catch(e){$('cLoad').textContent='✖ '+(/key/i.test(e.message)?'Key inválida':e.message).slice(0,60);setOnline(false);}};
 $('cClose').onclick=()=>{cfg.key=$('cKey').value.trim();cfg.model=$('cModel').value;cfg.name=$('cName').value.trim()||'Kiga';cfg.every=+$('cEvery').value;cfg.idle=+$('cIdle').value;cfg.notif=$('cNotif').value==='1';askNotif();
-  cfg.voiceName=$('cVoice').value;cfg.rate=+$('cRate').value;cfg.pitch=+$('cPitch').value;cfg.sens=+$('cSens').value;cfg.claudeKey=$('cClaude').value.trim();cfg.claudeModel=$('cClaudeModel').value;store.set('cfg',cfg);$('modal').classList.remove('show');$('mdl').textContent=cfg.model||'—';
+  cfg.voiceName=$('cVoice').value;cfg.rate=+$('cRate').value;cfg.pitch=+$('cPitch').value;cfg.fx=$('cFx').value;cfg.sens=+$('cSens').value;cfg.claudeKey=$('cClaude').value.trim();cfg.claudeModel=$('cClaudeModel').value;store.set('cfg',cfg);$('modal').classList.remove('show');$('mdl').textContent=cfg.model||'—';
   if(cfg.key&&cfg.model)setOnline(true);if(watching)schedule();bump();};
 $('cWipe').onclick=()=>{history=[];store.set('history',[]);term.innerHTML='';line('s','(Memoria borrada.)');};
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('show');}));
