@@ -749,7 +749,7 @@ function buildContents(extra){const msgs=history.slice(-30).map(h=>({role:h.role
 async function streamModel(model,parts,onText){
   const gc={temperature:1.1,topP:.95,maxOutputTokens:3072};const tc=thinkCfg(model);if(tc)gc.thinkingConfig=tc;
   const r=await fetch(API+'models/'+encodeURIComponent(model)+':streamGenerateContent?alt=sse',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':cfg.key},
-    body:JSON.stringify({systemInstruction:{parts:[{text:personality(cfg.name||'Kiga',studyText())}]},contents:buildContents([...studyPdfParts(),...parts]),generationConfig:gc})});
+    body:JSON.stringify({systemInstruction:{parts:[{text:personality(cfg.name||'Kiga',studyText())+(window.medPrompt?medPrompt():'')}]},contents:buildContents([...studyPdfParts(),...parts]),generationConfig:gc})});
   if(!r.ok){const j=await r.json().catch(()=>({}));const e=new Error(j.error?.message||('Error '+r.status));e.status=r.status;
     if(r.status===400&&tc&&/think/i.test(e.message)){cfg.noThink[model]=true;store.set('cfg',cfg);return streamModel(model,parts,onText);}throw e;}
   const reader=r.body.getReader(),dec=new TextDecoder();let buf='',full='',finish='';
@@ -861,6 +861,7 @@ async function respond(userText,extra,mode){ // mode: user | watch | idle | voic
       log('respuesta en '+Math.round(performance.now()-t0)+' ms','g');raw=rest;}
     const body=clean(raw).replace(/^\s+/,'');const add=body.slice(shown.length);if(!add)return;ensureLine();shown=body;el.textContent=shown.slice(off).replace(/^\s+/,'');term.scrollTop=1e9;showBubble(shown);
     speakBuf+=add;const mm=[...speakBuf.matchAll(/[.!?…](\s)/g)];if(mm.length){const cut=mm[mm.length-1].index+1;speakChunk(speakBuf.slice(0,cut));speakBuf=speakBuf.slice(cut);}};
+  if(window.medPrepare)await medPrepare(mode==='user'?userText:'');
   try{const full=await ask(parts,onText);setOnline(true);absorbMem(full);M().visto=Date.now();store.set('mem',mem);let body=clean(full).trim();
     if(mode==='voice'){body=body.replace(/^\{[^}]*\}\s*/,'');}
     if(speakBuf.trim())speakChunk(speakBuf);if(cur)cur.remove();
@@ -868,6 +869,7 @@ async function respond(userText,extra,mode){ // mode: user | watch | idle | voic
     history.push({role:'user',text:utext});history.push({role:'model',text:'['+curState+'] '+body});store.set('history',history.slice(-60));
     if(body&&mode!=='watch')opBtn(mode==='idle'?'(Capri habló sola, sin que yo le preguntara nada)':utext,body);
     if(!body){setState('observando');log('nada interesante en pantalla','g');}
+    if(body&&mode==='user')window.medAfter?.();
   }catch(e){if(cur)cur.remove();showError(e);}
   fragNow=null;busy=false;bump();setTimeout(hideBubble,5000);afterTalk();}
 function afterTalk(){const w=setInterval(()=>{if(isSpeaking())return;clearInterval(w);core('DORMANT');if(cfg.hands&&!recording&&!busy)setTimeout(()=>{if(cfg.hands&&!recording&&!busy)startRec(true)},400);},300);}
@@ -963,13 +965,13 @@ async function autoLook(){if(!watching)return;if(!busy&&!recording&&!q.value){co
 
 // ================= CHAT =================
 async function send(v){v=v.trim();if(!v||busy)return;askNotif();window.speechSynthesis?.cancel();bump();line('u',v);const k=v.toLowerCase();
-  if(k==='help'){line('c','CAPRI');line('t',"Háblame normal o por voz (🎤 / Ctrl+Espacio), choom~\n  ¿qué ves? — miro tu pantalla (activa 👁 primero)\n  estudio — abro tu biblioteca\n  sal — me salgo a pasear por la pantalla\n  recuerdos — lo que sé de ti\n  olvida <algo> — borro ese recuerdo\n  fragmentos — los ecos de mi mosaico\n  limpiar — borro mi memoria del chat\n  ajustes — configuración");setState('presumida');return;}
+  if(k==='help'){line('c','CAPRI');line('t',"Háblame normal o por voz (🎤 / Ctrl+Espacio), choom~\n  ¿qué ves? — miro tu pantalla (activa 👁 primero)\n  estudio — abro tu biblioteca\n  médico — abro tu reservorio médico\n  sal — me salgo a pasear por la pantalla\n  recuerdos — lo que sé de ti\n  olvida <algo> — borro ese recuerdo\n  fragmentos — los ecos de mi mosaico\n  limpiar — borro mi memoria del chat\n  ajustes — configuración");setState('presumida');return;}
   if(k==='limpiar'){history=[];store.set('history',[]);term.innerHTML='';line('s','(Memoria borrada.)');setState('glitch_fuerte');return;}
   if(k==='recuerdos'){M();line('c','CAPRI');const a=animoNow();line('t',(mem.hechos.length?'Esto es lo que la hermosa yo sabe de ti~\n'+mem.hechos.map(h=>'  · ['+(MEMCATS[h.c]||h.c)+'] '+h.t).join('\n'):'…todavía no sé casi nada de ti. Cuéntame cosas, choom.')+'\n  ánimo: '+(a?a.n+' '+Math.round(a.i)+'/10'+(a.why?' ('+a.why+')':''):'normal'));setState('presumida');return;}
   if(k.startsWith('olvida ')){M();const n=mem.hechos.length;forget(v.slice(7));store.set('mem',mem);line('c','CAPRI');line('t',mem.hechos.length<n?'…listo. Eso ya no existe en mí. Creo.':'mmm no encontré ese recuerdo.');setState('glitch_entrada');return;}
   if(k==='fragmentos'){line('c','CAPRI');line('t',frags.length?'…ecos que viven en mí: '+frags.map(f=>f.name).join(', ')+'. No les hagas caso. Los tengo controlados. Casi siempre.':'nadie más vive aquí. solo la hermosa yo~ (puedes cargar fragmentos en ⚙)');setState('mirada_intensa');return;}
   if(k.startsWith('despierta ')){const f=frags.find(f=>f.name.toLowerCase()===k.slice(10).trim());if(f)fragForce=f;}
-  if(k==='ajustes'){openCfg();return;}if(k==='estudio'){openLib();return;}
+  if(k==='ajustes'){openCfg();return;}if(k==='estudio'){openLib();return;}if(/^m[eé]dico$/.test(k)){openMed();return;}
   if(k==='sal'){wander();setState('risa_malvada');return;}
   let extra=null;if(watching&&/(ves|ver|pantalla|mira|checa|esto)/i.test(v)){const g=grab();if(g){extra={inlineData:{mimeType:'image/jpeg',data:g.b64}};lastSig=g.sig;}}
   await respond(v,extra,'user');if(watching)schedule();}
@@ -1161,4 +1163,4 @@ else bootP.then(()=>setTimeout(()=>{setState(cfg.key&&cfg.model?'presumida':'son
 if(DESK){if(cfg.key&&cfg.model)minimize();else expand();}
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
-<script src="desk.js"></script></body></html>
+<script src="medico.js"></script><script src="desk.js"></script></body></html>
