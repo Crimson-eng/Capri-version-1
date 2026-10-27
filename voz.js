@@ -14,7 +14,8 @@ const ANIMO={presumida:'presumida y coqueta, con picardía',risa_malvada:'riénd
  emocionada:'muy emocionada, rápida',glitch_entrada:'entrecortada, como con interferencia',glitch_fuerte:'robótica y entrecortada, como con interferencia',
  observando:'tranquila y curiosa',pensando:'pensativa, despacio',sorpresa:'sorprendida',mirada_intensa:'seria e intensa',hipnosis:'susurrando, hipnótica',
  escuchando:'atenta y suave',sonrisa_traviesa:'juguetona y traviesa'};
-cfg.tts=cfg.tts||'nav';cfg.ttsVoice=cfg.ttsVoice||'Leda';cfg.ttsModel=cfg.ttsModel||'gemini-3.8-flash-tts';cfg.ttsStyle=cfg.ttsStyle||'';
+if(!cfg.ttsV2){cfg.ttsV2=true;cfg.tts='gemini';cfg.ttsVoice='Leda';store.set('cfg',cfg);} // Kiga eligió Leda: Gemini queda prendido de entrada
+cfg.tts=cfg.tts||'gemini';cfg.ttsVoice=cfg.ttsVoice||'Leda';cfg.ttsModel=cfg.ttsModel||'gemini-3.8-flash-tts';cfg.ttsStyle=cfg.ttsStyle||'';
 const styleNow=extra=>['chica joven, español de México',ANIMO[curState]||ANIMO.sonrisa_traviesa,cfg.ttsStyle,extra].filter(Boolean).join(', ');
 
 // ---------- pedir el audio ----------
@@ -30,12 +31,16 @@ async function pedir(text,voice,style,model){
     response_format:{type:'audio'},generation_config:{speech_config:[{voice}]}})}).catch(()=>null);
   if(r?.ok){const a=findAudio(await r.json().catch(()=>null));if(a)return a;}
   else if(r&&(r.status===429||r.status===403)){const j=await r.json().catch(()=>({}));const e=new Error(j.error?.message||'Error '+r.status);e.status=r.status;throw e;}
-  // plan B: la forma anterior (generateContent con salida de audio)
-  r=await fetch(API+'models/'+encodeURIComponent(model)+':generateContent',{method:'POST',headers:H,body:JSON.stringify({
-    contents:[{role:'user',parts:[{text:'Dilo con tono '+style+': '+text}]}],
-    generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}}})});
-  const j=await r.json().catch(()=>({}));if(!r.ok){const e=new Error(j.error?.message||'Error '+r.status);e.status=r.status;throw e;}
-  const a=findAudio(j);if(!a)throw new Error('Gemini no devolvió audio');return a;}
+  // plan B: generateContent con salida de audio, primero con su modelo y luego con el TTS anterior por si ese nombre no existe en su cuenta
+  let err=null;
+  for(const m of [model,'gemini-2.5-flash-preview-tts']){
+    r=await fetch(API+'models/'+encodeURIComponent(m)+':generateContent',{method:'POST',headers:H,body:JSON.stringify({
+      contents:[{role:'user',parts:[{text:'Dilo con tono '+style+': '+text}]}],
+      generationConfig:{responseModalities:['AUDIO'],speechConfig:{voiceConfig:{prebuiltVoiceConfig:{voiceName:voice}}}}})}).catch(e=>{err=e;return null;});
+    if(!r)continue;const j=await r.json().catch(()=>({}));
+    if(r.ok){const a=findAudio(j);if(a)return a;err=new Error('Gemini no devolvió audio');continue;}
+    err=new Error(j.error?.message||'Error '+r.status);err.status=r.status;if(r.status===429)throw err;}
+  throw err||new Error('sin respuesta');}
 let actx=null;const AC=()=>actx||(actx=new (window.AudioContext||window.webkitAudioContext)());
 async function decode({data,mime}){const bin=atob(data),u8=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
   const ctx=AC();if(u8[0]===82&&u8[1]===73&&u8[2]===70&&u8[3]===70)return ctx.decodeAudioData(u8.buffer); // "RIFF" = WAV
@@ -71,13 +76,15 @@ function parar(){for(const s of playing)try{s.stop();}catch(e){}playing=[];ends=
 window.ttsBusy=()=>enVuelo||cola.length>0||(actx&&actx.currentTime<ends);
 
 // ---------- hablar: junta frases mientras la anterior se genera, para pedir poquitas veces ----------
-let cola=[],enVuelo=false,fuera=0,avisado=false,fxOn=false,gen=0;
+let cola=[],enVuelo=false,fuera=0,avisado=0,fxOn=false,gen=0,ultimo='todavía no ha hablado';
 async function siguiente(){if(enVuelo||!cola.length)return;enVuelo=true;const text=cola.join(' ');cola=[];const mode=cfg.fx||'off',g=gen;
   try{const buf=await decode(await pedir(text,cfg.ttsVoice,styleNow(),cfg.ttsModel));if(g!==gen)return; // la callaron mientras se generaba
-    if(!fxOn){fxOn=true;sfx('on',mode);}const {end}=tocar(buf,mode);
+    ultimo='Gemini · '+cfg.ttsVoice+' ✔';if(!fxOn){fxOn=true;sfx('on',mode);}const {end}=tocar(buf,mode);
     clearTimeout(siguiente.t);siguiente.t=setTimeout(()=>{if(!window.ttsBusy()){fxOn=false;sfx('off',mode);}},(end-AC().currentTime)*1000+300);}
   catch(e){if(e.status===429||e.status===403)fuera=Date.now()+10*60e3;
-    if(!avisado){avisado=true;log('voz Gemini: '+String(e.message).slice(0,60),'w');line('s','(La voz de Gemini no respondió'+(e.status===429?' (sin cupo por ahora)':'')+'; mientras, hablo con la del navegador.)');}
+    ultimo='navegador — '+(e.status?e.status+': ':'')+String(e.message).slice(0,140);log('voz Gemini: '+String(e.message).slice(0,60),'w');
+    if(Date.now()-avisado>5*60e3){avisado=Date.now();const t='(La voz de Gemini no respondió'+(e.status===429?' (sin cupo por ahora)':'')+': '+String(e.message).slice(0,120)+'. Mientras, hablo con la del navegador.)';
+      line('s',t);if(document.body.classList.contains('desk'))window.deskSay?.('mi voz de Gemini falló, uso la otra',3500);}
     if(g===gen)_speak(text,true);}
   if(g===gen){enVuelo=false;if(cola.length)siguiente();}}
 const _speak=speakChunk;
@@ -97,11 +104,13 @@ const box=document.createElement('div');box.innerHTML=`<h3>Voz de Gemini <small 
  <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" id="cTtsTry" style="width:auto;flex:1;padding:8px 10px">▶ Probar esta voz</button><button class="btn" id="cTtsAll" style="width:auto;flex:1;padding:8px 10px">♫ Comparar las 6 recomendadas</button></div>
  <small id="cTtsSt"></small>`;
 row.after(box);
-const set=()=>{cfg.tts=$('cTts').value;cfg.ttsVoice=$('cTtsVoice').value;cfg.ttsModel=$('cTtsModel').value;cfg.ttsStyle=$('cTtsStyle').value.trim();store.set('cfg',cfg);};
-const load=()=>{$('cTts').value=cfg.tts;$('cTtsVoice').value=cfg.ttsVoice;$('cTtsModel').value=cfg.ttsModel;$('cTtsStyle').value=cfg.ttsStyle;};load();
-['cTts','cTtsVoice','cTtsModel','cTtsStyle'].forEach(id=>$(id).addEventListener('change',set));
-$('bCfg')?.addEventListener('click',()=>setTimeout(load,50));
 const st=t=>{$('cTtsSt').textContent=t;};
+const set=()=>{cfg.tts=$('cTts').value;cfg.ttsVoice=$('cTtsVoice').value;cfg.ttsModel=$('cTtsModel').value;cfg.ttsStyle=$('cTtsStyle').value.trim();store.set('cfg',cfg);};
+const load=()=>{$('cTts').value=cfg.tts;$('cTtsVoice').value=cfg.ttsVoice;$('cTtsModel').value=cfg.ttsModel;$('cTtsStyle').value=cfg.ttsStyle;
+  st(cfg.tts!=='gemini'?'⚠ El motor está en «Voz del navegador»: cámbialo a Gemini para que hable con '+cfg.ttsVoice+'.':!cfg.key?'⚠ Falta tu API key de Google.':'Última vez que habló: '+ultimo);};
+load();['cTts','cTtsVoice','cTtsModel','cTtsStyle'].forEach(id=>$(id).addEventListener('change',()=>{set();load();}));
+$('bCfg')?.addEventListener('click',()=>setTimeout(load,50));
+
 async function prueba(voice){if(!cfg.key){st('Primero pega tu API key de Google arriba.');return false;}set();
   const t0=performance.now();st('Generando '+voice+'…');
   try{const buf=await decode(await pedir($('cTtsText').value||'Hola, choom.',voice,styleNow(),cfg.ttsModel));const mode=$('cFx').value||'off';

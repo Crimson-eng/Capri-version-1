@@ -92,6 +92,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true, nodeIntegration: false, sandbox: true,
       backgroundThrottling: false, // que siga rondando y hablando sola
+      autoplayPolicy: 'no-user-gesture-required', // la voz de Gemini suena aunque no le hayas dado clic
     },
   });
   setMode('desk');
