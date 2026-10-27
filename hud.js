@@ -50,7 +50,11 @@ body:not([data-view=capri]) .app .desk>:not(.hview){visibility:hidden}body:not([
 .cwd .nm{font:600 16px var(--sans);color:var(--hc);letter-spacing:.06em}.cwd .ty{font:10px var(--mono);color:#a0565e;letter-spacing:.2em;text-transform:uppercase}
 .cwd p{margin:4px 0 0;color:#ffd0d4;max-width:640px}.cwd .sp{flex:1}
 /* médico */
-.md{display:grid;grid-template-columns:minmax(260px,1fr) minmax(300px,440px);gap:26px;height:100%;min-height:520px}
+.md{display:grid;grid-template-columns:170px minmax(260px,1fr) minmax(300px,420px);gap:22px;height:100%;min-height:520px}
+.mdz{display:flex;flex-direction:column;gap:4px}.mdz button{display:flex;justify-content:space-between;align-items:center;background:none;border:0;border-left:2px solid #3b1418;color:#d9a3a9;font:12px var(--mono);text-align:left;padding:7px 10px;cursor:pointer}
+.mdz button:hover{color:#fff;border-left-color:var(--hr)}.mdz button.on{color:var(--hg);border-left-color:var(--hg);background:rgba(243,200,75,.06)}.mdz b{background:var(--hg);color:#140c00;font:700 10px var(--mono);padding:0 5px}.mdz b:empty{display:none}
+.mat{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid #2a0d11;padding:5px 0;font-size:12px}.mat span{color:#ffe4e6}.mat em{color:var(--hc);font:10px var(--mono);font-style:normal;text-transform:uppercase;white-space:nowrap}
+.hview .holo.holo3d>svg{display:none}
 .md .zone{cursor:pointer}.md .zone circle.h{fill:rgba(94,246,255,.12);stroke:var(--hc);stroke-width:1}.md .zone:hover circle.h,.md .zone.sel circle.h{fill:rgba(243,200,75,.25);stroke:var(--hg)}
 .md .zone text{font:7px var(--mono);fill:#9fdfe3;letter-spacing:.08em}.md .zone.sel text{fill:var(--hg)}
 .mdp{display:flex;flex-direction:column;gap:14px}
@@ -90,7 +94,7 @@ body:not([data-view=capri]) .app .desk>:not(.hview){visibility:hidden}body:not([
 #hconn .ld i{flex:1;height:6px;background:#2a0d11;position:relative}#hconn .ld i b{position:absolute;inset:0 auto 0 0;width:0;background:var(--hr);box-shadow:0 0 10px var(--hr)}
 #hconn .ld em{font:600 16px var(--sans);color:#fff;font-style:normal;width:40px}
 @media (max-width:980px){.cw{grid-template-columns:1fr;min-height:0}.cw .cap{display:none}.cw .holo{min-height:300px;height:300px;order:-1}.cw .col.r .slots{justify-content:flex-start}.cw .col.r .grp .gl{flex-direction:row}
- .md{grid-template-columns:1fr;min-height:0}.md .holo{height:340px;min-height:340px}.dy{grid-template-columns:1fr}.dyl,.dyd{grid-column:1}.hnav .st{display:none}.hview{padding:16px}}
+ .md{grid-template-columns:1fr;min-height:0}.md .holo{height:380px;min-height:380px}.mdz{flex-direction:row;flex-wrap:wrap}.mdz button{border-left:0;border-bottom:2px solid #3b1418;padding:6px 8px}.dy{grid-template-columns:1fr}.dyl,.dyd{grid-column:1}.hnav .st{display:none}.hview{padding:16px}}
 `;document.head.appendChild(css);
 
 // ---------- cuerpo holográfico (SVG generado, mitad derecha reflejada) ----------
@@ -132,8 +136,9 @@ const AB=[
  {g:'Sistema auditivo',side:'r',k:'voz',n:'Sintetizador de voz',ty:'Sistema auditivo · voz',d:'Capri lee en voz alta lo que te contesta.',b:'bVoice'},
  {g:'Sistema operativo',side:'r',k:'claude',n:'Enlace Mi Claude',ty:'Sistema operativo · netrunning',d:'Abre tu Claude para preguntarle directo o pedir segunda opinión de lo que dijo Capri.',b:'bClaude'},
  {g:'Sistema operativo',side:'r',k:'mini',n:'Biochip flotante',ty:'Sistema operativo · mini Capri',d:'Minimiza a Capri a una ventanita flotante que se queda contigo.',b:'bMini'},
+ {g:'Brazos',side:'l',k:'brazos',n:'Manos de Capri',ty:'Brazos · actuar en tu PC',get d(){const i=window.manosInfo?.();return 'Capri abre programas, páginas o carpetas, escribe donde hagas clic y puede atrapar tu puntero. Te pide permiso antes de cada acción.'+(i&&!i.pc?' En el navegador solo abre páginas y copia texto.':'')+(i?.aprendido.length?' Ha aprendido '+i.aprendido.length+' cosa(s) de ti: '+i.aprendido.slice(-3).map(a=>a.n).join(', ')+'.':' Enséñale dónde están tus cosas y lo recuerda.');},b:'bManos'},
  {g:'Biomonitor',side:'r',k:'medico',n:'Biomonitor médico',ty:'Biomonitor · reservorio',d:'Capri consulta tus apuntes y fuentes verificadas en temas de salud. Se configura en la sección MÉDICO.',b:'bMed',go:'medico'}];
-const icon=k=>k==='ingles'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M4 19 L9 5 L14 19 M6 14 H12"/><path class="a2 k" d="M15 12 H21 M18 9 V19"/></svg>':(typeof ico==='function'?ico(k):'');
+const icon=k=>k==='brazos'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M7 21 V11 L5 8 V4 M7 11 L9 4 M7 11 L12 3 M7 11 L15 5 M7 11 L17 9"/><path class="a2 k" d="M15 16 H21 M18 13 V19"/></svg>':k==='ingles'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M4 19 L9 5 L14 19 M6 14 H12"/><path class="a2 k" d="M15 12 H21 M18 9 V19"/></svg>':(typeof ico==='function'?ico(k):'');
 
 // ---------- estructura ----------
 const VIEWS=[['capri','CAPRI'],['ciberware','CIBERWARE'],['medico','MÉDICO'],['diario','DIARIO']];
@@ -163,34 +168,77 @@ function renderC(){if(!vC.classList.contains('on'))return;
 vC.addEventListener('click',e=>{const s=e.target.closest('.slot[data-i]');if(!s)return;const a=AB[+s.dataset.i];if(sel===a&&!['bClaude','bMini','bMed','bEng','bStudy'].includes(a.b)){click(a.b)();setTimeout(renderC,250);}sel=a;renderC();});
 
 // MÉDICO
-const ZONES=[['nervioso','Sistema nervioso',100,30,'cerebro, nervios, sueño, dolor de cabeza'],['respiratorio','Sistema respiratorio',84,112,'pulmones, tos, asma, respiración'],
- ['circulatorio','Sistema circulatorio',112,118,'corazón, presión, venas y arterias'],['digestivo','Sistema digestivo',106,170,'estómago, hígado, intestino'],
- ['urinario','Sistema renal',88,190,'riñones, vejiga, hidratación'],['endocrino','Sistema endocrino',100,72,'tiroides, hormonas, glucosa'],
- ['musculo','Músculos y huesos',152,204,'músculos, articulaciones, fracturas'],['inmune','Sistema inmune',50,150,'defensas, infecciones, alergias'],
- ['piel','Piel',120,300,'piel, heridas, quemaduras'],['repro','Sistema reproductor',100,232,'salud sexual y reproductiva']];
-let zs=null;
-const vM=mk('vMed',`<div class="md"><div class="holo">${bodySVG(ZONES.map(([k,n,x,y],i)=>`<g class="zone" data-z="${i}"><circle class="h" cx="${x}" cy="${y}" r="7"/><circle cx="${x}" cy="${y}" r="2" fill="#5ef6ff"/><line x1="${x+(x<100?-8:8)}" y1="${y}" x2="${x<100?6:194}" y2="${y}" stroke="#5ef6ff" stroke-opacity=".35" stroke-width=".6"/><text x="${x<100?6:194}" y="${y-3}" text-anchor="${x<100?'start':'end'}">${n.replace('Sistema ','').toUpperCase()}</text></g>`).join(''))}</div>
+const ZONES=[['nervioso','Sistema nervioso',100,30,'cerebro, médula, nervios, sueño, dolor de cabeza'],['respiratorio','Sistema respiratorio',84,112,'pulmones, vías aéreas, tos, asma'],
+ ['circulatorio','Sistema circulatorio',112,118,'corazón, presión, venas y arterias, sangre'],['digestivo','Sistema digestivo',106,170,'estómago, hígado, vesícula, intestino, apéndice'],
+ ['urinario','Sistema renal',88,190,'riñones, vejiga, vías urinarias'],['endocrino','Sistema endocrino',100,72,'tiroides, hormonas, glucosa, páncreas'],
+ ['musculo','Músculos y huesos',152,204,'huesos, articulaciones, columna, fracturas'],['inmune','Sistema inmune',50,150,'defensas, infecciones, alergias, ganglios'],
+ ['piel','Piel',120,300,'piel, heridas, suturas, quemaduras'],['repro','Sistema reproductor',100,232,'embarazo, ginecología, salud sexual']];
+// palabras (raíces sin acentos) que dicen a qué parte del cuerpo pertenece un material o una pregunta
+const LEX={nervioso:'cerebr neuro nervi encefal medula crane epileps convuls migran cefalea ictus derrame demencia alzheimer parkinson meninge sinap neurona glasgow',
+ respiratorio:'pulmon bronq traque alveol respirat asma epoc neumon torax toracotom pleura laring intubac ventilac disnea oxigen espirometr',
+ circulatorio:'corazon cardi arteri vena venos vascular aort coronar infart hipertens sangre hemorrag bypass valvul arritm marcapas anemia trombo embol choque transfus',
+ digestivo:'estomag gastr intestin colon hepat higado vesicul colecist apendic pancreat esofag duoden recto hernia laparoscop laparotom digest biliar cirrosis endoscop periton',
+ urinario:'rinon renal nefr vejiga urinar uretr prostat cistit dialisis litiasis sonda',
+ endocrino:'tiroid hormon insulin diabet glucos endocrin suprarrenal hipofis cortisol metabol obesid',
+ musculo:'hueso oseo fractur articul muscul tendon ligament columna ortoped traumat rodilla cadera femur tibia humero artros osteo esquelet vertebr yeso ferula',
+ inmune:'inmun linf bazo anticuerp vacun alergi infecc antibiot sepsis vih leucocit autoinmun inflamac',
+ piel:'piel derm herida sutur quemad cicatriz incision injerto colgajo apósito aposito curacion',
+ repro:'utero ovari embaraz obstetr ginec parto cesarea mama testic menstru placent fetal gestac anticoncep'};
+const LEXR=Object.fromEntries(Object.entries(LEX).map(([k,v])=>[k,new RegExp('\\b('+v.split(' ').join('|')+')','g')]));
+const norm=s=>String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+function sistemas(text){const t=norm(text).slice(0,400000),out={};let tot=0;for(const [k,re] of Object.entries(LEXR)){const n=(t.match(re)||[]).length;if(n){out[k]=n;tot+=n;}}
+  return Object.entries(out).filter(([,n])=>n>=2&&n/tot>=.12).sort((a,b)=>b[1]-a[1]).map(([k])=>k);}
+const ZN=k=>ZONES.find(z=>z[0]===k);
+let zs=null,mats=[];
+const vM=mk('vMed',`<div class="md"><div class="mdz"><div class="sub">Zonas</div><button data-k="">Vista general</button>${ZONES.map(([k,n])=>`<button data-k="${k}">${n.replace('Sistema ','')}<b data-n="${k}"></b></button>`).join('')}</div>
+<div class="holo" id="mdHolo">${bodySVG(ZONES.map(([k,n,x,y],i)=>`<g class="zone" data-z="${i}"><circle class="h" cx="${x}" cy="${y}" r="7"/><circle cx="${x}" cy="${y}" r="2" fill="#5ef6ff"/><line x1="${x+(x<100?-8:8)}" y1="${y}" x2="${x<100?6:194}" y2="${y}" stroke="#5ef6ff" stroke-opacity=".35" stroke-width=".6"/><text x="${x<100?6:194}" y="${y-3}" text-anchor="${x<100?'start':'end'}">${n.replace('Sistema ','').toUpperCase()}</text></g>`).join(''))}</div>
 <div class="mdp"><div class="box"><div class="sub">Biomonitor // módulo médico</div><div class="row" style="margin-top:8px"><button class="hbtn" id="mdOn">Módulo médico</button><button class="hbtn c" id="mdOnl">MedlinePlus + PubMed</button><button class="hbtn c" id="mdLib">Mis apuntes</button></div>
  <div class="st" id="mdSt" style="margin-top:10px"></div></div>
-<div class="box"><div class="sub">Sistema seleccionado</div><div class="sys" id="mdSys">Toca una zona del cuerpo</div><div class="st" id="mdDesc">o escribe tu pregunta abajo</div><div class="q" id="mdQ"></div>
+<div class="box"><div class="sub">Zona seleccionada</div><div class="sys" id="mdSys">Cuerpo completo</div><div class="st" id="mdDesc">Toca un órgano o elige una zona. Tus materiales se acomodan solos en la parte del cuerpo de la que hablan.</div>
+ <div class="mats" id="mdMats"></div><div class="q" id="mdQ"></div>
  <div class="in"><span>&gt;_</span><input id="mdIn" placeholder="consulta o tema para estudiar…" autocomplete="off"></div></div>
-<div class="warn">Info educativa con fuentes; no sustituye la consulta con tu médico. Si es urgencia: 911.</div></div></div>`);
+<div class="warn">Modelo estilizado, no a escala anatómica exacta. Info educativa con fuentes; no sustituye la consulta con tu médico. Si es urgencia: 911.</div></div></div>`);
 const medCk=id=>document.getElementById(id);
 function renderM(){if(!vM.classList.contains('on'))return;const a=medCk('medOn'),b=medCk('medOnline');
   vM.querySelector('#mdOn').classList.toggle('on',!!a?.checked);vM.querySelector('#mdOn').textContent='Módulo médico: '+(a?.checked?'activo':'apagado');
   vM.querySelector('#mdOnl').classList.toggle('on',!!b?.checked);
-  const docs=document.querySelectorAll('#medDocs > *').length,tot=medCk('medTotal')?.textContent||'';
-  vM.querySelector('#mdSt').innerHTML=`Apuntes cargados: <b>${docs}</b>${tot?' · '+tot:''}${a?.checked?'':' · actívalo para que Capri cite tus fuentes'}`;
-  vM.querySelectorAll('.zone').forEach((g,i)=>g.classList.toggle('sel',zs===i));}
+  vM.querySelector('#mdSt').innerHTML=`Materiales cargados: <b>${mats.length}</b>${a?.checked?'':' · actívalo para que Capri cite tus fuentes'}`;
+  vM.querySelectorAll('.zone').forEach((g,i)=>g.classList.toggle('sel',zs===ZONES[i][0]));
+  vM.querySelectorAll('.mdz button').forEach(b=>b.classList.toggle('on',(b.dataset.k||null)===zs));
+  const cnt=counts();vM.querySelectorAll('.mdz b[data-n]').forEach(b=>{const n=cnt[b.dataset.n]||0;b.textContent=n||'';});
+  const here=zs?mats.filter(m=>m.sis.includes(zs)):mats;
+  vM.querySelector('#mdMats').innerHTML=here.length?`<div class="sub" style="margin-top:10px">${zs?'Tus materiales de esta zona':'Todos tus materiales'}</div>`+here.slice(0,12).map(m=>`<div class="mat"><span>${esc(m.name)}</span><em>${m.sis.map(k=>ZN(k)[1].replace('Sistema ','')).join(' · ')||'general'}</em></div>`).join(''):(zs?'<div class="st" style="margin-top:8px">Aún no tienes materiales de esta zona.</div>':'');}
+function counts(){const c={};for(const m of mats)for(const k of m.sis)c[k]=(c[k]||0)+1;return c;}
+function zone(k,fromHolo){zs=k||null;const z=zs&&ZN(zs);
+  vM.querySelector('#mdSys').textContent=z?z[1]:'Cuerpo completo';vM.querySelector('#mdDesc').textContent=z?z[4]:'Toca un órgano o elige una zona. Tus materiales se acomodan solos en la parte del cuerpo de la que hablan.';
+  const n=z&&z[1].toLowerCase();
+  const qs=z?[`Explícame cómo funciona el ${n}, como para estudiar.`,`¿Qué señales de alarma del ${n} deben llevarme a urgencias?`,`Hazme 5 preguntas de examen sobre el ${n}${mats.some(m=>m.sis.includes(zs))?', usando mis apuntes':''}.`,`Tengo una molestia relacionada con el ${n}: `]:[];
+  vM.querySelector('#mdQ').innerHTML=qs.map((q,i)=>`<button data-q="${i}">${q}</button>`).join('');
+  vM.querySelectorAll('#mdQ button').forEach(b=>b.onclick=()=>{const q=qs[+b.dataset.q];if(q.endsWith(': ')){const i=vM.querySelector('#mdIn');i.value=q;i.focus();}else ask(q);});
+  if(!fromHolo)window.Holo3D?.select(zs);renderM();}
 const flip=id=>{const c=medCk(id);if(!c)return;c.checked=!c.checked;c.dispatchEvent(new Event('change'));renderM();};
 vM.querySelector('#mdOn').onclick=()=>flip('medOn');vM.querySelector('#mdOnl').onclick=()=>flip('medOnline');
 vM.querySelector('#mdLib').onclick=()=>medCk('bMed')?.click();
 function ask(t){if(!t.trim())return;const c=medCk('medOn');if(c&&!c.checked)flip('medOn');go('capri',true);setTimeout(()=>send(t),380);}
-vM.addEventListener('click',e=>{const g=e.target.closest('.zone');if(!g)return;zs=+g.dataset.z;const [,n,,,d]=ZONES[zs];
-  vM.querySelector('#mdSys').textContent=n;vM.querySelector('#mdDesc').textContent=d;
-  const qs=[`Explícame cómo funciona el ${n.toLowerCase()}, como para estudiar.`,`¿Qué señales de alarma del ${n.toLowerCase()} deben llevarme a urgencias?`,`Hazme 5 preguntas de examen sobre el ${n.toLowerCase()}.`,`Tengo una molestia relacionada con el ${n.toLowerCase()}: `];
-  vM.querySelector('#mdQ').innerHTML=qs.map((q,i)=>`<button data-q="${i}">${q}</button>`).join('');
-  vM.querySelectorAll('#mdQ button').forEach(b=>b.onclick=()=>{const q=qs[+b.dataset.q];if(q.endsWith(': ')){const i=vM.querySelector('#mdIn');i.value=q;i.focus();}else ask(q);});renderM();});
+vM.addEventListener('click',e=>{const b=e.target.closest('.mdz button');if(b)return zone(b.dataset.k);const g=e.target.closest('.zone');if(g)zone(ZONES[+g.dataset.z][0]);});
+// el cuerpo 3D sustituye al dibujo plano cuando la compu soporta WebGL
+function mount3D(){const H=window.Holo3D;if(!H)return;
+  if(vM.classList.contains('on')&&!vM.querySelector('#mdHolo canvas')){if(H.attach(vM.querySelector('#mdHolo'),'medico')){H.onPick(k=>zone(k,true));H.setCounts(counts());H.select(zs);}}
+  if(vC.classList.contains('on')&&!vC.querySelector('.holo canvas'))H.attach(vC.querySelector('.holo'),'ciber');}
+addEventListener('holo3d:ready',mount3D);
+// materiales: cada uno se acomoda en el sistema del que habla; los nuevos te avisan a dónde fueron
+let firstMat=store.get('matSeen',null)===null;let seenMat=new Set(store.get('matSeen',[]));
+async function loadMats(){const T=window.medTextos?.();if(!T)return;mats=T.map(m=>({id:m.id,name:m.name,sis:sistemas(m.name+' '+m.text)}));
+  window.Holo3D?.setCounts(counts());const nuevos=mats.filter(m=>!seenMat.has(m.id));
+  if(nuevos.length&&!firstMat){for(const m of nuevos){const k=m.sis[0];
+      const d=line('s med','📍 «'+m.name+'» '+(k?'va a '+ZN(k)[1]+(m.sis.length>1?' (también '+m.sis.slice(1).map(x=>ZN(x)[1].replace('Sistema ','')).join(', ')+')':'')+' — toca aquí para verlo en el cuerpo':'quedó como material general'));
+      if(k){d.style.cursor='pointer';d.onclick=()=>{go('medico');setTimeout(()=>zone(k),900);};}
+      if(k&&cur==='medico'){zone(k);window.Holo3D?.pulse(k);}}}
+  mats.forEach(m=>seenMat.add(m.id));store.set('matSeen',[...seenMat]);firstMat=false;renderM();}
+addEventListener('med:libros',loadMats);setTimeout(loadMats,1500);
+// cuando preguntas algo de salud, se ilumina dónde ocurre
+addEventListener('med:pregunta',e=>{const k=sistemas(e.detail||'')[0];if(!k)return;window.Holo3D?.pulse(k,6000);
+  const d=line('s med','📍 esto pasa en: '+ZN(k)[1]+' — ver en el holograma');d.style.cursor='pointer';d.onclick=()=>{go('medico');setTimeout(()=>zone(k),900);};});
 vM.querySelector('#mdIn').addEventListener('keydown',e=>{if(e.key==='Enter'){ask(e.target.value);e.target.value='';}});
 
 // DIARIO
@@ -244,7 +292,7 @@ async function go(v,quick){if(v===cur)return;const name=VIEWS.find(x=>x[0]===v)[
   streaks(quick?300:420);cur=v;document.body.dataset.view=v;
   nav.querySelectorAll('.t').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
   document.querySelectorAll('.hview').forEach(s=>s.classList.toggle('on',s.id==={ciberware:'vCiber',medico:'vMed',diario:'vDiario'}[v]));
-  renderC();renderM();renderD();stats();if(v==='capri')setTimeout(()=>document.getElementById('q')?.focus(),50);}
+  renderC();renderM();renderD();stats();mount3D();if(v==='capri')setTimeout(()=>document.getElementById('q')?.focus(),50);}
 window.hudGo=go;
 nav.querySelectorAll('.t').forEach(b=>b.onclick=()=>go(b.dataset.v));
 const step=d=>{const i=VIEWS.findIndex(x=>x[0]===cur);go(VIEWS[(i+d+VIEWS.length)%VIEWS.length][0]);};

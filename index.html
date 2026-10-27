@@ -790,7 +790,7 @@ function buildContents(extra){const msgs=history.slice(-30).map(h=>({role:h.role
 async function streamModel(model,parts,onText){
   const gc={temperature:1.1,topP:.95,maxOutputTokens:3072};const tc=thinkCfg(model);if(tc)gc.thinkingConfig=tc;
   const r=await fetch(API+'models/'+encodeURIComponent(model)+':streamGenerateContent?alt=sse',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':cfg.key},
-    body:JSON.stringify({systemInstruction:{parts:[{text:personality(cfg.name||'Kiga',studyText())+(window.medPrompt?medPrompt():'')}]},contents:buildContents([...studyPdfParts(),...parts]),generationConfig:gc})});
+    body:JSON.stringify({systemInstruction:{parts:[{text:personality(cfg.name||'Kiga',studyText())+(window.medPrompt?medPrompt():'')+(window.manosPrompt?manosPrompt():'')}]},contents:buildContents([...studyPdfParts(),...parts]),generationConfig:gc})});
   if(!r.ok){const j=await r.json().catch(()=>({}));const e=new Error(j.error?.message||('Error '+r.status));e.status=r.status;
     if(r.status===400&&tc&&/think/i.test(e.message)){cfg.noThink[model]=true;store.set('cfg',cfg);return streamModel(model,parts,onText);}throw e;}
   const reader=r.body.getReader(),dec=new TextDecoder();let buf='',full='',finish='';
@@ -1206,4 +1206,4 @@ else bootP.then(()=>setTimeout(()=>{setState(cfg.key&&cfg.model?'presumida':'son
 if(DESK){if(cfg.key&&cfg.model)minimize();else expand();}
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
-<script src="medico.js"></script><script src="ingles.js"></script><script src="hud.js"></script><script src="desk.js"></script></body></html>
+<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="hud.js"></script><script type="module" src="holo3d.js"></script><script src="desk.js"></script></body></html>

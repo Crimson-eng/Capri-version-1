@@ -348,6 +348,9 @@ window.deskPetHit=(x,y)=>{if(!S.started||S.stowed||!document.body.classList.cont
   if(rot===90)[u,v]=[v,1-u];else if(rot===-90)[u,v]=[1-v,u];else if(rot===180)[u,v]=[1-u,1-v];if(S.face<0)u=1-u;
   const px=Math.floor(u*a.width),py=Math.floor(v*a.height);return a.data[(py*a.width+px)*4+3]>40;};
 window.deskPetDrag=()=>!!S.drag;
+// para las manos de Capri (manos.js): dónde está su mano y que diga algo
+window.deskPetHand=()=>{if(!S.started||S.stowed)return null;const b=box();return {x:S.x+S.face*b.w*.3,y:b.t+b.h*.45};};
+window.deskSay=(t,ms)=>say(t,ms);
 el.style.pointerEvents='auto';
 el.addEventListener('pointerdown',e=>{if(e.button!==0||!window.deskPetHit(e.clientX,e.clientY))return;e.preventDefault();
   el.setPointerCapture(e.pointerId);S.drag={x:e.clientX,y:e.clientY,dx:e.clientX-S.x,dy:e.clientY-S.y,moved:false};});

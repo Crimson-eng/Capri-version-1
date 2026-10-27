@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('capriDesk', {
   getCfg: () => ipcRenderer.invoke('cfg:get'),
   setCfg: (patch) => ipcRenderer.invoke('cfg:set', patch),
   cursor: () => ipcRenderer.invoke('cursor'),
+  act: (a) => ipcRenderer.invoke('act', a),              // manos de Capri: abrir, escribir, mover el puntero
   windowsNow: () => ipcRenderer.invoke('windows:get'),
   onWindows: on('desk:windows'),                      // tus ventanas (solo Windows): dónde sentarse
   onCfg: on('desk:cfg'),

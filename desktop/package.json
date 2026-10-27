@@ -1,7 +1,7 @@
 {
   "name": "capri-desktop",
   "productName": "Capri",
-  "version": "1.6.2",
+  "version": "1.7.0",
   "description": "Mini Capri rondando por tu escritorio",
   "author": "Kiga",
   "private": true,

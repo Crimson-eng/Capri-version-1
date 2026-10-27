@@ -17,7 +17,9 @@ function mOpen(){return new Promise(res=>{try{const r=indexedDB.open(MED_DB,1);
   r.onsuccess=()=>{mdb=r.result;res();};r.onerror=()=>res();}catch(e){res();}});}
 const mAll=s=>new Promise(res=>{if(!mdb)return res([]);const t=mdb.transaction(s).objectStore(s).getAll();t.onsuccess=()=>res(t.result||[]);t.onerror=()=>res([]);});
 const mTx=(fn)=>new Promise(res=>{if(!mdb)return res();const t=mdb.transaction(['libros','trozos'],'readwrite');fn(t.objectStore('libros'),t.objectStore('trozos'));t.oncomplete=res;t.onerror=res;});
-async function mLoad(){libros=(await mAll('libros')).sort((a,b)=>a.added-b.added);trozos=await mAll('trozos');idx=null;}
+async function mLoad(){libros=(await mAll('libros')).sort((a,b)=>a.added-b.added);trozos=await mAll('trozos');idx=null;dispatchEvent(new Event('med:libros'));}
+// para el holograma del HUD: el texto de cada material, para saber de qué parte del cuerpo habla
+window.medTextos=()=>libros.map(l=>({id:l.id,name:l.name,active:l.active,text:trozos.filter(t=>t.libro===l.id).map(t=>t.text).join(' ')}));
 async function mDel(id){await mTx((L,T)=>{L.delete(id);const r=T.index('libro').openKeyCursor(IDBKeyRange.only(id));r.onsuccess=()=>{const c=r.result;if(c){T.delete(c.primaryKey);c.continue();}};});await mLoad();}
 
 // ---------- texto → palabras ----------
@@ -90,6 +92,7 @@ async function enLinea(q){const got=await Promise.allSettled([withTimeout(medlin
 
 // ---------- lo que se le manda a Capri ----------
 window.medPrepare=async(q)=>{ctx=null;fuentes=[];if(!med.on||!q||q.length<4)return;const t0=performance.now();
+  if(SALUD.test(q))dispatchEvent(new CustomEvent('med:pregunta',{detail:q}));
   const loc=search(q);const fuerte=loc.length&&loc[0].s>4;
   // solo busca en línea si la pregunta suena a salud: así un "hola" no espera a MedlinePlus/PubMed
   const onl=med.online&&!fuerte&&SALUD.test(q)?await enLinea(q).catch(()=>[]):[];

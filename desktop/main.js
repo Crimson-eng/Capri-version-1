@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const http = require('http');
 const { startWindowWatch } = require('./windows');
+const { spawn } = require('child_process');
 
 // Capri viaja dentro de la app (carpeta web/, copiada al armar el .exe) y se sirve solo para esta PC
 // en una dirección fija, para que su key y su memoria no se pierdan entre versiones.
@@ -195,6 +196,44 @@ ipcMain.handle('cfg:get', () => loadPrefs());
 ipcMain.handle('cfg:set', (e, patch) => setPrefs(patch || {}));
 ipcMain.handle('windows:get', () => lastWins);
 // dónde está el ratón, aunque esté sobre otra ventana (para que se asuste o despierte al acercarte)
+// Manos de Capri: abrir programas, páginas o archivos, escribir donde tengas el cursor y mover el puntero.
+// La página solo llega aquí si tú le diste permiso (Ciberware → Manos de Capri). Nada de clics ni de borrar cosas.
+function ps(script, env = {}) {
+  return new Promise((res) => {
+    if (process.platform !== 'win32') return res(false);
+    const c = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
+      { windowsHide: true, env: { ...process.env, ...env } });
+    c.on('exit', (code) => res(code === 0)); c.on('error', () => res(false));
+  });
+}
+// SendKeys trata + ^ % ~ ( ) { } [ ] como teclas especiales: se envuelven en llaves para escribirlas tal cual
+const sendKeysText = (t) => String(t).slice(0, 4000).replace(/[+^%~(){}[\]]/g, (c) => '{' + c + '}').replace(/\r?\n/g, '{ENTER}');
+const OPEN_APP = `$n=$env:CAPRI_ARG; try { Start-Process -ErrorAction Stop $n } catch {
+  $l = Get-ChildItem "$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs","$env:ProgramData\\Microsoft\\Windows\\Start Menu\\Programs" -Recurse -Filter *.lnk -ErrorAction SilentlyContinue | Where-Object { $_.BaseName -like "*$n*" } | Select-Object -First 1
+  if ($l) { Start-Process $l.FullName } else { exit 1 } }`;
+// nunca consolas, editores del registro ni scripts: con eso se puede romper la PC
+const RISKY = /(^|[\\/\s])(cmd|powershell|pwsh|regedit|reg|diskpart|format|shutdown|bcdedit|wscript|cscript|mshta|rundll32|regsvr32|taskkill|del|rm)(\.exe)?(\s|$)|\.(bat|cmd|ps1|vbs|vbe|js|jse|wsf|hta|scr|reg|lnk)$/i;
+ipcMain.handle('act', async (_e, a) => {
+  if (!a || typeof a !== 'object') return false;
+  if (a.type === 'open') {
+    const t = String(a.target || '').trim(); if (!t) return false;
+    if (RISKY.test(t)) return false;
+    if (/^https?:\/\//i.test(t)) { await shell.openExternal(t); return true; }
+    if (/^([a-z]:[\\/]|~[\\/]|%)/i.test(t)) {
+      const p = t.replace(/^~/, app.getPath('home')).replace(/%([^%]+)%/g, (m, v) => process.env[v] || m);
+      return (await shell.openPath(p)) === '';
+    }
+    return ps(OPEN_APP, { CAPRI_ARG: t });
+  }
+  if (a.type === 'type') return ps('Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait($env:CAPRI_ARG)', { CAPRI_ARG: sendKeysText(a.text) });
+  if (a.type === 'cursor' && win && Array.isArray(a.path)) {
+    const b = win.getBounds();
+    const pts = a.path.slice(0, 200).map(([x, y]) => screen.dipToScreenPoint({ x: Math.round(b.x + x), y: Math.round(b.y + y) }));
+    return ps('Add-Type -AssemblyName System.Windows.Forms; foreach($p in ($env:CAPRI_ARG -split ";")){ $c=$p -split ","; [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point([int]$c[0],[int]$c[1]); Start-Sleep -Milliseconds 16 }',
+      { CAPRI_ARG: pts.map((p) => p.x + ',' + p.y).join(';') });
+  }
+  return false;
+});
 ipcMain.handle('cursor', () => {
   if (!win) return null;
   const p = screen.getCursorScreenPoint(), b = win.getBounds();
