@@ -740,7 +740,7 @@ function speakChunk(text,force){if((!cfg.voice&&!force)||!('speechSynthesis' in 
   u.onstart=()=>{if(!fxOn){fxOn=true;sfx('on',mode);}else if(mode==='glitch'&&Math.random()<.3)sfx('glitch',mode);};
   u.onend=u.onerror=()=>setTimeout(()=>{if(fxOn&&!speechSynthesis.speaking&&!speechSynthesis.pending){fxOn=false;sfx('off',mode);}},250);
   speechSynthesis.speak(u);}
-const isSpeaking=()=>'speechSynthesis' in window&&(speechSynthesis.speaking||speechSynthesis.pending);
+const isSpeaking=()=>!!window.ttsBusy?.()||('speechSynthesis' in window&&(speechSynthesis.speaking||speechSynthesis.pending));
 
 // ================= DOCUMENTOS (IndexedDB) =================
 let db=null,docs=[];
@@ -1206,4 +1206,4 @@ else bootP.then(()=>setTimeout(()=>{setState(cfg.key&&cfg.model?'presumida':'son
 if(DESK){if(cfg.key&&cfg.model)minimize();else expand();}
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
-<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="redaccion.js"></script><script src="hud.js"></script><script type="module" src="holo3d.js"></script><script src="desk.js"></script></body></html>
+<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="redaccion.js"></script><script src="voz.js"></script><script src="hud.js"></script><script type="module" src="holo3d.js"></script><script src="desk.js"></script></body></html>
