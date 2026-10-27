@@ -2,6 +2,7 @@
 // Mini Capri ronda por ella; donde no está Capri, los clics pasan a tus otras ventanas.
 const { app, BrowserWindow, Tray, Menu, ipcMain, screen, session, desktopCapturer, shell, nativeImage, globalShortcut } = require('electron');
 const path = require('path');
+const os = require('os');
 const fs = require('fs');
 const http = require('http');
 const { startWindowWatch } = require('./windows');
@@ -283,6 +284,139 @@ ipcMain.handle('act', async (_e, a) => {
   }
   return false;
 });
+// ---------- Taller técnico: diagnosticar y reparar memorias USB (solo Windows) ----------
+// La página propone; aquí se vuelve a comprobar todo: que el disco sea USB/SD, que no sea el de Windows,
+// que la letra sea suya y que no lo hayan cambiado por otro desde que lo viste. Lo que borra o repara
+// corre con permiso de administrador, así que Windows también te pregunta (UAC).
+const USB_LIST = `[Console]::OutputEncoding = [Text.Encoding]::UTF8
+$ErrorActionPreference = 'SilentlyContinue'
+$wp = (Get-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\StorageDevicePolicies' -Name WriteProtect).WriteProtect
+$sysL = $env:SystemDrive.Substring(0,1)
+$disks = @(Get-Disk | Where-Object { $_.BusType -match '^(USB|SD|MMC)$' })
+$out = @(foreach ($d in $disks) {
+  $parts = @(Get-Partition -DiskNumber $d.Number)
+  $vols = @(foreach ($p in $parts) { if ($p.DriveLetter) { $v = Get-Volume -DriveLetter $p.DriveLetter
+    [pscustomobject]@{ letra = [string]$p.DriveLetter; fs = [string]$v.FileSystem; etiqueta = [string]$v.FileSystemLabel; salud = [string]$v.HealthStatus; estado = [string]$v.OperationalStatus; tam = $v.Size; libre = $v.SizeRemaining; soloLectura = [bool]$p.IsReadOnly } } })
+  $sinLetra = @($parts | Where-Object { -not $_.DriveLetter -and $_.Type -notmatch 'Reserved|System' }).Count
+  [pscustomobject]@{ num = $d.Number; nombre = [string]$d.FriendlyName; tam = $d.Size; bus = [string]$d.BusType; estilo = [string]$d.PartitionStyle; soloLectura = [bool]$d.IsReadOnly; offline = [bool]$d.IsOffline; salud = [string]$d.HealthStatus; estado = [string]$d.OperationalStatus; sistema = [bool]($d.IsSystem -or $d.IsBoot -or ($vols | Where-Object { $_.letra -eq $sysL })); particiones = $parts.Count; sinLetra = $sinLetra; volumenes = $vols }
+})
+$idx = @($disks | ForEach-Object { [int]$_.Number })
+$sinMedio = @(Get-CimInstance Win32_DiskDrive | Where-Object { $_.InterfaceType -eq 'USB' -and ($idx -notcontains [int]$_.Index) } | ForEach-Object { [pscustomobject]@{ nombre = [string]$_.Model; medio = [bool]$_.MediaLoaded; estado = [string]$_.Status } })
+$prob = @(Get-PnpDevice -PresentOnly | Where-Object { $_.InstanceId -like 'USB*' -and $_.Status -ne 'OK' -and $_.Status -ne 'Unknown' } | Select-Object -First 8 | ForEach-Object { [pscustomobject]@{ nombre = [string]$_.FriendlyName; estado = [string]$_.Status; clase = [string]$_.Class } })
+[pscustomobject]@{ politicaWP = [int]$wp; discos = $out; sinMedio = $sinMedio; problemas = $prob } | ConvertTo-Json -Depth 5 -Compress`;
+// prueba de lectura/escritura: escribe 8 MB (sin caché), los vuelve a leer, compara y los borra
+const USB_TEST = `[Console]::OutputEncoding = [Text.Encoding]::UTF8
+$r = $env:CAPRI_L + ':\\'
+$res = [ordered]@{ lee = $false; archivos = 0; escribe = $false; verifica = $false; mbps = 0; error = '' }
+try { $res.archivos = @(Get-ChildItem -LiteralPath $r -Force -ErrorAction Stop).Count; $res.lee = $true } catch { $res.error = 'leer: ' + $_.Exception.Message }
+if ($res.lee) {
+  $f = Join-Path $r ('.capri-prueba-' + [guid]::NewGuid().ToString('N').Substring(0,6) + '.bin')
+  try {
+    $b = New-Object byte[] (8MB); (New-Object Random).NextBytes($b)
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $s = New-Object IO.FileStream($f, [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::None, 65536, [IO.FileOptions]::WriteThrough)
+    $s.Write($b, 0, $b.Length); $s.Close(); $sw.Stop()
+    $res.escribe = $true; $res.mbps = [math]::Round(8 / [math]::Max($sw.Elapsed.TotalSeconds, 0.001), 1)
+    $h = New-Object Security.Cryptography.SHA256Managed
+    $res.verifica = [BitConverter]::ToString($h.ComputeHash($b)) -eq [BitConverter]::ToString($h.ComputeHash([IO.File]::ReadAllBytes($f)))
+  } catch { $res.error = 'escribir: ' + $_.Exception.Message } finally { Remove-Item -LiteralPath $f -Force -ErrorAction SilentlyContinue }
+}
+$res | ConvertTo-Json -Compress`;
+// rescatar: copia todo lo legible a la PC; robocopy reintenta poco y sigue con lo demás si un archivo está dañado
+const USB_RESCUE = `[Console]::OutputEncoding = [Text.Encoding]::UTF8
+New-Item -ItemType Directory -Force -Path $env:CAPRI_DST | Out-Null
+robocopy ($env:CAPRI_L + ':\\') $env:CAPRI_DST /E /R:1 /W:1 /XJ /NP /NFL /NDL /COPY:DT /DCOPY:T /XD 'System Volume Information' '$RECYCLE.BIN' | Out-String
+exit $LASTEXITCODE`;
+const USB_EJECT = `$d = (New-Object -ComObject Shell.Application).Namespace(17).ParseName($env:CAPRI_L + ':'); if (-not $d) { exit 2 }
+$d.InvokeVerb('Eject'); Start-Sleep -Seconds 2; if (Test-Path ($env:CAPRI_L + ':\\')) { exit 3 }`;
+// lo que necesita administrador, ya con valores comprobados (número de disco, letra, sistema de archivos y nombre limpios)
+const FMT_OUT = `Format-List DriveLetter, FileSystem, FileSystemLabel, Size, SizeRemaining, HealthStatus | Out-String`;
+const ADMIN = {
+  revisar: ({ L }) => `chkdsk ${L}: | Out-String\n$global:capriCode = $LASTEXITCODE`,
+  reparar: ({ L }) => `chkdsk ${L}: /f /x | Out-String\n$global:capriCode = $LASTEXITCODE`,
+  desproteger: ({ N }) => `$k = 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\StorageDevicePolicies'
+if ((Get-ItemProperty -Path $k -Name WriteProtect -ErrorAction SilentlyContinue).WriteProtect -eq 1) { Set-ItemProperty -Path $k -Name WriteProtect -Value 0 -ErrorAction Stop; 'Política WriteProtect de Windows: 1 -> 0' }
+$d = Get-Disk -Number ${N} -ErrorAction Stop
+if ($d.IsOffline) { Set-Disk -Number ${N} -IsOffline $false -ErrorAction Stop; 'Disco puesto en línea' }
+if ($d.IsReadOnly) { Set-Disk -Number ${N} -IsReadOnly $false -ErrorAction Stop; 'Atributo de solo lectura del disco quitado' }
+Get-Partition -DiskNumber ${N} -ErrorAction SilentlyContinue | Where-Object { $_.IsReadOnly } | ForEach-Object { Set-Partition -DiskNumber ${N} -PartitionNumber $_.PartitionNumber -IsReadOnly $false -ErrorAction Stop; 'Solo lectura quitado de la partición ' + $_.PartitionNumber }
+Start-Sleep -Seconds 1
+if ((Get-Disk -Number ${N}).IsReadOnly) { 'SIGUE EN SOLO LECTURA'; $global:capriCode = 4 } else { 'El disco ya no está en solo lectura' }`,
+  letra: ({ N }) => `if ((Get-Disk -Number ${N} -ErrorAction Stop).IsOffline) { Set-Disk -Number ${N} -IsOffline $false -ErrorAction Stop; 'Disco puesto en línea' }
+$p = Get-Partition -DiskNumber ${N} -ErrorAction Stop | Where-Object { -not $_.DriveLetter -and $_.Type -notmatch 'Reserved|System' } | Select-Object -First 1
+if (-not $p) { 'No hay partición sin letra'; $global:capriCode = 2 } else {
+  Add-PartitionAccessPath -DiskNumber ${N} -PartitionNumber $p.PartitionNumber -AssignDriveLetter -ErrorAction Stop
+  'Letra asignada: ' + (Get-Partition -DiskNumber ${N} -PartitionNumber $p.PartitionNumber).DriveLetter }`,
+  formatear: ({ L, FS, LBL }) => `Format-Volume -DriveLetter ${L} -FileSystem ${FS} -NewFileSystemLabel '${LBL}' -Confirm:$false -Force -ErrorAction Stop | ${FMT_OUT}`,
+  reconstruir: ({ N, FS, LBL }) => `$d = Get-Disk -Number ${N} -ErrorAction Stop
+if ($d.IsOffline) { Set-Disk -Number ${N} -IsOffline $false -ErrorAction Stop }
+if ($d.IsReadOnly) { Set-Disk -Number ${N} -IsReadOnly $false -ErrorAction Stop }
+if ($d.PartitionStyle -ne 'RAW') { Clear-Disk -Number ${N} -RemoveData -RemoveOEM -Confirm:$false -ErrorAction Stop; 'Disco limpiado' }
+Initialize-Disk -Number ${N} -PartitionStyle MBR -ErrorAction Stop; 'Tabla de particiones MBR nueva'
+$p = New-Partition -DiskNumber ${N} -UseMaximumSize -AssignDriveLetter -ErrorAction Stop
+Start-Sleep -Seconds 2
+Format-Volume -Partition $p -FileSystem ${FS} -NewFileSystemLabel '${LBL}' -Confirm:$false -Force -ErrorAction Stop | ${FMT_OUT}`,
+};
+const psq = (s) => String(s).replace(/'/g, "''");
+async function psAdmin(body) {
+  if (process.platform !== 'win32') return { code: -1, out: '', why: 'no-windows' };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'capri-tec-'));
+  const f = path.join(dir, 'tarea.ps1'), log = path.join(dir, 'salida.txt'), rc = path.join(dir, 'codigo.txt');
+  fs.writeFileSync(f, '﻿' + `$ErrorActionPreference = 'Continue'
+$global:capriCode = 0
+try { & {
+${body}
+} *>&1 | Out-File -Encoding utf8 -FilePath '${psq(log)}' } catch { $_ | Out-String | Out-File -Append -Encoding utf8 -FilePath '${psq(log)}'; $global:capriCode = 1 }
+Set-Content -Path '${psq(rc)}' -Value $global:capriCode`, 'utf8');
+  const r = await psx(`try { Start-Process powershell.exe -Verb RunAs -Wait -WindowStyle Hidden -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File',('"' + $env:CAPRI_F + '"') -ErrorAction Stop } catch { exit 5 }`, { CAPRI_F: f });
+  const read = (p) => { try { return fs.readFileSync(p, 'utf8').replace(/^﻿/, '').trim(); } catch { return ''; } };
+  const out = read(log), code = r.code === 5 ? -2 : parseInt(read(rc), 10);
+  fs.rm(dir, { recursive: true, force: true }, () => {});
+  return { code: Number.isNaN(code) ? -1 : code, out, why: r.code === 5 ? 'uac' : '' };
+}
+async function usbList() { const r = await psx(USB_LIST); try { return JSON.parse(r.out); } catch { return null; } }
+// ¿ese disco es de verdad una USB/SD tuya, y no el disco de Windows?
+async function usbTarget(a) {
+  const L = await usbList(); if (!L) return { why: 'no-lista' };
+  const d = (L.discos || []).find((x) => x && x.num === Number(a.disco));
+  if (!d) return { why: 'no-encontre' };
+  if (!/^(USB|SD|MMC)$/.test(d.bus) || d.sistema) return { why: 'no-usb' };
+  if (a.tam != null && Number(a.tam) !== Number(d.tam)) return { why: 'cambio' };
+  let letra = '';
+  if (a.letra) {
+    letra = String(a.letra).toUpperCase();
+    if (!/^[D-Z]$/.test(letra) || !(d.volumenes || []).some((v) => v && v.letra === letra)) return { why: 'letra' };
+  }
+  return { d, letra };
+}
+const tail = (s, n = 3500) => (s.length > n ? '…' + s.slice(-n) : s);
+ipcMain.handle('tec', async (_e, a) => {
+  if (!a || typeof a !== 'object') return { ok: false, why: 'nada' };
+  if (process.platform !== 'win32') return { ok: false, why: 'no-windows' };
+  if (a.type === 'usb') { const L = await usbList(); return L ? { ok: true, data: L } : { ok: false, why: 'no-lista' }; }
+  const t = await usbTarget(a); if (t.why) return { ok: false, why: t.why };
+  const { d, letra } = t, N = d.num;
+  const needL = ['probar', 'revisar', 'reparar', 'rescatar', 'formatear', 'expulsar'];
+  if (needL.includes(a.type) && !letra) return { ok: false, why: 'sin-letra' };
+  if (a.type === 'probar') { const r = await psx(USB_TEST, { CAPRI_L: letra }); try { return { ok: true, data: JSON.parse(r.out) }; } catch { return { ok: false, why: 'error', out: r.out }; } }
+  if (a.type === 'expulsar') { const r = await psx(USB_EJECT, { CAPRI_L: letra }); return { ok: r.code === 0, why: { 2: 'no-encontre', 3: 'ocupada' }[r.code] || (r.code ? 'error' : '') }; }
+  if (a.type === 'rescatar') {
+    const v = d.volumenes.find((x) => x.letra === letra), stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
+    const nombre = (String(v?.etiqueta || '').replace(/[^\w -]/g, '').trim() || 'USB-' + letra) + '-' + stamp;
+    const dst = path.join(app.getPath('documents'), 'Capri-rescate', nombre);
+    const r = await psx(USB_RESCUE, { CAPRI_L: letra, CAPRI_DST: dst });
+    if (r.code >= 0 && fs.existsSync(dst)) shell.openPath(dst);
+    return { ok: r.code >= 0 && r.code < 8, code: r.code, out: tail(r.out, 1500), dest: dst, why: r.code >= 8 ? 'parcial' : r.code < 0 ? 'error' : '' };
+  }
+  if (!ADMIN[a.type]) return { ok: false, why: 'nada' };
+  const FS = { exfat: 'exFAT', fat32: 'FAT32', ntfs: 'NTFS' }[String(a.fs || 'exfat').toLowerCase()];
+  if (!FS) return { ok: false, why: 'fs' };
+  if (FS === 'FAT32' && (a.type === 'formatear' || a.type === 'reconstruir') && d.tam > 32 * 1024 ** 3) return { ok: false, why: 'fat32-grande' };
+  const LBL = String(a.etiqueta || 'CAPRI').replace(/[^A-Za-z0-9 _-]/g, '').trim().slice(0, 11) || 'CAPRI';
+  const r = await psAdmin(ADMIN[a.type]({ N, L: letra, FS, LBL }));
+  return { ok: r.code === 0 || (/revisar|reparar/.test(a.type) && r.code >= 0 && r.code < 3), code: r.code, out: tail(r.out), why: r.why || (r.code ? 'error' : '') };
+});
+
 ipcMain.handle('cursor', () => {
   if (!win) return null;
   const p = screen.getCursorScreenPoint(), b = win.getBounds();
