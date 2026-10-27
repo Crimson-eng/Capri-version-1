@@ -5,9 +5,11 @@
 // También aprende con tu GPU: guarda cada plática en una memoria buscable y antes de contestar busca lo que
 // viene al caso; y cada tanto relee lo último y saca datos nuevos de ti para su memoria de siempre.
 // Ollama acepta llamadas desde 127.0.0.1, así que funciona en Capri de escritorio (el .exe) sin configurar nada.
+// Tercer cerebro opcional: Claude (API de Anthropic, con la misma key de «Mi Claude»). Queda apagado hasta que
+// haya key y lo prendas; entonces lo pesado va a Claude, con un tope de gasto que tú pones.
 (()=>{
 const OLL='http://127.0.0.1:11434';
-const cer=Object.assign({modo:'auto',modelo:'',emb:'',aprende:true},store.get('cerebro',{}));
+const cer=Object.assign({modo:'auto',modelo:'',emb:'',aprende:true,claude:'off',tope:5},store.get('cerebro',{}));
 const save=()=>store.set('cerebro',cer);
 let ok=false,modelos=[],ultimo='',modoAct='user';
 const esEmb=n=>/embed|bge|minilm|e5-|gte|arctic/i.test(n);
@@ -20,7 +22,7 @@ async function ver(){
   pinta();return ok;}
 setInterval(ver,60000);setTimeout(ver,1500);
 const listo=()=>ok&&!!cer.modelo;
-window.cerebroInfo=()=>({ok,modelo:cer.modelo,modo:cer.modo,emb:cer.emb,mems:mems.length,ultimo});
+window.cerebroInfo=()=>({ok,modelo:cer.modelo,modo:cer.modo,emb:cer.emb,mems:mems.length,ultimo,claude:cer.claude,claudeKey:!!cfg.claudeKey,gasto:claudeSpent,tope:cer.tope});
 
 // ---------- ¿quién contesta? ----------
 const PESADO=/\b(explica|expl[ií]came|analiza|resume|resumen|c[oó]digo|programa|script|traduce|examen|investiga|compara|calcula|ecuaci[oó]n|ensayo|tarea|redacta|escr[ií]beme)\b|por qu[eé]|c[oó]mo funciona/i;
@@ -39,9 +41,9 @@ function sysPrompt(){const name=cfg.name||'Kiga';
   // la hora va al final: si cambia al principio, Ollama tiene que releer todo el texto en cada mensaje
   const now=new Date().toLocaleString('es-MX',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'});
   s=s.replace('Ahora es '+now+'.','');
-  return s+`\n\nAhora es ${now}${now.endsWith('.')?'':'.'}\nEmpieza SIEMPRE con tu estado entre corchetes, ej. [presumida]. Contesta en español, corto y natural.`;}
+  return [s,`Ahora es ${now}${now.endsWith('.')?'':'.'}\nEmpieza SIEMPRE con tu estado entre corchetes, ej. [presumida]. Contesta en español, corto y natural.`];}
 async function local(parts,onText){
-  const msgs=[{role:'system',content:sysPrompt()}];
+  const msgs=[{role:'system',content:sysPrompt().join('\n\n')}];
   for(const h of history.slice(-12))msgs.push({role:h.role==='model'?'assistant':'user',content:h.text});
   msgs.push({role:'user',content:parts.filter(p=>p.text).map(p=>p.text).join('\n')});
   const m2=[];for(const m of msgs){const l=m2[m2.length-1];if(l&&l.role===m.role&&m.role!=='system')l.content+='\n'+m.content;else m2.push({...m});}
@@ -59,14 +61,46 @@ async function local(parts,onText){
   marca('GPU · '+cer.modelo);return full;}
 function marca(quien){ultimo=quien;const el=$('mdl');if(el)el.textContent=quien==='nube'?(cfg.model||'—'):quien;log('cerebro: '+(quien==='nube'?'Gemini':quien),'g');pinta();}
 
+// ---------- pensar con Claude ----------
+let claudeFuera=0;
+const claudeOk=()=>cer.claude!=='off'&&!!cfg.claudeKey&&claudeSpent<cer.tope&&Date.now()>claudeFuera;
+function rutaClaude(parts){if(!claudeOk()||modoAct==='watch'||modoAct==='idle')return false;
+  if(parts.some(p=>p.inlineData&&/^audio/.test(p.inlineData.mimeType)))return false;   // Claude no oye audio: la voz sigue en Gemini
+  if(cer.claude==='siempre')return true;
+  const t=parts.map(p=>p.text||'').join(' ');
+  return parts.some(p=>p.inlineData)||(cfg.study&&!!studyText())||t.length>=260||PESADO.test(t)||SALUD.test(t);}
+async function claudeBrain(parts,onText){
+  const [base,hora]=sysPrompt();
+  // lo que no cambia va primero y se marca para caché: Anthropic cobra menos por releerlo
+  const system=[{type:'text',text:base,cache_control:{type:'ephemeral'}},{type:'text',text:hora}];
+  const msgs=[];const add=(role,content)=>{const l=msgs[msgs.length-1];if(l&&l.role===role)l.content.push(...content);else msgs.push({role,content:[...content]});};
+  for(const h of history.slice(-16))add(h.role==='model'?'assistant':'user',[{type:'text',text:h.text}]);
+  while(msgs.length&&msgs[0].role!=='user')msgs.shift();
+  const cur=[];for(const p of [...studyPdfParts(),...parts]){const d=p.inlineData;
+    if(d&&/^image\//.test(d.mimeType))cur.push({type:'image',source:{type:'base64',media_type:d.mimeType,data:d.data}});
+    else if(d&&d.mimeType==='application/pdf')cur.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:d.data}});
+    else if(p.text)cur.push({type:'text',text:p.text});}
+  add('user',cur);
+  const {full,cost}=await claudeStream(system,msgs,onText,4096);
+  marca('Claude · '+(cfg.claudeModel||'claude-opus-5-5'));log('Claude: ~'+usd(cost)+' · total '+usd(claudeSpent),'y');
+  if(claudeSpent>=cer.tope)line('s','(◆ Llegaste a tu tope de gasto de Claude ('+usd(cer.tope)+'). Sigo con Gemini y tu GPU; súbelo en AJUSTES → Cerebro si quieres.)');
+  return full;}
+function claudeFallo(e){const m=String(e.message||'');
+  const sinCredito=/credit balance|billing|purchase credits/i.test(m),key=e.status===401||e.status===403;
+  claudeFuera=Date.now()+(sinCredito||key?30:5)*60e3;
+  line('s','(◆ Claude no respondió'+(sinCredito?': tu cuenta de Anthropic no tiene créditos todavía':key?': la key no es válida':' ('+m.slice(0,80)+')')+'. Te contesto con otro cerebro.)');}
+
 // ---------- el que decide ----------
 const _ask=ask;
 ask=async(parts,onText)=>{
   const rec=await recordar(parts).catch(()=>'');const p2=rec?[{text:rec},...parts]:parts;
+  if(rutaClaude(parts)){let dijo=false;try{return await claudeBrain(p2,x=>{dijo=true;onText(x);});}catch(e){if(dijo)throw e;claudeFallo(e);}}
   if(rutaLocal(parts)){let dijo=false;try{return await local(p2,x=>{dijo=true;onText(x);});}catch(e){log(String(e.message).slice(0,60),'w');if(dijo||!cfg.key||!cfg.model)throw e;}}
   let algo=false;
   try{const t=await _ask(p2,x=>{algo=true;onText(x);});marca('nube');return t;}
   catch(e){const caido=e.status===429||e.status>=500||e.message==='NOKEY'||e instanceof TypeError;
+    if(!algo&&caido&&claudeOk()&&!parts.some(p=>p.inlineData&&/^audio/.test(p.inlineData.mimeType))){
+      line('s','(Gemini no respondió; te contesto con Claude.)');try{return await claudeBrain(p2,onText);}catch(e2){claudeFallo(e2);}}
     if(algo||!caido||!listo()||cer.modo==='gemini'||parts.some(p=>p.inlineData))throw e;
     line('s','(Gemini no respondió'+(e.status===429?' (sin cupo)':e instanceof TypeError?' (sin internet)':'')+'; te contesto con el cerebro de tu GPU.)');
     return local(p2,onText);}};
@@ -121,6 +155,11 @@ btn.onclick=async()=>{await ver();
   else cer.modo='gemini';save();pinta();
   line('s',cer.modo==='auto'?'(🧠 Cerebro doble activo: tu GPU ('+cer.modelo+') contesta la plática y lo que digo sola; lo pesado sigue en Gemini.)':'(🧠 Cerebro de tu GPU apagado: todo va a Gemini.)');};
 document.querySelector('.dock .tools')?.appendChild(btn);
+const bCl=document.createElement('button');bCl.id='bClaudeBrain';bCl.className='btn';bCl.style.display='none';bCl.title='Coprocesador Claude';
+bCl.onclick=()=>{if(cer.claude!=='off'){cer.claude='off';save();pinta();return line('s','(◆ Coprocesador Claude apagado: lo pesado vuelve a Gemini.)');}
+  if(!cfg.claudeKey)return line('s','(◆ El coprocesador Claude está instalado pero sin energía: cuando compres créditos en console.anthropic.com, crea una API key y pégala en AJUSTES → «API key de Claude». Luego vuelve a activarlo aquí.)');
+  cer.claude='pesado';save();pinta();line('s','(◆ Coprocesador Claude activo: lo pesado (explicaciones, salud, estudio, imágenes) lo piensa Claude, con tope de '+usd(cer.tope)+'.)');};
+document.querySelector('.dock .tools')?.appendChild(bCl);
 
 // ---------- panel en Ajustes ----------
 const box=document.createElement('div');box.innerHTML=`<h3>Cerebro de tu GPU <small style="font-weight:400">· Ollama</small></h3>
@@ -130,18 +169,28 @@ const box=document.createElement('div');box.innerHTML=`<h3>Cerebro de tu GPU <sm
  <label>Aprender de las pláticas<select id="ceApr"><option value="1">Sí: memoria buscable y saca datos nuevos de ti</option><option value="0">No</option></select></label>
  <small>Para tu GTX 1650 (4 GB): instala Ollama de <b>ollama.com</b>, abre PowerShell y escribe <code>ollama pull gemma3:4b</code> y luego <code>ollama pull embeddinggemma</code> (para que busque por significado). Si la sientes lenta, prueba <code>ollama pull llama3.2:3b</code>. Todo se queda en tu PC.</small>
  <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" id="ceTry" style="width:auto;flex:1;padding:8px 10px">▶ Probar cerebro local</button><button class="btn" id="ceRe" style="width:auto;flex:1;padding:8px 10px">↻ Buscar Ollama</button><button class="btn" id="ceDel" style="width:auto;flex:1;padding:8px 10px">✖ Borrar memoria buscable</button></div>
- <small id="ceOut"></small>`;
+ <small id="ceOut"></small>
+ <h3>Cerebro de Claude <small style="font-weight:400">· Anthropic</small></h3>
+ <small id="ceClSt"></small>
+ <label>Cuándo usa Claude<select id="ceCl"><option value="off">Apagado</option><option value="pesado">Para lo pesado (explicaciones, salud, estudio, imágenes)</option><option value="siempre">Siempre que se pueda (la voz sigue en Gemini)</option></select></label>
+ <label>Tope de gasto en dólares (cuando llega, deja de usarlo)<input id="ceTope" type="number" min="0" step="0.5"></label>
+ <small>Usa la key de «API key de Claude» de arriba y el modelo que elijas ahí. Cada respuesta cuesta centavos; Capri lleva la cuenta. La voz y lo que mira de tu pantalla siguen en Gemini.</small>`;
 $('cClose')?.parentElement?.before(box);
 function pinta(){btn.classList.toggle('act',cer.modo!=='gemini'&&listo());const st=$('ceSt');if(!st)return;
   st.textContent=ok?(chats().length?'● Conectado a Ollama · '+chats().length+' modelo(s) · memoria buscable: '+mems.length+' plática(s)'+(cer.emb?' (por significado)':' (por palabras: baja embeddinggemma para que busque mejor)')+(ultimo?' · último que contestó: '+(ultimo==='nube'?'Gemini':ultimo):''):'● Ollama está abierto pero no tiene modelos: baja uno (abajo dice cómo).')
     :'✖ No encontré Ollama en tu PC (o está cerrado). Sin él, todo va a Gemini.';
   st.style.color=ok&&chats().length?'var(--grn)':'#ffb000';
   const s=$('ceMod');s.innerHTML=chats().map(m=>`<option value="${m.n}">${m.n} · ${m.gb.toFixed(1)} GB${m.gb>3.6?' (grande para 4 GB)':''}</option>`).join('')||'<option value="">(ninguno)</option>';s.value=cer.modelo;
-  $('ceModo').value=cer.modo;$('ceApr').value=cer.aprende?'1':'0';}
+  $('ceModo').value=cer.modo;$('ceApr').value=cer.aprende?'1':'0';
+  bCl.classList.toggle('act',claudeOk());$('ceCl').value=cer.claude;$('ceTope').value=cer.tope;
+  const cs=$('ceClSt');cs.textContent=!cfg.claudeKey?'○ Listo para cuando tengas créditos: falta tu API key de Anthropic.':cer.claude==='off'?'○ Key puesta, pero Claude está apagado.':claudeSpent>=cer.tope?'✖ Llegó al tope: gastado '+usd(claudeSpent)+' de '+usd(cer.tope)+'.':Date.now()<claudeFuera?'✖ Claude no respondió hace poco (¿sin créditos?); lo vuelve a intentar en unos minutos.':'● Activo · gastado '+usd(claudeSpent)+' de '+usd(cer.tope)+' · modelo '+(cfg.claudeModel||'claude-opus-5-5');
+  cs.style.color=claudeOk()?'var(--grn)':'#ffb000';}
 $('ceModo').onchange=()=>{cer.modo=$('ceModo').value;save();pinta();};
 $('ceMod').onchange=()=>{cer.modelo=$('ceMod').value;save();pinta();};
 $('ceApr').onchange=()=>{cer.aprende=$('ceApr').value==='1';save();};
 $('ceRe').onclick=()=>ver();
+$('ceCl').onchange=()=>{cer.claude=$('ceCl').value;claudeFuera=0;save();pinta();};
+$('ceTope').onchange=()=>{cer.tope=Math.max(0,+$('ceTope').value||0);save();pinta();};
 $('ceDel').onclick=async()=>{if(!confirm('¿Borrar la memoria buscable de pláticas? (Sus recuerdos de siempre no se borran.)'))return;mems=[];await tx('readwrite',s=>s.clear()).catch(()=>{});pinta();};
 $('ceTry').onclick=async()=>{const o=$('ceOut');if(!await ver()||!cer.modelo){o.textContent='Primero instala Ollama y baja un modelo.';return;}
   o.textContent='Pensando con '+cer.modelo+'… (la primera vez tarda en cargarlo a la tarjeta)';const t0=performance.now();let txt='';
