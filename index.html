@@ -887,7 +887,7 @@ async function respond(userText,extra,mode){ // mode: user | watch | idle | voic
   busy=true;setState('pensando');core('THINKING');const t0=performance.now();bump();
   const parts=[];if(extra)parts.push(extra);parts.push({text:userText});
   let raw='',shown='',stateSet=false,heard=null,el=null,cur=null,speakBuf='',off=0,supp=false;
-  fragNow=fragPick(mode);const who=fragNow?'??? // '+fragNow.name.toUpperCase():'CAPRI';let label=who;if(fragNow){store.set('fragLast',Date.now());log('ALERTA: fragmento '+fragNow.name+' fuera de control','w');}
+  fragNow=fragPick(mode);const who=fragNow?'??? // '+fragNow.name.toUpperCase():(window.crimsonWho?.()||'CAPRI');let label=who;if(fragNow){store.set('fragLast',Date.now());log('ALERTA: fragmento '+fragNow.name+' fuera de control','w');}
   const ensureLine=()=>{if(!el){line('c',label);el=line('t','');cur=document.createElement('span');cur.className='cur';cur.innerHTML='&nbsp;';el.after(cur);}};
   const onText=t=>{raw+=t;
     if(fragNow&&stateSet&&!supp){const mi=raw.search(/<<\s*suprime\s*>>/i);if(mi>=0){supp=true;off=clean(raw.slice(0,mi)).replace(/^\s+/,'').length;
@@ -1206,4 +1206,4 @@ else bootP.then(()=>setTimeout(()=>{setState(cfg.key&&cfg.model?'presumida':'son
 if(DESK){if(cfg.key&&cfg.model)minimize();else expand();}
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
-<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="redaccion.js"></script><script src="voz.js"></script><script src="cerebro.js"></script><script src="hud.js"></script><script type="module" src="holo3d.js"></script><script src="desk.js"></script></body></html>
+<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="redaccion.js"></script><script src="crimson.js"></script><script src="voz.js"></script><script src="cerebro.js"></script><script src="hud.js"></script><script type="module" src="holo3d.js"></script><script src="desk.js"></script></body></html>
