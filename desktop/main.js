@@ -206,6 +206,45 @@ function ps(script, env = {}) {
     c.on('exit', (code) => res(code === 0)); c.on('error', () => res(false));
   });
 }
+// igual que ps() pero devuelve el código de salida y lo que imprimió
+function psx(script, env = {}) {
+  return new Promise((res) => {
+    if (process.platform !== 'win32') return res({ code: -1, out: '' });
+    let out = '';
+    const c = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
+      { windowsHide: true, env: { ...process.env, ...env } });
+    c.stdout.on('data', (d) => { out += d; });
+    c.on('exit', (code) => res({ code, out: out.trim() })); c.on('error', () => res({ code: -1, out: '' }));
+  });
+}
+// ventanas abiertas (programa y título) para que Capri sepa qué puede guardar o cerrar; nunca las de Capri
+const SELF = () => app.getAppMetrics().map((m) => m.pid).join(',');
+const LIST_WINS = `$self = $env:CAPRI_SELF -split ','
+Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and $_.MainWindowTitle -and ($self -notcontains [string]$_.Id) -and $_.ProcessName -notmatch '^(explorer|TextInputHost|ShellExperienceHost|SearchHost|StartMenuExperienceHost|LockApp)$' } |
+  ForEach-Object { $_.ProcessName + [char]9 + $_.MainWindowTitle }`;
+// guardar = trae la ventana al frente y manda Ctrl+S; cerrar = guarda y luego le pide a la ventana que se cierre
+// (como darle a la X: si el programa pregunta algo, te lo pregunta a ti). Nunca mata procesos.
+const WIN_ACT = `Add-Type @"
+using System; using System.Runtime.InteropServices;
+public class CapriW {
+  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
+  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] public static extern void keybd_event(byte b, byte s, uint f, UIntPtr e);
+}
+"@
+$n = $env:CAPRI_ARG; $mode = $env:CAPRI_MODE; $self = $env:CAPRI_SELF -split ','
+$p = Get-Process | Where-Object { $_.MainWindowHandle -ne 0 -and ($self -notcontains [string]$_.Id) -and $_.ProcessName -notmatch '^(explorer|TextInputHost|ShellExperienceHost|SearchHost|StartMenuExperienceHost|LockApp|dwm|winlogon|csrss)$' -and ($_.MainWindowTitle -like "*$n*" -or $_.ProcessName -like "*$n*") } | Select-Object -First 1
+if (-not $p) { exit 2 }
+$h = $p.MainWindowHandle
+[CapriW]::ShowWindow($h, 9) | Out-Null
+[CapriW]::keybd_event(0x12, 0, 0, [UIntPtr]::Zero); [CapriW]::keybd_event(0x12, 0, 2, [UIntPtr]::Zero)
+[CapriW]::SetForegroundWindow($h) | Out-Null; Start-Sleep -Milliseconds 350
+if ([CapriW]::GetForegroundWindow() -ne $h) { exit 3 }
+$browser = $p.ProcessName -match '^(chrome|msedge|firefox|opera|brave|vivaldi)$'
+if ($mode -ne 'cerrar-sin' -and -not $browser) { Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('^s'); Start-Sleep -Milliseconds 1300 }
+if ($mode -like 'cerrar*') { $p.CloseMainWindow() | Out-Null }
+Write-Output ($p.ProcessName + [char]9 + $p.MainWindowTitle)`;
 // SendKeys trata + ^ % ~ ( ) { } [ ] como teclas especiales: se envuelven en llaves para escribirlas tal cual
 const sendKeysText = (t) => String(t).slice(0, 4000).replace(/[+^%~(){}[\]]/g, (c) => '{' + c + '}').replace(/\r?\n/g, '{ENTER}');
 const OPEN_APP = `$n=$env:CAPRI_ARG; try { Start-Process -ErrorAction Stop $n } catch {
@@ -224,6 +263,15 @@ ipcMain.handle('act', async (_e, a) => {
       return (await shell.openPath(p)) === '';
     }
     return ps(OPEN_APP, { CAPRI_ARG: t });
+  }
+  if (a.type === 'windows') {
+    const r = await psx(LIST_WINS, { CAPRI_SELF: SELF() });
+    return r.out ? r.out.split(/\r?\n/).map((l) => { const [name, ...t] = l.split('\t'); return { name, title: t.join(' ') }; }).slice(0, 40) : [];
+  }
+  if (a.type === 'guardar' || a.type === 'cerrar') {
+    const t = String(a.target || '').trim(); if (!t || /[*?[\]`$]/.test(t)) return { ok: false, why: 'nombre' };
+    const r = await psx(WIN_ACT, { CAPRI_ARG: t, CAPRI_SELF: SELF(), CAPRI_MODE: a.type === 'cerrar' ? (a.save === false ? 'cerrar-sin' : 'cerrar') : 'guardar' });
+    return { ok: r.code === 0, why: { 2: 'no-encontre', 3: 'no-pude-enfocar' }[r.code] || (r.code ? 'error' : ''), win: r.out };
   }
   if (a.type === 'type') return ps('Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait($env:CAPRI_ARG)', { CAPRI_ARG: sendKeysText(a.text) });
   if (a.type === 'cursor' && win && Array.isArray(a.path)) {

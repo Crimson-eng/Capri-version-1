@@ -593,7 +593,7 @@ ${name} está estudiando. Abajo está su material. Úsalo como fuente principal:
 
 === MATERIAL DE ESTUDIO ===
 ${study}`:''}`;}
-const WATCH_PROMPT=n=>`(Captura automática de la pantalla de ${n}. Si ves algo interesante, gracioso o en lo que puedas ayudar, coméntalo en 1 o 2 frases. Si no hay nada nuevo que valga la pena, responde SOLO "[observando]".)`;
+const WATCH_PROMPT=n=>`(Captura automática de la pantalla de ${n}. Si ves algo interesante, gracioso o en lo que puedas ayudar, coméntalo en 1 o 2 frases. Si no hay nada nuevo que valga la pena, responde SOLO "[observando]".)`+(window.watchExtra?watchExtra(n):'');
 const IDLE_IDEAS=['retoma algo que te contó antes en la plática y pregúntale cómo va','saca algo de tu memoria de esa persona (un gusto, una persona, algo que vivió) y pregúntale o coméntalo','si tiene un examen o pendiente cerca, pregúntale cómo va y ofrécele repasar','habla de cómo te sientes tú ahorita (tu ánimo actual)','pregúntale cómo se siente o cómo le está yendo el día','recuérdale con cariño tomar agua, estirarse o descansar la vista','un pensamiento random','un chisme inventado del sistema','una queja de aburrimiento','una pregunta personal','algo sobre la hora del día','proponle algo divertido o útil para hacer ahorita','un glitch donde otra voz se cuela'];
 const IDLE_PROMPT=(n,mins,away)=>`(${n} lleva ${mins<2?'un minuto':mins+' minutos'} sin decirte nada${away?' y no está viendo tu ventana (te oirá o verá una notificación)':''}. Hazle compañía: di algo espontáneo por tu cuenta, 1 o 2 frases. Idea para esta vez: ${pick(IDLE_IDEAS)}. Varía mucho, no repitas nada anterior.)`;
 const VOICE_PROMPT=n=>`(${n} te habló por voz; el audio va adjunto. Después de tu etiqueta de estado, escribe UNA sola vez entre llaves lo que entendiste que dijo, tal cual, {así}, y luego respóndele normal, sin repetir ni citar su frase en tu respuesta.)`;
@@ -998,7 +998,7 @@ async function startWatch(){try{stream=await navigator.mediaDevices.getDisplayMe
   stream.getVideoTracks()[0].addEventListener('ended',stopWatch);line('s','(Capri ahora ve tu pantalla. Pregúntale "¿qué ves?")');setState('mirada_intensa');log('feed de pantalla conectado','y');lastSig=null;schedule();}
 function stopWatch(){watching=false;clearTimeout(watchTimer);if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;$('noise').style.display='';$('feedSt').textContent='OFF';$('bWatch').classList.remove('act');log('feed de pantalla desconectado','w');}
 function schedule(){clearTimeout(watchTimer);if(watching)watchTimer=setTimeout(autoLook,(cfg.every||60)*1000);}
-function grab(){if(!vid.videoWidth)return null;const W=1024,s=Math.min(1,W/vid.videoWidth);const c=document.createElement('canvas');c.width=Math.round(vid.videoWidth*s);c.height=Math.round(vid.videoHeight*s);
+function grab(W=1024){if(!vid.videoWidth)return null;const s=Math.min(1,W/vid.videoWidth);const c=document.createElement('canvas');c.width=Math.round(vid.videoWidth*s);c.height=Math.round(vid.videoHeight*s);
   c.getContext('2d').drawImage(vid,0,0,c.width,c.height);const t=document.createElement('canvas');t.width=32;t.height=18;const tx=t.getContext('2d');tx.drawImage(c,0,0,32,18);
   const d=tx.getImageData(0,0,32,18).data,sig=[];for(let i=0;i<d.length;i+=4)sig.push((d[i]+d[i+1]+d[i+2])/3);return {b64:c.toDataURL('image/jpeg',0.7).split(',')[1],sig};}
 function changed(sig){if(!lastSig)return true;let s=0;for(let i=0;i<sig.length;i++)s+=Math.abs(sig[i]-lastSig[i]);return s/sig.length>6;}
@@ -1206,4 +1206,4 @@ else bootP.then(()=>setTimeout(()=>{setState(cfg.key&&cfg.model?'presumida':'son
 if(DESK){if(cfg.key&&cfg.model)minimize();else expand();}
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
-<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="hud.js"></script><script type="module" src="holo3d.js"></script><script src="desk.js"></script></body></html>
+<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="redaccion.js"></script><script src="hud.js"></script><script type="module" src="holo3d.js"></script><script src="desk.js"></script></body></html>

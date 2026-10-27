@@ -1,7 +1,7 @@
 // ================= MANOS DE CAPRI =================
 // Capri puede actuar en tu computadora cuando se lo pides: abrir programas, páginas o carpetas, escribir donde
 // tengas el cursor y, para jugar, atrapar tu puntero un momento. Lo pide con etiquetas ocultas al final de su
-// respuesta (<<abrir: …>>, <<escribir: …>>, <<cursor: agarrar>>). Están apagadas hasta que las activas en
+// respuesta (<<abrir: …>>, <<escribir: …>>, <<guardar: …>>, <<cerrar: …>>, <<cursor: agarrar>>). Están apagadas hasta que las activas en
 // CIBERWARE, y cada acción te pide permiso salvo que elijas «Siempre». Abrir y mover el puntero solo funcionan
 // en el .exe (Windows); en el navegador abre páginas y copia el texto.
 // También aprende en el camino: <<aprende: nombre | cómo>> guarda lo que le enseñas (una ruta, un programa,
@@ -11,7 +11,11 @@ const man=Object.assign({on:false,libre:false},store.get('manos',{}));
 let aprendido=store.get('aprendido',[]),abiertos=store.get('manosOk',[]);
 const save=()=>{store.set('manos',man);store.set('aprendido',aprendido);store.set('manosOk',abiertos);};
 const D=window.capriDesk,PC=!!D?.act;
-const TAG=/<<\s*(abrir|escribir|cursor|aprende)\s*:([^>]*)>>/gi;
+const TAG=/<<\s*(abrir|escribir|cursor|aprende|guardar|cerrar)\s*:([^>]*)>>/gi;
+// ventanas abiertas (programa y título), para que sepa qué puede guardar o cerrar; se refresca sola mientras las manos están prendidas
+let ventanas=[];
+async function verVentanas(){if(!PC||!man.on)return;try{ventanas=await D.act({type:'windows'})||[];}catch(e){}}
+setInterval(verVentanas,20000);setTimeout(verVentanas,3000);
 
 window.manosPrompt=()=>{const name=cfg.name||'Kiga';
   const learned=aprendido.length?'\nLo que ya aprendiste (úsalo cuando venga al caso):\n'+aprendido.map(a=>'  - '+a.n+': '+a.how).join('\n'):'';
@@ -26,8 +30,10 @@ TUS MANOS (activas${PC?'':', pero ahora estás en el navegador: solo puedes abri
 Puedes actuar en la computadora de ${name}, solo cuando te lo pida o cuando de verdad le ayude, no por llamar la atención. Al final de tu respuesta, en su propia línea:
 <<abrir: programa, página https://… o ruta de carpeta/archivo>>  (ej. <<abrir: notepad>>, <<abrir: https://www.youtube.com>>, <<abrir: spotify>>)
 <<escribir: texto>>  (se escribe donde ${name} haga clic; tiene 3 segundos para elegir la ventana)${PC?`
+<<guardar: ventana>>  (le da Ctrl+S; «ventana» es parte del título o el programa, ej. <<guardar: Word>>)
+<<cerrar: ventana>>  (primero guarda y luego la cierra como si le dieras a la X; si el archivo es nuevo, el programa le pedirá nombre a ${name}. Para no guardar: <<cerrar: ventana | sin guardar>>)
 <<cursor: agarrar>>  (de juego: atrapas su puntero un momento; con medida)`:''}
-${man.libre?'Lo haces sin preguntar.':name+' te da permiso con un botón antes de cada acción.'} No puedes hacer clic, borrar, ni abrir consolas, scripts o el registro.${abiertos.length?'\nProgramas que ya abriste bien: '+abiertos.join(', ')+'.':''}`;};
+${man.libre?'Lo haces sin preguntar.':name+' te da permiso con un botón antes de cada acción.'} No puedes hacer clic, borrar, ni abrir consolas, scripts o el registro.${PC&&ventanas.length?'\nVentanas abiertas ahora (programa — título):\n'+ventanas.map(v=>'  - '+v.name+' — '+v.title.slice(0,90)).join('\n'):''}${abiertos.length?'\nProgramas que ya abriste bien: '+abiertos.join(', ')+'.':''}`;};
 
 // ---------- ejecutar ----------
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -54,11 +60,18 @@ async function agarrar(){if(!PC||!document.body.classList.contains('desk'))retur
 function aprende(arg){const [n,...r]=arg.split('|').map(x=>x.trim());const how=r.join(' | ');if(!n||!how)return;
   aprendido=aprendido.filter(a=>a.n.toLowerCase()!==n.toLowerCase());aprendido.push({n:n.slice(0,80),how:how.slice(0,300),ts:Date.now()});aprendido=aprendido.slice(-60);save();
   log('aprendió: '+n.slice(0,40),'y');line('s','✦ Capri aprendió: '+n);}
-const RUN={abrir,escribir,cursor:agarrar};
+async function ventana(kind,arg){if(!PC)return line('s','(Guardar y cerrar ventanas solo se puede en Capri de escritorio, el .exe.)');
+  const [t,opt]=arg.split('|').map(x=>x.trim());const sin=kind==='cerrar'&&/sin\s*guardar|no\s*guard/i.test(opt||'');
+  const full=!document.body.classList.contains('desk');if(full)minimize();say(kind==='cerrar'?'cerrando '+t+'…':'guardando '+t+'…',1800);
+  const r=await D.act({type:kind,target:t,save:!sin});if(full)setTimeout(expand,900);
+  const w=r?.win?r.win.split('\t').pop():t;
+  if(r?.ok){line('s','🖐 '+(kind==='guardar'?'guardé':'cerré')+' «'+w+'»'+(kind==='cerrar'&&!sin?' (le di Ctrl+S antes)':'')+'.');log('manos: '+kind+' '+w,'g');setTimeout(verVentanas,1500);}
+  else line('s',{'no-encontre':'(No encontré una ventana abierta que se llame «'+t+'».)','no-pude-enfocar':'(Windows no me dejó traer «'+t+'» al frente. Dale un clic y vuelve a pedírmelo.)',nombre:'(Ese nombre de ventana no me sirve.)'}[r?.why]||'(No pude '+kind+' «'+t+'».)');}
+const RUN={abrir,escribir,cursor:agarrar,guardar:a=>ventana('guardar',a),cerrar:a=>ventana('cerrar',a)};
 
 // pedir permiso con botones dentro de la terminal
 function permiso(kind,arg){return new Promise(res=>{if(man.libre)return res(true);
-  const what=kind==='abrir'?'abrir «'+arg+'»':kind==='escribir'?'escribir: «'+arg.slice(0,80)+(arg.length>80?'…':'')+'»':'atrapar tu puntero un momento';
+  const what=kind==='guardar'?'guardar «'+arg+'» (Ctrl+S)':kind==='cerrar'?(/sin\s*guardar/i.test(arg)?'cerrar «'+arg.split('|')[0].trim()+'» sin guardar':'guardar y cerrar «'+arg+'»'):kind==='abrir'?'abrir «'+arg+'»':kind==='escribir'?'escribir: «'+arg.slice(0,80)+(arg.length>80?'…':'')+'»':'atrapar tu puntero un momento';
   // en modo escritorio la terminal no se ve: ahí pregunta con una ventanita
   if(document.body.classList.contains('desk')){say('¿me dejas? '+what,3000);return setTimeout(()=>res(confirm('Capri quiere '+what+'.\n¿La dejas?')),300);}
   const d=line('s man','🖐 Capri quiere '+what+'  ');
@@ -74,7 +87,7 @@ const _absorb=absorbMem;absorbMem=full=>{_absorb(full);manosAbsorb(full);};
 // botón (escondido) que usa CIBERWARE para prenderlas y apagarlas
 const btn=document.createElement('button');btn.id='bManos';btn.className='btn';btn.style.display='none';btn.title='Manos de Capri';
 const sync=()=>btn.classList.toggle('act',man.on);sync();
-btn.onclick=()=>{man.on=!man.on;if(!man.on)man.libre=false;save();sync();
+btn.onclick=()=>{man.on=!man.on;if(!man.on)man.libre=false;save();sync();verVentanas();
   line('s',man.on?'(🖐 Manos de Capri activas: te pedirá permiso antes de abrir o escribir algo.'+(PC?'':' En el navegador solo abre páginas y copia texto.')+')':'(Manos de Capri apagadas.)');};
 document.querySelector('.dock .tools')?.appendChild(btn);
 window.manosInfo=()=>({on:man.on,libre:man.libre,aprendido:aprendido.slice(),pc:PC});
