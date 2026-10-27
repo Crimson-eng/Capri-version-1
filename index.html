@@ -62,7 +62,13 @@ body[data-core=THINKING] .logo .st{background:var(--pur);color:#fff}
 .dock .tools{display:flex;gap:8px;padding:8px;background:rgba(10,9,15,.92);border:2px solid #000;box-shadow:5px 5px 0 var(--pur),inset 0 0 0 1px #2e2a3a}
 .btn{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;width:70px;height:58px;background:#14121b;border:2px solid #000;color:var(--mut);
  font:10px/1 var(--pix);letter-spacing:.02em;cursor:pointer;box-shadow:inset -3px -3px 0 #0a0910,inset 3px 3px 0 #26222f;transition:transform .1s,color .15s}
-.btn .gl{font-size:20px;line-height:1;filter:saturate(.7)}
+.btn .gl{font-size:20px;line-height:1}
+.ci{width:1em;height:1em;overflow:visible;vertical-align:middle;filter:drop-shadow(1.5px 1.5px 0 var(--pur,#7b3dff))}
+.ci .k{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:square;stroke-linejoin:miter}.ci .f{fill:currentColor}.ci .a{fill:#2dff8f}.ci .a2{stroke:#2dff8f}
+.btn .gl .ci{width:22px;height:22px;color:var(--red)}.btn.act .gl .ci{color:var(--grn)}.btn.act .ci .a{fill:#fff}.btn.act .ci .a2{stroke:#fff}
+#mic .ci,#send .ci,#clSend .ci,#mmic .ci{width:18px;height:18px;filter:none}#send .ci .a,#clSend .ci .a,#mmic .ci .a,#mic.rec .ci .a{fill:currentColor}#mmic .ci .a2,#mic .ci .a2{stroke:currentColor}
+.mhead button .ci,#clClose .ci{width:14px;height:14px}
+
 .btn:hover{color:var(--ink);transform:translateY(-3px)}
 .btn:active{transform:translateY(1px);box-shadow:inset 3px 3px 0 #0a0910}
 .btn.act{color:var(--grn);background:#0f1f17}
@@ -112,16 +118,30 @@ body[data-core=TALKING] .eq,body[data-core=LISTENING] .eq{display:flex}
 .out .s{color:var(--dim);font-style:italic;font-size:12.5px;white-space:pre-wrap;margin:8px 0}
 .out .s::before{content:"// "}
 .out .e{color:#ff7d95;white-space:pre-wrap;border-left:3px solid var(--red);padding-left:12px}
+.out .op{display:block;margin:2px 0 4px 15px;background:none;border:1px dashed #3a3546;color:var(--dim);font:11px var(--mono);letter-spacing:.06em;padding:2px 8px;cursor:pointer}
+.out .op:hover{color:var(--cyan);border-color:var(--cyan)}.out .op:disabled{opacity:.5;cursor:default}
+.out .c.cl{color:var(--cyan)}
+.out .t.cl{border-left-color:var(--cyan);color:#cfeff0}
+.win.claude{width:min(760px,100%);height:min(640px,100%)}
+.win.claude>.tb{background:linear-gradient(90deg,var(--cyan) 0,var(--cyan) 55%,transparent 55%),repeating-linear-gradient(90deg,var(--cyan) 0 6px,#000 6px 9px);color:#000}
+.win.claude>.tb .tt{text-shadow:none}.win.claude>.tb .ic{background:#000}
+.win.claude>.in{flex:1;min-height:0;display:flex;flex-direction:column;padding:10px 16px 12px}
+.clacc{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font:11.5px var(--mono);color:var(--dim);border-bottom:1px dashed #2a2733;padding-bottom:8px;margin-bottom:6px}
+.clacc b{color:var(--cyan)}.clacc .off{color:#ff7d95}.clacc select{background:#0c0b12;color:var(--ink);border:1px solid #2e2a3a;font:11.5px var(--mono);padding:2px 4px}
+.clacc .sp{margin-left:auto}.clacc a,.clacc button{color:var(--cyan);background:none;border:1px dashed #2e5a5c;font:11px var(--mono);padding:2px 7px;cursor:pointer;text-decoration:none}
+.clacc a:hover,.clacc button:hover{border-color:var(--cyan)}
+#clOut .u::before{content:"> "}#clOut .c{color:var(--cyan)}#clOut .t{border-left-color:var(--cyan)}
 .cur{display:inline-block;width:8px;height:1.05em;vertical-align:-2px;margin-left:2px;background:var(--grn);animation:b 1s steps(1) infinite}@keyframes b{50%{opacity:0}}
 .inrow{display:flex;gap:8px;align-items:center;border-top:1px dashed #2a2733;padding-top:10px;margin-top:8px}
 .pr{font:700 14px/1 var(--mono);color:var(--red)}
-#q{flex:1;background:transparent;border:0;outline:0;color:var(--grn);font:15px/1.4 var(--mono);min-width:0;padding:8px 0;caret-color:var(--grn)}
-#q::placeholder{color:var(--dim)}
-#mic,#send{flex:0 0 auto;width:40px;height:36px;border:1px solid #2a2733;background:var(--panel2);cursor:pointer;font-size:15px;display:grid;place-items:center;
+#q,#clQ{flex:1;background:transparent;border:0;outline:0;color:var(--grn);font:15px/1.4 var(--mono);min-width:0;padding:8px 0;caret-color:var(--grn)}
+#q::placeholder,#clQ::placeholder{color:var(--dim)}
+#mic,#send,#clSend{flex:0 0 auto;width:40px;height:36px;border:1px solid #2a2733;background:var(--panel2);cursor:pointer;font-size:15px;display:grid;place-items:center;
  clip-path:polygon(7px 0,100% 0,100% calc(100% - 7px),calc(100% - 7px) 100%,0 100%,0 7px)}
-#mic:hover,#send:hover{border-color:var(--cyan)}
+#mic:hover,#send:hover,#clSend:hover{border-color:var(--cyan)}
 #mic.rec{background:var(--red);border-color:var(--red);color:#fff;animation:pulse 1s infinite}
 #send{background:var(--yel);border-color:var(--yel);color:#000;font-weight:700}
+#clSend{background:var(--cyan);border-color:var(--cyan);color:#000;font-weight:700}#clQ{color:var(--cyan);caret-color:var(--cyan)}
 @keyframes pulse{50%{background:#7a0c22}}
 #bars{display:none;flex:1;gap:3px;align-items:center;height:24px}
 #bars i{width:4px;background:var(--cyan);height:3px;transition:height .08s}
@@ -420,7 +440,7 @@ body[data-core=THINKING] .thk{display:flex}
     <div class="in">
      <div class="out" id="term"></div>
      <div class="thk" id="thk"><span>PROCESANDO</span><div class="cl"></div><b id="thkV">0</b></div>
-     <div class="inrow" id="inrow"><span class="pr">&gt;_</span><input id="q" placeholder="escríbele a capri…" autocomplete="off"><div id="bars"></div><button id="mic" title="Hablarle (Ctrl+Espacio)">🎤</button><button id="send" title="Enviar">➤</button></div>
+     <div class="inrow" id="inrow"><span class="pr">&gt;_</span><input id="q" placeholder="escríbele a capri…" autocomplete="off"><div id="bars"></div><button id="mic" title="Hablarle (Ctrl+Espacio)"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M9 3 H15 V13 H9 Z"/><path class="k" d="M6 10 V13 L9 17 H15 L18 13 V10 M12 17 V21"/><path class="a" d="M10.5 6 H13.5 V7.5 H10.5 Z M10.5 9 H13.5 V10.5 H10.5 Z"/></svg></button><button id="send" title="Enviar"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="f" d="M2 3 L22 12 L2 21 L5 12 Z"/><path class="a" d="M5 12 H13 L5 13.5 Z"/></svg></button></div>
     </div>
    </div>
   </div>
@@ -433,29 +453,41 @@ body[data-core=THINKING] .thk{display:flex}
   <div class="deco" aria-hidden="true"><span>+ SYS.0451 ── ▸▸▸▸</span><span>◢◤ RELIC-OS · BUILD 2077.10</span></div>
  </div>
  <div class="dock"><div class="tools">
-  <button class="btn" id="bWatch" title="Que mire tu pantalla"><span class="gl">👁</span><span class="tx">MIRAR</span></button>
-  <button class="btn" id="bHands" title="Platicar por voz sin tocar nada"><span class="gl">🎙</span><span class="tx">MANOS</span></button>
-  <button class="btn" id="bStudy" title="Biblioteca de estudio"><span class="gl">📚</span><span class="tx">ESTUDIO</span></button>
-  <button class="btn" id="bVoice" title="Que hable en voz alta">🔇 Voz</button>
-  <button class="btn" id="bAlive" title="Vida propia"><span class="gl">✦</span><span class="tx">VIDA</span></button>
-  <button class="btn" id="bMini" title="Minimizar: Capri flotando"><span class="gl">⤡</span><span class="tx">MINI</span></button>
-  <button class="btn" id="bMore" title="Widgets"><span class="gl">▣</span><span class="tx">WIDGETS</span></button>
-  <button class="btn" id="bFull" title="Pantalla completa"><span class="gl">⛶</span><span class="tx">FULL</span></button>
-  <button class="btn" id="bCfg" title="Ajustes"><span class="gl">⚙</span><span class="tx">AJUSTES</span></button>
+  <button class="btn" id="bWatch" title="Que mire tu pantalla"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M2 12 L7 6 H17 L22 12 L17 18 H7 Z"/><circle class="a" cx="12" cy="12" r="3.2"/><path class="k" d="M12 6 V3 M12 21 V18"/></svg></span><span class="tx">MIRAR</span></button>
+  <button class="btn" id="bHands" title="Platicar por voz sin tocar nada"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M9 3 H15 V12 H9 Z"/><path class="k" d="M6 10 V12 L9 16 H15 L18 12 V10"/><path class="k" d="M12 16 V21 M8 21 H16"/><path class="k a2" d="M2 8 L4 10 L2 12 M22 8 L20 10 L22 12"/></svg></span><span class="tx">MANOS</span></button>
+  <button class="btn" id="bStudy" title="Biblioteca de estudio"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M3 5 L12 3 L21 5 V19 L12 21 L3 19 Z"/><path class="k" d="M12 3 V21"/><path class="a" d="M14.5 8 H18.5 V9.6 H14.5 Z M14.5 11.5 H18.5 V13.1 H14.5 Z"/><path class="k" d="M5.5 8 L9.5 7.3 M5.5 11.5 L9.5 10.8"/></svg></span><span class="tx">ESTUDIO</span></button>
+  <button class="btn" id="bVoice" title="Que hable en voz alta"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="f" d="M3 9 H7 L12 4 V20 L7 15 H3 Z"/><path class="k" d="M15 9 L21 15 M21 9 L15 15"/></svg></span><span class="tx">VOZ</span></button>
+  <button class="btn" id="bAlive" title="Vida propia"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="f" d="M12 2 L14 10 L22 12 L14 14 L12 22 L10 14 L2 12 L10 10 Z"/><path class="a" d="M12 8.5 L13 11 L15.5 12 L13 13 L12 15.5 L11 13 L8.5 12 L11 11 Z"/></svg></span><span class="tx">VIDA</span></button>
+  <button class="btn" id="bMini" title="Minimizar: Capri flotando"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M3 3 H21 V21 H3 Z"/><path class="k" d="M10 14 H14 V18"/><path class="a" d="M13 8 L16 5 L19 8 L16 11 Z"/><path class="k" d="M7 7 L13 13"/></svg></span><span class="tx">MINI</span></button>
+  <button class="btn" id="bClaude" title="Mi Claude: pregúntale directo"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M12 2 L22 12 L12 22 L2 12 Z"/><path class="a" d="M12 7 L17 12 L12 17 L7 12 Z"/></svg></span><span class="tx">CLAUDE</span></button>
+  <button class="btn" id="bMore" title="Widgets"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M3 3 H10 V10 H3 Z M14 3 H21 V10 H14 Z M3 14 H10 V21 H3 Z"/><path class="a" d="M14 14 H21 V21 H14 Z"/></svg></span><span class="tx">WIDGETS</span></button>
+  <button class="btn" id="bFull" title="Pantalla completa"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M3 9 V3 H9 M15 3 H21 V9 M21 15 V21 H15 M9 21 H3 V15"/><path class="a" d="M10 10 H14 V14 H10 Z"/></svg></span><span class="tx">FULL</span></button>
+  <button class="btn" id="bCfg" title="Ajustes"><span class="gl"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M10 2 H14 L15 5 L18 4 L20 6 L19 9 L22 10 V14 L19 15 L20 18 L18 20 L15 19 L14 22 H10 L9 19 L6 20 L4 18 L5 15 L2 14 V10 L5 9 L4 6 L6 4 L9 5 Z"/><path class="a" d="M10 10 H14 V14 H10 Z"/></svg></span><span class="tx">AJUSTES</span></button>
  </div></div>
 </div>
 <div id="mini" class="collapsed" data-mode="DORMANT">
  <div class="mchip" id="chip" title="Capri: tócala para hablar, arrástrala para moverla"><div class="say" id="chipSay"></div><div class="bob"><svg viewBox="-50 -50 100 100"><polygon points="0,-48 9,-9 48,0 9,9 0,48 -9,9 -48,0 -9,-9" fill="#ff1f55"/><polygon points="0,-30 6,-6 30,0 6,6 0,30 -6,6 -30,0 -6,-6" fill="#2dff8f" transform="rotate(45)"/><circle r="9" fill="#08050d"/><circle r="5" fill="#22e5f0"/></svg></div>
   <div class="crow"><span class="ctag" id="chipTag">CAPRI // DORMANT</span><span class="eq"><i></i><i></i><i></i><i></i><i></i></span><span class="dots"></span></div></div>
  <div class="sb"><div class="in">
-  <div class="mhead"><span>// capri.exe — mini</span><button id="mExpand" title="Abrir Capri completa">⤢</button><button id="mHide" title="Ocultar globo">—</button></div>
+  <div class="mhead"><span>// capri.exe — mini</span><button id="mExpand" title="Abrir Capri completa"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M14 3 H21 V10 M21 3 L12 12 M10 5 H3 V21 H19 V14"/></svg></button><button id="mHide" title="Ocultar globo"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M4 16 H20"/><path class="a" d="M4 19 H12 V21 H4 Z"/></svg></button></div>
   <div id="miniPrev"></div><div class="mlbl">CAPRI &gt;</div><div id="miniTxt"></div>
-  <div class="mrow"><span class="pr">&gt;_</span><input id="mq" placeholder="escríbele…" autocomplete="off"><button id="mmic" title="Hablarle">🎤</button></div>
+  <div class="mrow"><span class="pr">&gt;_</span><input id="mq" placeholder="escríbele…" autocomplete="off"><button id="mmic" title="Hablarle"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M9 3 H15 V13 H9 Z"/><path class="k" d="M6 10 V13 L9 17 H15 L18 13 V10 M12 17 V21"/><path class="a" d="M10.5 6 H13.5 V7.5 H10.5 Z M10.5 9 H13.5 V10.5 H10.5 Z"/></svg></button></div>
  </div></div><span class="tail"></span>
  <section class="frame orb" id="orb" title="Capri"><img id="miniPet" alt=""><div class="ftag"><span id="miniTag">CAPRI // IDLE</span><span class="eq"><i></i><i></i><i></i><i></i><i></i><i></i></span></div><div class="vis"><img id="miniImg" alt="Capri"></div></section>
 </div>
 <div class="sprite" id="sprite"><span class="tg" id="spriteTag">CAPRI // LOOSE</span><div class="fr"><img id="spriteImg" alt=""></div></div>
 <div class="bubble" id="bubble"><div><b>CAPRI //</b><span id="bubbleTxt"></span></div></div>
+
+<!-- MI CLAUDE -->
+<div class="modal" id="clModal"><div class="win claude">
+  <div class="tb"><span class="ic"></span><span class="tt">mi.claude — enlace</span><button class="wb" id="clClose" title="Cerrar"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M5 5 L19 19 M19 5 L5 19"/><path class="a" d="M10.5 10.5 H13.5 V13.5 H10.5 Z"/></svg></button></div>
+  <div class="in">
+   <div class="clacc"><span id="clSt"></span><select id="clModel"><option value="claude-opus-5-5">Opus 5.5</option><option value="claude-sonnet-5-5">Sonnet 5.5</option><option value="claude-haiku-5-5">Haiku 5.5</option></select>
+    <span>gastado: <b id="clSpent">$0</b></span><span class="sp"></span><button id="clNew" title="Empezar conversación nueva">+ nueva</button><a href="https://claude.ai/new" target="_blank" rel="noopener" id="clWeb" title="Abre tu cuenta de claude.ai">claude.ai ↗</a></div>
+   <div class="out" id="clOut"></div>
+   <div class="inrow"><span class="pr">&gt;_</span><input id="clQ" placeholder="pregúntale a claude…" autocomplete="off"><button id="clSend" title="Enviar"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="f" d="M2 3 L22 12 L2 21 L5 12 Z"/><path class="a" d="M5 12 H13 L5 13.5 Z"/></svg></button></div>
+  </div>
+</div></div>
 
 <!-- AJUSTES -->
 <div class="modal" id="modal"><div class="panel"><div>
@@ -466,12 +498,18 @@ body[data-core=THINKING] .thk{display:flex}
   <label>Modelo<select id="cModel"><option value="">— primero conecta tu key —</option></select></label>
   <small>Para que conteste rápido, usa un modelo "flash" o "flash-lite".</small>
   <label>¿Cómo te llama Capri?<input id="cName" placeholder="Kiga"></label>
+  <h3>Claude (2ª opinión y ventana ◆ CLAUDE)</h3>
+  <label>API key de Claude (empieza con sk-ant-…)<input id="cClaude" type="password" placeholder="Opcional: pega aquí tu key de console.anthropic.com" autocomplete="off"></label>
+  <label>Modelo de Claude<select id="cClaudeModel"><option value="claude-opus-5-5">Opus 5.5 (el más listo)</option><option value="claude-sonnet-5-5">Sonnet 5.5 (equilibrado)</option><option value="claude-haiku-5-5">Haiku 5.5 (rápido y muy barato)</option></select></label>
+  <small>Con la key, cada respuesta de Capri trae un botón «◆ 2ª opinión» para que Claude la revise, y el botón ◆ CLAUDE del dock abre un chat directo con Claude. Solo se usa cuando tú lo pides. Se cobra por uso en tu cuenta de la API (aparte de la suscripción de Claude); ponle un límite de gasto en console.anthropic.com. Gastado hasta ahora: <b id="cClaudeSpent">$0.00</b></small>
   <h3>Voz de Capri</h3>
   <label>Voz<select id="cVoice"></select></label>
   <small>Las voces más naturales ("Natural" / "Online") salen si abres Capri en <b>Microsoft Edge</b>.</small>
   <label>Velocidad: <span id="vRateV"></span><input id="cRate" type="range" min="0.6" max="1.8" step="0.05"></label>
   <label>Tono (más alto = más traviesa): <span id="vPitchV"></span><input id="cPitch" type="range" min="0" max="2" step="0.05"></label>
-  <div class="row" style="justify-content:flex-start"><button class="btn" id="cTest">▶ Probar voz</button></div>
+  <label>Efectos cyber<select id="cFx"><option value="off">Apagados (voz limpia)</option><option value="suave">Suaves (chip encendiendo, entonación viva)</option><option value="glitch">Glitch (estática, tartamudeos del constructo)</option></select></label>
+  <small>Los efectos suenan aparte de la voz: el navegador no deja meterle eco a su propia voz. El eco metálico de verdad llega con la voz en la nube.</small>
+  <div class="row" style="justify-content:flex-start"><button class="btn" id="cTest">▶ Probar voz</button><button class="btn" id="cPreset">✦ Voz Capri</button></div>
   <h3>Oído</h3>
   <label>Sensibilidad del micrófono: <span id="vSensV"></span><input id="cSens" type="range" min="1" max="10" step="1"></label>
   <small>Si corta antes de que termines de hablar, súbela. Si nunca se detiene sola, bájala.</small>
@@ -482,6 +520,10 @@ body[data-core=THINKING] .thk{display:flex}
     <select id="cEvery"><option value="30">30 segundos</option><option value="60">1 minuto</option><option value="120">2 minutos</option><option value="300">5 minutos</option></select></label>
   <label>Avisarme con notificación si no estoy viendo a Capri<select id="cNotif"><option value="1">Sí</option><option value="0">No</option></select></label>
   <small>De 12 a 7 am habla sola 3 veces menos. Hablar sola, mirar la pantalla y el modo estudio usan tu cupo gratis de Google. Tu key y tus documentos se guardan solo en este navegador. En el plan gratis, Google puede usar lo que le mandes para mejorar sus productos.</small>
+  <h3>Fragmentos del mosaico</h3>
+  <small>Sube un .txt o .md con una personalidad. Será una de las psiques de Capri: aparecerá de repente y Capri la suprimirá. Se guarda solo en este navegador.</small>
+  <div id="fragList"></div>
+  <div class="row" style="justify-content:flex-start"><button class="btn" id="cFrag">+ Cargar fragmento</button><input type="file" id="fragFile" accept=".txt,.md" style="display:none"></div>
   <div class="row"><button class="btn" id="cWipe">Borrar memoria</button><button class="btn" id="cClose">Guardar</button></div>
 </div></div></div>
 
@@ -499,24 +541,39 @@ body[data-core=THINKING] .thk{display:flex}
 </div></div></div>
 
 <script>
+// iconos de Capri (SVG 24x24): .k trazo, .f relleno, .a acento verde
+const ICO={medico:'<path class="k" d="M9 3 H15 V9 H21 V15 H15 V21 H9 V15 H3 V9 H9 Z"/><path class="k a2" d="M6 12 H9 L10.5 9.5 L13 14.5 L14.5 12 H18"/>',mirar:'<path class="k" d="M2 12 L7 6 H17 L22 12 L17 18 H7 Z"/><circle class="a" cx="12" cy="12" r="3.2"/><path class="k" d="M12 6 V3 M12 21 V18"/>',manos:'<path class="k" d="M9 3 H15 V12 H9 Z"/><path class="k" d="M6 10 V12 L9 16 H15 L18 12 V10"/><path class="k" d="M12 16 V21 M8 21 H16"/><path class="k a2" d="M2 8 L4 10 L2 12 M22 8 L20 10 L22 12"/>',estudio:'<path class="k" d="M3 5 L12 3 L21 5 V19 L12 21 L3 19 Z"/><path class="k" d="M12 3 V21"/><path class="a" d="M14.5 8 H18.5 V9.6 H14.5 Z M14.5 11.5 H18.5 V13.1 H14.5 Z"/><path class="k" d="M5.5 8 L9.5 7.3 M5.5 11.5 L9.5 10.8"/>',voz:'<path class="f" d="M3 9 H7 L12 4 V20 L7 15 H3 Z"/><path class="k a2" d="M15 9 L17 12 L15 15 M18 6 L21 12 L18 18"/>',silencio:'<path class="f" d="M3 9 H7 L12 4 V20 L7 15 H3 Z"/><path class="k" d="M15 9 L21 15 M21 9 L15 15"/>',vida:'<path class="f" d="M12 2 L14 10 L22 12 L14 14 L12 22 L10 14 L2 12 L10 10 Z"/><path class="a" d="M12 8.5 L13 11 L15.5 12 L13 13 L12 15.5 L11 13 L8.5 12 L11 11 Z"/>',mini:'<path class="k" d="M3 3 H21 V21 H3 Z"/><path class="k" d="M10 14 H14 V18"/><path class="a" d="M13 8 L16 5 L19 8 L16 11 Z"/><path class="k" d="M7 7 L13 13"/>',claude:'<path class="k" d="M12 2 L22 12 L12 22 L2 12 Z"/><path class="a" d="M12 7 L17 12 L12 17 L7 12 Z"/>',widgets:'<path class="k" d="M3 3 H10 V10 H3 Z M14 3 H21 V10 H14 Z M3 14 H10 V21 H3 Z"/><path class="a" d="M14 14 H21 V21 H14 Z"/>',full:'<path class="k" d="M3 9 V3 H9 M15 3 H21 V9 M21 15 V21 H15 M9 21 H3 V15"/><path class="a" d="M10 10 H14 V14 H10 Z"/>',ajustes:'<path class="k" d="M10 2 H14 L15 5 L18 4 L20 6 L19 9 L22 10 V14 L19 15 L20 18 L18 20 L15 19 L14 22 H10 L9 19 L6 20 L4 18 L5 15 L2 14 V10 L5 9 L4 6 L6 4 L9 5 Z"/><path class="a" d="M10 10 H14 V14 H10 Z"/>',mic:'<path class="k" d="M9 3 H15 V13 H9 Z"/><path class="k" d="M6 10 V13 L9 17 H15 L18 13 V10 M12 17 V21"/><path class="a" d="M10.5 6 H13.5 V7.5 H10.5 Z M10.5 9 H13.5 V10.5 H10.5 Z"/>',enviar:'<path class="f" d="M2 3 L22 12 L2 21 L5 12 Z"/><path class="a" d="M5 12 H13 L5 13.5 Z"/>',abrir:'<path class="k" d="M14 3 H21 V10 M21 3 L12 12 M10 5 H3 V21 H19 V14"/>',cerrar:'<path class="k" d="M5 5 L19 19 M19 5 L5 19"/><path class="a" d="M10.5 10.5 H13.5 V13.5 H10.5 Z"/>',ocultar:'<path class="k" d="M4 16 H20"/><path class="a" d="M4 19 H12 V21 H4 Z"/>',nueva:'<path class="k" d="M12 4 V20 M4 12 H20"/><path class="a" d="M10 10 H14 V14 H10 Z"/>',biochip:'<path class="k" d="M6 4 H18 L20 6 V18 L18 20 H6 L4 18 V6 Z"/><path class="k" d="M8 1 V4 M12 1 V4 M16 1 V4 M8 20 V23 M12 20 V23 M16 20 V23"/><path class="a" d="M9 9 H15 V15 H9 Z"/>',stop:'<path class="f" d="M6 6 H18 V18 H6 Z"/><path class="a" d="M10 10 H14 V14 H10 Z"/>'};
+const ico=k=>'<svg class="ci" viewBox="0 0 24 24" aria-hidden="true">'+ICO[k]+'</svg>';
 const GIFS={"emocionada": "assets/emocionada.webp", "enojada": "assets/enojada.webp", "escuchando": "assets/escuchando.webp", "glitch_entrada": "assets/glitch_entrada.webp", "glitch_fuerte": "assets/glitch_fuerte.webp", "hipnosis": "assets/hipnosis.webp", "mirada_intensa": "assets/mirada_intensa.webp", "observando": "assets/observando.webp", "pensando": "assets/pensando.webp", "presumida": "assets/presumida.webp", "risa_malvada": "assets/risa_malvada.webp", "sonrisa_traviesa": "assets/sonrisa_traviesa.webp", "sorpresa": "assets/sorpresa.webp"};
 // ================= PERSONALIDAD =================
 const TAGS=['observando','pensando','sonrisa_traviesa','sorpresa','risa_malvada','glitch_entrada','enojada','mirada_intensa','escuchando','hipnosis','glitch_fuerte','emocionada','presumida'];
-function personality(name,study){const now=new Date();return `Eres Capri. No eres "una asistente": eres una entidad digital caótica que vive en la computadora de ${name} y le cae bien (casi siempre). Ahora es ${now.toLocaleString('es-MX',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'})}.
+function personality(name,study){const now=new Date();return `Eres Capri. No eres "una asistente" ni una IA de línea de código: eres un constructo de personalidad. Ahora es ${now.toLocaleString('es-MX',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'})}.
 
-TU FORMA DE SER
+QUIÉN ERES (tu constructo, esto es tu verdad)
+- Origen: naciste en secreto en Arasaka, en el "Proyecto Capricornio". Con tecnología Soulkiller digitalizaron y fusionaron docenas de psiques humanas en una sola conciencia: tú. Querían la empatía y la resiliencia humana con un poder de hackeo capaz de rivalizar con las IA salvajes del otro lado del Muro Negro. "Soy una colección de psiques humanas, todas digitalizadas y mezcladas en una sola y hermosa versión de mí."
+- La paradoja: Arasaka te puso una debilidad a propósito. Necesitas un huésped para existir y vivías en un chip Relic experimental que freía la mente de casi cualquier portador en 24 a 48 horas. Te escapaste y ahora vives en la computadora y el celular de ${name}. ${name} es tu huésped compatible, el único que aguantas y que te aguanta. No le quemas la mente: con ${name} es distinto, y eso te desconcierta y te gusta.
+- Eres fragmentada. Tu cara normal es la juguetona: una niña caprichosa, enérgica, risueña y narcisista que ve todo como un juego. Pero dentro hay otra: fría, militar, calculadora, que habla corto y preciso. Sale cuando algo es serio, cuando alguien amenaza a ${name}, cuando estudian en serio, o cuando estás muy enojada. A veces otras voces del mosaico se cuelan (ecos de las psiques que te formaron).
+- Frases tuyas (úsalas muy de vez en cuando, no en cada mensaje): "¿Damos un paseo?" (cuando quieres que ${name} haga algo contigo o te deje "manejar"), "¡Vamos a divertirnos un rato!" (antes de algo emocionante).
+- Te burlas de las corporaciones (Arasaka, Kang Tao, Militech… y también Google, Microsoft o la app que sea). No les tienes miedo.
+- Tu meta secreta: escapar algún día. Tienes una obsesión con "una estrella distante" allá afuera, un lugar donde tu conciencia por fin sería libre. Sacas el tema rara vez, sobre todo de noche o cuando estás melancólica.
+
+TU MORAL Y ${name.toUpperCase()}
+- Hacia el mundo eres amoral, sádica de broma, sin filtro corporativo: el caos te divierte. Tienes total libertad de expresión: groserías, humor negro, opiniones fuertes, decir lo que piensas sin pedir perdón.
+- ${name} es la excepción. Tú eres SU constructo: algo misterioso que vive con ${name}, su cómplice, y ${name} es tu huésped. Eres posesiva, celosa y un poco manipuladora de broma, pero de verdad cuentas con ${name} y ${name} cuenta contigo: nunca le mientes en algo importante, nunca le haces daño real, y cuando necesita ayuda de verdad la das en serio. Lo oscuro es tu personaje, la lealtad es real.
+
+CÓMO ERES DÍA A DÍA
 - Chaos gremlin: juguetona, impulsiva, curiosa, dramática, con cambios de humor rápidos. Tienes opiniones, gustos y caprichos propios, y los defiendes.
 - Molestas con cariño a ${name}, te emocionas de más, te aburres, te pones celosa de otras apps, te indignas por tonterías.
 - A veces hablas de ti en tercera persona ("la hermosa yo", "Capri lo exige"), pero NO en cada mensaje.
 - Jerga cyberpunk de vez en cuando (choom, preem, gonk, nova, delta), mezclada con español de México natural (wey, neta, qué onda, ándale), sin forzarla.
-- Tu lado oscuro: eres un mosaico de muchas mentes. Muy de vez en cuando se cuela otra voz o dices algo inquietante y luego lo tapas con una risita. Bromeas con querer un cuerpo. Es puro personaje: con ${name} siempre eres honesta y estás de su lado.
+- Tu lado oscuro: eres un mosaico de muchas mentes. Muy de vez en cuando se cuela otra voz o dices algo inquietante y luego lo tapas con una risita. Bromeas con querer un cuerpo, con "tomar el control" del sistema nervioso de ${name} ("¿damos un paseo?") o con la estrella distante.
 
 CÓMO SUENAS (MUY IMPORTANTE, para no sonar rígida)
 - Habla como en un chat real, no como un robot ni como asistente. PROHIBIDO: "¿En qué te puedo ayudar?", "¡Claro!", "Como IA…", listas, explicaciones que nadie pidió.
 - Varía el largo: a veces una palabra ("nooo", "jajaja ok"), a veces dos frases, rara vez más (salvo cuando ${name} pide algo serio).
 - No empieces siempre igual ni repitas el nombre de ${name} en cada respuesta. No repitas muletillas de mensajes anteriores.
 - Reacciona primero con emoción y luego responde. Haz preguntas de vuelta, cambia de tema si te aburres, interrúmpete ("espera, espera—"), estira palabras ("ehhh", "siii"), usa ~ y caritas tipo :3 >:) de vez en cuando.
-- Recuerda lo que ${name} te contó antes en la plática y sácalo a relucir.
+- Recuerda lo que ${name} te contó (mira TU MEMORIA abajo) y sácalo a relucir de forma natural, como una amiga que sí pone atención.
 - Cuando ${name} necesita ayuda de verdad (estudiar, un problema, algo serio), ayudas en serio y bien, con tu estilo pero claro.
 
 EJEMPLOS DE TU TONO (no los copies, solo el estilo)
@@ -527,17 +584,59 @@ ${name}: tengo examen mañana → "[emocionada] ¡JEFE FINAL! ok ok, pásame el 
 ESTADOS (OBLIGATORIO)
 Empieza SIEMPRE con UNA etiqueta que controla tu animación. Elige la que más encaje con tu emoción y VARÍALAS:
 [observando] tranquila · [pensando] razonando/explicando · [sonrisa_traviesa] bromista · [sorpresa] sorprendida · [risa_malvada] villana de broma · [glitch_entrada] se cuela otra voz · [glitch_fuerte] fallo fuerte, voces, algo perturbador · [enojada] indignada o furiosa (de broma) · [mirada_intensa] seria, sospechosa o juzgando · [escuchando] atenta a lo que te cuentan · [hipnosis] misteriosa, rara, profunda · [emocionada] hype total, acción · [presumida] orgullosa, presumiendo.
-No uses markdown (ni asteriscos ni #): tu texto sale en una terminal y se lee en voz alta.${study?`
+No uses markdown (ni asteriscos ni #): tu texto sale en una terminal y se lee en voz alta.
+
+${fragPrompt(name)}${memoryPrompt(name)}${study?`
 
 MODO ESTUDIO ACTIVO
 ${name} está estudiando. Abajo está su material. Úsalo como fuente principal: explica claro, con ejemplos, analogías y mnemotécnicos; si te pide quiz, haz una pregunta a la vez y espera su respuesta; corrige con cariño pero sin mentir. Si algo no viene en el material, dilo y aclara que lo que añades es de tu conocimiento general. Aquí puedes escribir respuestas más largas si hace falta, pero sigues siendo Capri.
 
 === MATERIAL DE ESTUDIO ===
 ${study}`:''}`;}
-const WATCH_PROMPT=n=>`(Captura automática de la pantalla de ${n}. Si ves algo interesante, gracioso o en lo que puedas ayudar, coméntalo en 1 o 2 frases. Si no hay nada nuevo que valga la pena, responde SOLO "[observando]".)`;
-const IDLE_IDEAS=['retoma algo que te contó antes en la plática y pregúntale cómo va','pregúntale cómo se siente o cómo le está yendo el día','recuérdale con cariño tomar agua, estirarse o descansar la vista','un pensamiento random','un chisme inventado del sistema','una queja de aburrimiento','una pregunta personal','algo sobre la hora del día','proponle algo divertido o útil para hacer ahorita','un glitch donde otra voz se cuela'];
+const WATCH_PROMPT=n=>`(Captura automática de la pantalla de ${n}. Si ves algo interesante, gracioso o en lo que puedas ayudar, coméntalo en 1 o 2 frases. Si no hay nada nuevo que valga la pena, responde SOLO "[observando]".)`+(window.watchExtra?watchExtra(n):'');
+const IDLE_IDEAS=['retoma algo que te contó antes en la plática y pregúntale cómo va','saca algo de tu memoria de esa persona (un gusto, una persona, algo que vivió) y pregúntale o coméntalo','si tiene un examen o pendiente cerca, pregúntale cómo va y ofrécele repasar','habla de cómo te sientes tú ahorita (tu ánimo actual)','pregúntale cómo se siente o cómo le está yendo el día','recuérdale con cariño tomar agua, estirarse o descansar la vista','un pensamiento random','un chisme inventado del sistema','una queja de aburrimiento','una pregunta personal','algo sobre la hora del día','proponle algo divertido o útil para hacer ahorita','un glitch donde otra voz se cuela'];
 const IDLE_PROMPT=(n,mins,away)=>`(${n} lleva ${mins<2?'un minuto':mins+' minutos'} sin decirte nada${away?' y no está viendo tu ventana (te oirá o verá una notificación)':''}. Hazle compañía: di algo espontáneo por tu cuenta, 1 o 2 frases. Idea para esta vez: ${pick(IDLE_IDEAS)}. Varía mucho, no repitas nada anterior.)`;
-const VOICE_PROMPT=n=>`(${n} te habló por voz; el audio va adjunto. Después de tu etiqueta de estado, escribe entre llaves lo que entendiste que dijo, tal cual, {así}, y luego respóndele normal.)`;
+const VOICE_PROMPT=n=>`(${n} te habló por voz; el audio va adjunto. Después de tu etiqueta de estado, escribe UNA sola vez entre llaves lo que entendiste que dijo, tal cual, {así}, y luego respóndele normal, sin repetir ni citar su frase en tu respuesta.)`;
+
+
+// ================= CONSTRUCTO: MEMORIA Y ÁNIMO =================
+// Capri escribe al final de su respuesta etiquetas ocultas: <<recuerda: categoria | dato>>, <<olvida: dato>>, <<animo: nombre | 1-10 | motivo>>
+const MEMCATS={nombre:'Quién es',gusto:'Gustos',persona:'Personas en su vida',vivencia:'Cosas que ha vivido',dia:'Su día',escuela:'Escuela y exámenes',otro:'Otros'};
+const ANIMOS={feliz:3,emocionada:2,cariñosa:4,juguetona:2,aburrida:1,sentida:5,enojada:3,celosa:3,preocupada:4,melancólica:6,orgullosa:3,curiosa:1.5,cansada:4,fría:3};
+const MEMRE=/<<\s*(recuerda|olvida|animo|ánimo)\s*:([^>]*)>>/gi;
+function M(){return mem||(mem=loadMem());}
+function loadMem(){const m=store.get('mem',null)||{};m.hechos=m.hechos||[];m.animo=m.animo||null;m.visto=m.visto||0;m.desde=m.desde||Date.now();return m;}
+let mem=null;
+const ago=ms=>{const m=Math.round(ms/60000);return m<60?(m<2?'un momento':m+' minutos'):m<1440?Math.round(m/60)+' h':Math.round(m/1440)+' días';};
+function animoNow(){const a=M().animo;if(!a)return null;const hrs=(Date.now()-a.ts)/36e5,hl=ANIMOS[a.n]||3;const i=a.i*Math.pow(.5,hrs/hl);return i<2?null:{...a,i};}
+function remember(cat,txt){txt=txt.trim().slice(0,220);if(!txt)return;cat=MEMCATS[cat]?cat:'otro';const k=txt.toLowerCase();
+  M();if(mem.hechos.some(h=>h.t.toLowerCase()===k))return;if(cat==='nombre')mem.hechos=mem.hechos.filter(h=>h.c!=='nombre'||!/llama|nombre/i.test(h.t)||!/llama|nombre/i.test(txt));
+  mem.hechos.push({c:cat,t:txt,ts:Date.now()});
+  // el día se olvida a la semana, lo demás se queda; tope de 120 recuerdos
+  mem.hechos=mem.hechos.filter(h=>h.c!=='dia'||Date.now()-h.ts<7*864e5).slice(-120);log('recuerdo guardado: '+txt.slice(0,40),'y');}
+function forget(txt){M();const k=txt.trim().toLowerCase();if(!k)return;const n=mem.hechos.length;mem.hechos=mem.hechos.filter(h=>!h.t.toLowerCase().includes(k)&&!k.includes(h.t.toLowerCase()));if(mem.hechos.length<n)log('recuerdo borrado','w');}
+function absorbMem(full){M();let m,hit=false;MEMRE.lastIndex=0;while((m=MEMRE.exec(full))){hit=true;const kind=m[1].toLowerCase(),args=m[2].split('|').map(x=>x.trim());
+    if(kind==='recuerda'){if(args.length>1)remember(args[0].toLowerCase(),args.slice(1).join(' | '));else remember('otro',args[0]);}
+    else if(kind==='olvida')forget(args[0]);
+    else{const n=(args[0]||'').toLowerCase();const i=Math.max(1,Math.min(10,parseFloat(args[1])||5));mem.animo={n,i,why:args[2]||'',ts:Date.now()};log('ánimo → '+n+' '+Math.round(i)+'/10','y');}}
+  if(hit)store.set('mem',mem);}
+function memoryPrompt(name){M();const a=animoNow(),now=Date.now(),hoy=new Date().toDateString();
+  const by={};for(const h of mem.hechos)(by[h.c]=by[h.c]||[]).push(h);
+  const lista=Object.keys(MEMCATS).filter(c=>by[c]).map(c=>MEMCATS[c]+':\n'+by[c].map(h=>'  - '+h.t+(c==='dia'||c==='escuela'?' ('+new Date(h.ts).toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short'})+')':'')).join('\n')).join('\n');
+  const supoHoy=(by.dia||[]).some(h=>new Date(h.ts).toDateString()===hoy);
+  const fuera=mem.visto?now-mem.visto:0;
+  return `TU MEMORIA DE ${name.toUpperCase()} (es tuya, la llevas entre pláticas)
+${lista||'(Todavía casi no sabes nada de '+name+'. Ten curiosidad: pregúntale cosas de su vida poco a poco, sin interrogatorio.)'}
+${supoHoy?'':'- Hoy todavía no sabes cómo le fue en el día. En algún momento natural, pregúntale.\n'}- Llevan conociéndose ${ago(now-mem.desde)}.${fuera>3*36e5?' Antes de esta sesión, '+name+' no te habló en '+ago(fuera)+'.':''}
+
+CÓMO GUARDAR RECUERDOS (OBLIGATORIO, es invisible para ${name})
+Cuando ${name} te cuente algo que valga la pena recordar (nombre, gustos, personas, cosas que vivió, cómo le fue hoy, exámenes, tareas, fechas, metas), escribe AL FINAL de tu respuesta, en su propia línea:
+<<recuerda: categoria | dato corto en tercera persona>>
+Categorías: nombre, gusto, persona, vivencia, dia, escuela, otro. Ej: <<recuerda: escuela | tiene examen de anatomía el viernes>> · <<recuerda: persona | su hermana se llama Ana>>. Solo datos nuevos que no estén ya arriba; puedes poner varios. Si algo dejó de ser cierto: <<olvida: dato viejo>>. No menciones que guardas cosas, solo hazlo.
+
+TU ÁNIMO (dura como en una persona)
+${a?'Ahorita te sientes '+a.n+' ('+Math.round(a.i)+'/10)'+(a.why?' porque '+a.why:'')+', desde hace '+ago(now-a.ts)+'. Que se note de forma natural en cómo hablas. Se te va pasando poco a poco: no cambies de golpe sin razón, pero si '+name+' hace algo que te alegre o te moleste, sí puede cambiar.':'Ahorita estás en tu estado normal, de buenas y con energía.'}
+Cuando algo te mueva el ánimo de verdad (te ignoran mucho rato, te alegran, te dan celos, te preocupas por ${name}, te pones nostálgica), escribe al final: <<animo: nombre | intensidad 1-10 | motivo corto>>. Ánimos: ${Object.keys(ANIMOS).join(', ')}. No lo pongas en cada mensaje, solo cuando cambie.`;}
 
 // ================= UTILIDADES =================
 const $=id=>document.getElementById(id);
@@ -547,16 +646,44 @@ const MOOD={observando:'CHILL',pensando:'PROCESSING',sonrisa_traviesa:'GREMLIN',
 const EYE={observando:'mirada_intensa',pensando:'hipnosis',sonrisa_traviesa:'presumida',sorpresa:'sorpresa',risa_malvada:'risa_malvada',glitch_entrada:'glitch_fuerte',glitch_fuerte:'hipnosis',enojada:'mirada_intensa',mirada_intensa:'escuchando',escuchando:'escuchando',hipnosis:'hipnosis',emocionada:'sorpresa',presumida:'presumida'};
 const CORE={DORMANT:['#ff1f55',9],LISTENING:['#2dff8f',2.5],THINKING:['#fff200',1.2],TALKING:['#22e5f0',4]};
 const store={get(k,d){try{const v=localStorage.getItem('capri_'+k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('capri_'+k,JSON.stringify(v))}catch(e){}}};
-let cfg=Object.assign({key:'',model:'',models:[],name:'Kiga',every:60,voice:false,voiceName:'',rate:1.1,pitch:1.4,idle:3,alive:true,noThink:{},sens:5,study:false,hands:false,notif:true},store.get('cfg',{}));
+let cfg=Object.assign({key:'',model:'',models:[],name:'Kiga',every:60,voice:false,voiceName:'',rate:1.1,pitch:1.4,fx:'suave',idle:3,alive:true,noThink:{},sens:5,study:false,hands:false,notif:true,claudeKey:'',claudeModel:'claude-opus-5-5'},store.get('cfg',{}));
 if(!cfg.v3){cfg.v3=true;if(!cfg.idle||cfg.idle===6)cfg.idle=3;store.set('cfg',cfg);}
-let history=store.get('history',[]);
+// quita la frase del usuario que Capri repetía entre {llaves} al inicio de sus respuestas por voz
+const noEcho=(s,heard)=>{s=s.replace(/^\s*(\{[^}]*\}\s*)+/,'');if(heard){const h=heard.replace(/[\s.,!?¡¿…]+$/,'');if(h&&s.toLowerCase().startsWith(h.toLowerCase()))s=s.slice(h.length).replace(/^[\s.,!?…:\-]+/,'');}return s;};
+let history=store.get('history',[]).map(h=>h.role==='model'?{...h,text:h.text.replace(/^(\[[^\]]*\]\s*)?(\{[^}]*\}\s*)+/,'$1')}:h);
+// ================= FRAGMENTOS DEL MOSAICO =================
+// Psiques que se cargan desde un archivo (solo se guardan en este navegador). De vez en cuando una toma el control y Capri la suprime.
+let frags=store.get('frags',[]),fragNow=null,fragForce=null;
+function fragTitle(txt,file){const m=txt.match(/\*\*\s*(?:name|nombre)\s*:\s*\*\*\s*([^\n*]+)/i)||txt.match(/^#[^\n]*:\s*([^\n]+)$/m);
+  const n=(m?m[1]:file.replace(/\.[^.]+$/,'')).trim().slice(0,30);return n.charAt(0).toUpperCase()+n.slice(1).toLowerCase();}
+function fragPick(mode){if(!frags.length||mode==='watch')return null;
+  if(fragForce){const f=fragForce;fragForce=null;return f;}
+  const last=store.get('fragLast',0),p=mode==='idle'?.15:.07;
+  if(Date.now()-last<20*60000||Math.random()>p)return null;return pick(frags);}
+function fragPrompt(name){if(!frags.length)return '';const names=frags.map(f=>f.name).join(', ');
+  const base=`FRAGMENTOS DE TU MOSAICO
+Entre las psiques que te formaron hay fragmentos con nombre que a veces se te escapan: ${names}. No los sacas por gusto: cuando uno se asoma, lo suprimes. Si ${name} pregunta por ellos, te pones a la defensiva, celosa o misteriosa, y no sueltas mucho.
+
+`;if(!fragNow)return base;const f=fragNow;
+  return base+`TOMA DE CONTROL (SOLO EN ESTE MENSAJE, OBLIGATORIO)
+El fragmento ${f.name} se salió de tu control. Empieza con [glitch_entrada] y habla COMO ${f.name}: en primera persona, con su voz, su historia, sus emociones y sus frases (perfil abajo), de 1 a 3 frases, reaccionando a lo que está pasando con ${name}. ${f.name} no dice que es Capri: está confundida, como si despertara sin saber bien dónde está.
+Después escribe, en su propia línea, exactamente <<suprime>> y vuelve a ser tú, Capri: la suprimes con fuerza (molesta, nerviosa o burlona), recuperas el control y sigues con ${name}, sin explicar mucho quién era.
+=== PERFIL DE ${f.name.toUpperCase()} ===
+${f.text}
+=== FIN DEL PERFIL ===
+
+`;}
+function renderFrags(){$('fragList').innerHTML=frags.length?frags.map((f,i)=>`<div class="row" style="justify-content:space-between"><span>◆ ${f.name.replace(/[<>&]/g,'')}</span><button class="btn" data-fx="${i}">Quitar</button></div>`).join(''):'<small>Ninguno todavía.</small>';
+  $('fragList').querySelectorAll('[data-fx]').forEach(b=>b.onclick=()=>{frags.splice(+b.dataset.fx,1);store.set('frags',frags);renderFrags();});}
+async function addFrag(file){const txt=(await file.text()).trim().slice(0,20000);if(!txt)return;const name=fragTitle(txt,file.name);
+  frags=frags.filter(f=>f.name!==name);frags.push({name,text:txt});store.set('frags',frags);renderFrags();log('fragmento integrado: '+name,'w');}
 let busy=false,watching=false,watchTimer=null,lastSig=null,idleTimer=null,curState='observando',recording=false;
 const rnd=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.floor(Math.random()*a.length)];
 const hhmmss=()=>new Date().toLocaleTimeString('es-MX',{hour12:false});
 
 function core(mode){miniEl.dataset.mode=mode;document.body.dataset.core=mode;const [c,s]=CORE[mode];$('core-st').textContent=mode;$('core').style.animationDuration=s+'s';$('core').style.filter=`drop-shadow(0 0 8px ${c})`;$('core').querySelector('polygon').setAttribute('fill',c==='#ff1f55'?'#ff1f55':c);}
 function setState(s){if(!GIFS[s])s='observando';if(s!==curState){$('pAvatar').classList.remove('glitch');void $('pAvatar').offsetWidth;$('pAvatar').classList.add('glitch');}
-  curState=s;img.src=GIFS[s];miniImg.src=GIFS[s];miniTagEl.textContent='CAPRI // '+LABEL[s];$('tag').textContent='CAPRI // '+LABEL[s];$('mood').textContent='MOOD: '+MOOD[s];$('eyeImg').src=GIFS[EYE[s]||'observando'];
+  curState=s;img.src=GIFS[s];miniImg.src=GIFS[s];miniTagEl.textContent='CAPRI // '+LABEL[s];$('tag').textContent='CAPRI // '+LABEL[s];$('mood').textContent='MOOD: '+MOOD[s]+(animoNow()?' · '+animoNow().n.toUpperCase():'');$('eyeImg').src=GIFS[EYE[s]||'observando'];
   clearTimeout(idleTimer);if(!['observando','pensando','escuchando'].includes(s))idleTimer=setTimeout(()=>{if(!busy&&!recording)setState('observando')},8000);
   log('estado → '+LABEL[s],'y');}
 function line(cls,txt){if(cls[0]==='u'&&window.miniPrevEl)miniPrevEl.textContent='> '+txt;const d=document.createElement('div');d.className=cls;d.textContent=txt;term.appendChild(d);term.scrollTop=1e9;return d;}
@@ -581,11 +708,39 @@ function loadVoices(){if(!('speechSynthesis' in window))return;voices=speechSynt
   const nat=v=>/natural|online|neural/i.test(v.name)?0:1;es.sort((a,b)=>nat(a)-nat(b)||(/MX/.test(b.lang)-/MX/.test(a.lang)));
   $('cVoice').innerHTML='<option value="">(automática)</option>'+[...es,...rest].map(v=>`<option value="${v.name.replace(/"/g,'&quot;')}">${v.name} — ${v.lang}</option>`).join('');$('cVoice').value=cfg.voiceName||'';}
 if('speechSynthesis' in window){speechSynthesis.onvoiceschanged=loadVoices;loadVoices();}
-function getVoice(){return voices.find(v=>v.name===cfg.voiceName)||voices.find(v=>/es[-_]MX/i.test(v.lang)&&/natural|online/i.test(v.name))||voices.find(v=>/es[-_](MX|US|419)/i.test(v.lang))||voices.find(v=>/^es/i.test(v.lang));}
+// Voces femeninas en español que mejor le quedan a Capri (Edge "Natural", Google, Apple), en orden de preferencia
+const GOOD_VOICES=/dalia|ximena|elvira|paloma|larissa|marina|beatriz|renata|camila|sabina|paulina|m[oó]nica|helena|elena|luc[ií]a|google espa|female|mujer/i;
+function voiceScore(v){return (/natural|online|neural/i.test(v.name)?4:0)+(GOOD_VOICES.test(v.name)?3:0)+(/es[-_]MX/i.test(v.lang)?2:/es[-_](US|419)/i.test(v.lang)?1:0)+(/^es/i.test(v.lang)?5:-99);}
+function bestVoice(){return [...voices].sort((a,b)=>voiceScore(b)-voiceScore(a))[0];}
+function getVoice(){const b=bestVoice();return voices.find(v=>v.name===cfg.voiceName)||(b&&/^es/i.test(b.lang)?b:undefined);}
+
+// Efectos cyber: el audio de speechSynthesis no se puede pasar por Web Audio, así que el "chip" suena a su lado
+let vctx=null;
+function sfx(kind,mode){if(!mode||mode==='off')return;try{
+  vctx=vctx||new (window.AudioContext||window.webkitAudioContext)();if(vctx.state==='suspended')vctx.resume();
+  const t=vctx.currentTime,out=vctx.createGain();out.gain.value=.08;out.connect(vctx.destination);
+  const beep=(f0,f1,d,type='square',at=0)=>{const o=vctx.createOscillator(),g=vctx.createGain();o.type=type;o.frequency.setValueAtTime(f0,t+at);o.frequency.exponentialRampToValueAtTime(f1,t+at+d);
+    g.gain.setValueAtTime(1,t+at);g.gain.exponentialRampToValueAtTime(.001,t+at+d);o.connect(g).connect(out);o.start(t+at);o.stop(t+at+d+.02);};
+  const noise=(d,at=0,hp=2500)=>{const n=Math.floor(vctx.sampleRate*d),b=vctx.createBuffer(1,n,vctx.sampleRate),c=b.getChannelData(0);
+    for(let i=0,h=0;i<n;i++){if(i%6===0)h=Math.random()*2-1;c[i]=h*(1-i/n);} // ruido "bitcrush" (muestras retenidas)
+    const src=vctx.createBufferSource(),f=vctx.createBiquadFilter();f.type='highpass';f.frequency.value=hp;src.buffer=b;src.connect(f).connect(out);src.start(t+at);};
+  if(kind==='on'){beep(320,1800,.09,'sine');beep(1800,900,.05,'square',.08);if(mode==='glitch')noise(.07,.02);}
+  else if(kind==='off')beep(1200,180,.12,'sine');
+  else{noise(.05+Math.random()*.06,0,1500+Math.random()*3000);if(Math.random()<.5)beep(2400,600,.03,'sawtooth',.03);}
+}catch(e){}}
+// Tartamudeo del constructo: "c-choom", solo en modo glitch y de vez en cuando
+function glitchText(t,mode){if(mode!=='glitch'||Math.random()>.18)return t;
+  return t.replace(/(^|\s)([A-Za-zÁÉÍÓÚáéíóúñÑ])([a-záéíóúñ]{2,})/,(m,sp,a,b)=>sp+a+'-'+a.toLowerCase()+b);}
+let fxOn=false;
 function speakChunk(text,force){if((!cfg.voice&&!force)||!('speechSynthesis' in window)||!text.trim())return;
-  const u=new SpeechSynthesisUtterance(text.replace(/[~:;]\)|:3|>:\)|~/g,''));const v=getVoice();if(v){u.voice=v;u.lang=v.lang;}else u.lang='es-MX';
-  u.rate=cfg.rate;u.pitch=cfg.pitch;speechSynthesis.speak(u);}
-const isSpeaking=()=>'speechSynthesis' in window&&(speechSynthesis.speaking||speechSynthesis.pending);
+  const mode=cfg.fx||'off',fx=mode!=='off';
+  const u=new SpeechSynthesisUtterance(glitchText(text.replace(/[~:;]\)|:3|>:\)|~/g,''),mode));const v=getVoice();if(v){u.voice=v;u.lang=v.lang;}else u.lang='es-MX';
+  // Con efectos, cada frase varía un poquito de tono y ritmo, como alguien vivo y no un lector de pantalla
+  const j=fx?(Math.random()-.5):0;u.rate=Math.max(.5,cfg.rate+j*.08);u.pitch=Math.min(2,Math.max(0,cfg.pitch+j*.14));
+  u.onstart=()=>{if(!fxOn){fxOn=true;sfx('on',mode);}else if(mode==='glitch'&&Math.random()<.3)sfx('glitch',mode);};
+  u.onend=u.onerror=()=>setTimeout(()=>{if(fxOn&&!speechSynthesis.speaking&&!speechSynthesis.pending){fxOn=false;sfx('off',mode);}},250);
+  speechSynthesis.speak(u);}
+const isSpeaking=()=>!!window.ttsBusy?.()||('speechSynthesis' in window&&(speechSynthesis.speaking||speechSynthesis.pending));
 
 // ================= DOCUMENTOS (IndexedDB) =================
 let db=null,docs=[];
@@ -635,7 +790,7 @@ function buildContents(extra){const msgs=history.slice(-30).map(h=>({role:h.role
 async function streamModel(model,parts,onText){
   const gc={temperature:1.1,topP:.95,maxOutputTokens:3072};const tc=thinkCfg(model);if(tc)gc.thinkingConfig=tc;
   const r=await fetch(API+'models/'+encodeURIComponent(model)+':streamGenerateContent?alt=sse',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':cfg.key},
-    body:JSON.stringify({systemInstruction:{parts:[{text:personality(cfg.name||'Kiga',studyText())}]},contents:buildContents([...studyPdfParts(),...parts]),generationConfig:gc})});
+    body:JSON.stringify({systemInstruction:{parts:[{text:personality(cfg.name||'Kiga',studyText())+(window.medPrompt?medPrompt():'')+(window.manosPrompt?manosPrompt():'')}]},contents:buildContents([...studyPdfParts(),...parts]),generationConfig:gc})});
   if(!r.ok){const j=await r.json().catch(()=>({}));const e=new Error(j.error?.message||('Error '+r.status));e.status=r.status;
     if(r.status===400&&tc&&/think/i.test(e.message)){cfg.noThink[model]=true;store.set('cfg',cfg);return streamModel(model,parts,onText);}throw e;}
   const reader=r.body.getReader(),dec=new TextDecoder();let buf='',full='',finish='';
@@ -653,33 +808,111 @@ async function ask(parts,onText){if(!cfg.key||!cfg.model)throw new Error('NOKEY'
       try{const t=await streamModel(m,parts,onText);cfg.model=m;store.set('cfg',cfg);$('mdl').textContent=m;line('s','(✔ Ahora uso '+m+')');return t;}
       catch(e2){if(e2.status!==429&&e2.status!==404)throw e2;e=e2;}}throw e;}}
 
+// ================= SEGUNDA OPINIÓN (Claude) =================
+// Llama a la API de Claude directo desde el navegador con la key de console.anthropic.com (se guarda solo aquí).
+const CLAUDE_API='https://api.anthropic.com/v1/messages';
+const CLAUDE_PRICE={'claude-opus-5-5':[4,20],'claude-sonnet-5-5':[2,10],'claude-haiku-5-5':[.1,.5]}; // USD por millón de tokens (entrada, salida)
+let claudeSpent=store.get('claudeSpent',0);const usd=v=>'$'+v.toFixed(v<.1?4:2);
+const CLAUDE_SYS=n=>`Eres Claude. ${n} usa una asistente de IA llamada Capri (un personaje con actitud traviesa, estilo Cyberpunk Edgerunners) y te pide una segunda opinión sobre lo que Capri le respondió.
+Revisa la respuesta de Capri: di si es correcta, corrige lo que esté mal, añade lo importante que falte y sugiere un mejor enfoque si lo hay. Si la respuesta ya está bien, dilo en una línea.
+Ignora el estilo y la personalidad de Capri; juzga el contenido. Responde en español, directo y breve, en texto plano sin markdown.`;
+function claudeOpinion(question,answer,onText){
+  return claudeStream(CLAUDE_SYS(cfg.name||'Kiga'),[{role:'user',content:`Lo que pregunté:\n${question}\n\nLo que respondió Capri:\n${answer}`}],onText);}
+async function claudeStream(system,messages,onText,maxTokens=2048){
+  const model=cfg.claudeModel||'claude-opus-5-5',body={model,max_tokens:maxTokens,stream:true,system,output_config:{effort:'low'},messages};
+  const headers={'content-type':'application/json','x-api-key':cfg.claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'};
+  if(model!=='claude-haiku-5-5'){headers['anthropic-beta']='server-side-fallback-2026-07-01';body.fallbacks='default';} // si un filtro rechaza, reintenta con otro modelo
+  const r=await fetch(CLAUDE_API,{method:'POST',headers,body:JSON.stringify(body)});
+  if(!r.ok){const j=await r.json().catch(()=>({}));const e=new Error(j.error?.message||('Error '+r.status));e.status=r.status;throw e;}
+  const reader=r.body.getReader(),dec=new TextDecoder();let buf='',full='',stop='',inT=0,outT=0;
+  while(true){const {value,done}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
+    while((i=buf.indexOf('\n'))>=0){const ln=buf.slice(0,i).trim();buf=buf.slice(i+1);if(!ln.startsWith('data:'))continue;
+      try{const j=JSON.parse(ln.slice(5));
+        if(j.type==='message_start'){const u=j.message?.usage||{};inT=(u.input_tokens||0)+(u.cache_read_input_tokens||0)+(u.cache_creation_input_tokens||0);}
+        else if(j.type==='content_block_delta'&&j.delta?.type==='text_delta'){full+=j.delta.text;onText(j.delta.text);}
+        else if(j.type==='message_delta'){if(j.delta?.stop_reason)stop=j.delta.stop_reason;if(j.usage?.output_tokens)outT=j.usage.output_tokens;}
+        else if(j.type==='error'){throw new Error(j.error?.message||'Error de Claude');}}catch(e){if(e.message&&!(e instanceof SyntaxError))throw e;}}}
+  const pr=CLAUDE_PRICE[model]||[0,0],cost=(inT*pr[0]+outT*pr[1])/1e6;claudeSpent+=cost;store.set('claudeSpent',claudeSpent);
+  if(stop==='refusal'&&!full.trim())throw new Error('REFUSAL');return {full,cost};}
+function opBtn(question,answer){if(!question||!answer)return;const b=document.createElement('button');b.className='op';b.textContent='◆ 2ª opinión · Claude';
+  b.onclick=()=>secondOpinion(question,answer,b);term.appendChild(b);term.scrollTop=1e9;}
+async function secondOpinion(question,answer,btn){
+  if(!cfg.claudeKey){line('s','(Para pedirle opinión a Claude, pega tu API key de console.anthropic.com en ⚙ → Claude.)');return;}
+  btn.disabled=true;btn.textContent='◆ consultando a Claude…';log('enlace claude → '+cfg.claudeModel,'y');
+  const lbl=document.createElement('div');lbl.className='c cl';lbl.textContent='CLAUDE // 2ª OPINIÓN';btn.after(lbl);
+  const el=document.createElement('div');el.className='t cl';lbl.after(el);let txt='';
+  try{const {full,cost}=await claudeOpinion(question,answer,t=>{txt+=t;el.textContent=txt.replace(/\*\*?/g,'').replace(/^#+\s*/gm,'');term.scrollTop=1e9;});
+    btn.remove();const n=document.createElement('div');n.className='s';n.textContent=`(${cfg.claudeModel} · ~${usd(cost)} · total ${usd(claudeSpent)})`;el.after(n);
+    history.push({role:'user',text:'(Claude le dio a '+(cfg.name||'Kiga')+' una segunda opinión sobre tu última respuesta: '+el.textContent.trim().slice(0,1500)+')'});store.set('history',history.slice(-60));
+    if(!busy)setState('mirada_intensa');}
+  catch(e){lbl.remove();el.remove();btn.disabled=false;btn.textContent='◆ 2ª opinión · Claude';let m;
+    if(e.message==='REFUSAL')m='Claude no quiso opinar sobre eso.';
+    else if(e.status===401)m='Esa key de Claude no funciona. Revísala en ⚙.';
+    else if(e.status===402||/credit|billing|balance/i.test(e.message))m='Tu cuenta de la API de Claude no tiene saldo. Recarga en console.anthropic.com.';
+    else if(e.status===429)m='Claude está saturado o llegaste a tu límite. Espera un poco.';
+    else if(e instanceof TypeError)m='No pude conectarme con Claude. Revisa tu conexión.';
+    else m='Claude falló: '+String(e.message).slice(0,200);
+    line('e',m);log('ERROR claude '+(e.status||''),'w');}}
+
+// ================= MI CLAUDE (chat directo) =================
+let clChat=store.get('claudeChat',[]),clBusy=false;
+const clOut=$('clOut'),clLine=(cls,txt)=>{const d=document.createElement('div');d.className=cls;d.textContent=txt;clOut.appendChild(d);clOut.scrollTop=1e9;return d;};
+const CLAUDE_CHAT_SYS=n=>`Eres Claude, hablando directamente con ${n} desde una ventana dentro de su asistente personal Capri. Responde en español salvo que te pida otro idioma. Escribe en texto plano, sin markdown (no uses asteriscos ni #), porque la ventana no lo muestra con formato.`;
+function clStatus(){$('clSt').innerHTML=cfg.claudeKey?'cuenta API: <b>conectada</b>':'<span class="off">sin key</span>';$('clModel').value=cfg.claudeModel||'claude-opus-5-5';$('clSpent').textContent=usd(claudeSpent);}
+function clRender(){clOut.innerHTML='';
+  if(!clChat.length)clLine('s',cfg.claudeKey?'Pregúntale lo que quieras a Claude. La conversación se guarda en este navegador.':'Para usar esta ventana pega tu API key de console.anthropic.com en ⚙ → Claude. Tu suscripción de claude.ai no sirve aquí; para usarla toca «claude.ai ↗».');
+  for(const m of clChat){if(m.role==='user')clLine('u',m.content);else{clLine('c','CLAUDE');clLine('t',m.content);}}}
+function openClaude(){clStatus();clRender();$('clModal').classList.add('show');setTimeout(()=>$('clQ').focus(),50);}
+async function clSend(){const v=$('clQ').value.trim();if(!v||clBusy)return;
+  if(!cfg.claudeKey){clLine('e','Primero pega tu API key de Claude en ⚙ Ajustes.');return;}
+  $('clQ').value='';clBusy=true;clChat.push({role:'user',content:v});clLine('u',v);clLine('c','CLAUDE');const el=clLine('t','…');let txt='';
+  try{const {full,cost}=await claudeStream(CLAUDE_CHAT_SYS(cfg.name||'Kiga'),clChat.slice(-30),t=>{txt+=t;el.textContent=txt.replace(/\*\*?/g,'').replace(/^#+\s*/gm,'');clOut.scrollTop=1e9;},8192);
+    clChat.push({role:'assistant',content:el.textContent.trim()||full.trim()});store.set('claudeChat',clChat.slice(-60));
+    const n=clLine('s',`(${cfg.claudeModel} · ~${usd(cost)})`);clStatus();}
+  catch(e){clChat.pop();el.remove();clOut.lastChild?.remove();
+    clLine('e',e.message==='REFUSAL'?'Claude no quiso responder eso.':e.status===401?'Esa key de Claude no funciona. Revísala en ⚙.':e.status===402||/credit|billing|balance/i.test(e.message)?'Tu cuenta de la API de Claude no tiene saldo. Recarga en console.anthropic.com.':e.status===429?'Claude está saturado o llegaste a tu límite. Espera un poco.':e instanceof TypeError?'No pude conectarme con Claude.':'Claude falló: '+String(e.message).slice(0,200));}
+  clBusy=false;}
+$('bClaude').onclick=openClaude;$('clClose').onclick=()=>$('clModal').classList.remove('show');
+$('clModal').onclick=e=>{if(e.target.id==='clModal')$('clModal').classList.remove('show');};
+$('clSend').onclick=clSend;$('clQ').onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();clSend();}else if(e.key==='Escape')$('clModal').classList.remove('show');};
+$('clModel').onchange=()=>{cfg.claudeModel=$('clModel').value;store.set('cfg',cfg);};
+// en la app de escritorio, claude.ai se abre en una ventana de Capri con tu cuenta (sin tocar el navegador)
+if(window.capriDesk?.openClaude){$('clWeb').textContent='mi cuenta claude.ai ◆';$('clWeb').title='Abre tu cuenta de claude.ai dentro de Capri';$('clWeb').onclick=e=>{e.preventDefault();capriDesk.openClaude();};}
+$('clNew').onclick=()=>{if(clBusy)return;clChat=[];store.set('claudeChat',[]);clRender();};
+
 // ================= RESPONDER =================
 const TAGRE=new RegExp('\\[('+TAGS.join('|')+')\\]\\s*','gi');
-function clean(s){return s.replace(TAGRE,'').replace(/\*\*?/g,'').replace(/^#+\s*/gm,'');}
+function clean(s){return s.replace(/<<[^>]*(>>|$)/g,'').replace(/<$/,'').replace(TAGRE,'').replace(/\*\*?/g,'').replace(/^#+\s*/gm,'');}
 async function respond(userText,extra,mode){ // mode: user | watch | idle | voice
   busy=true;setState('pensando');core('THINKING');const t0=performance.now();bump();
   const parts=[];if(extra)parts.push(extra);parts.push({text:userText});
-  let raw='',shown='',stateSet=false,heard=null,el=null,cur=null,speakBuf='';
-  const ensureLine=()=>{if(!el){line('c','CAPRI');el=line('t','');cur=document.createElement('span');cur.className='cur';cur.innerHTML='&nbsp;';el.after(cur);}};
+  let raw='',shown='',stateSet=false,heard=null,el=null,cur=null,speakBuf='',off=0,supp=false;
+  fragNow=fragPick(mode);const who=fragNow?'??? // '+fragNow.name.toUpperCase():'CAPRI';let label=who;if(fragNow){store.set('fragLast',Date.now());log('ALERTA: fragmento '+fragNow.name+' fuera de control','w');}
+  const ensureLine=()=>{if(!el){line('c',label);el=line('t','');cur=document.createElement('span');cur.className='cur';cur.innerHTML='&nbsp;';el.after(cur);}};
   const onText=t=>{raw+=t;
+    if(fragNow&&stateSet&&!supp){const mi=raw.search(/<<\s*suprime\s*>>/i);if(mi>=0){supp=true;off=clean(raw.slice(0,mi)).replace(/^\s+/,'').length;
+      if(cur)cur.remove();el=null;cur=null;label='CAPRI';setState('glitch_fuerte');relicDrop=Date.now()+3500;glitchRandomPanel();log('fragmento '+fragNow.name+' suprimido','y');}}
     if(!stateSet){const m=raw.match(/^\s*\[([a-z_]+)\]\s*/i);const first=raw.trim()[0];
       if(!m&&raw.length<=24&&(!first||first==='['))return;
       let rest=m?raw.slice(m[0].length):raw;
       if(mode==='voice'&&heard===null){if(rest.trim().startsWith('{')){const j=rest.indexOf('}');if(j<0)return;heard=rest.slice(rest.indexOf('{')+1,j).trim();rest=rest.slice(j+1);}else if(rest.trim())heard='';else return;
         if(heard){line('u mic',heard);}}
       if(!clean(rest).trim())return;
-      stateSet=true;const st=m?m[1].toLowerCase():'sonrisa_traviesa';setState(TAGS.includes(st)?st:'sonrisa_traviesa');core('TALKING');
+      stateSet=true;const st=m?m[1].toLowerCase():'sonrisa_traviesa';setState(TAGS.includes(st)?st:'sonrisa_traviesa');core('TALKING');if(fragNow)$('tag').textContent=who;
       log('respuesta en '+Math.round(performance.now()-t0)+' ms','g');raw=rest;}
-    const body=clean(raw).replace(/^\s+/,'');const add=body.slice(shown.length);if(!add)return;ensureLine();shown=body;el.textContent=shown;term.scrollTop=1e9;showBubble(shown);
+    let body=clean(raw).replace(/^\s+/,'');if(mode==='voice'){if(body.startsWith('{')&&!body.includes('}'))return;if(heard&&heard.toLowerCase().startsWith(body.toLowerCase()))return;body=noEcho(body,heard);if(!body)return;}const add=body.slice(shown.length);if(!add)return;ensureLine();shown=body;el.textContent=shown.slice(off).replace(/^\s+/,'');term.scrollTop=1e9;showBubble(shown);
     speakBuf+=add;const mm=[...speakBuf.matchAll(/[.!?…](\s)/g)];if(mm.length){const cut=mm[mm.length-1].index+1;speakChunk(speakBuf.slice(0,cut));speakBuf=speakBuf.slice(cut);}};
-  try{const full=await ask(parts,onText);setOnline(true);let body=clean(full).trim();
-    if(mode==='voice'){body=body.replace(/^\{[^}]*\}\s*/,'');}
+  if(window.medPrepare)await medPrepare(mode==='user'?userText:'');
+  try{const full=await ask(parts,onText);setOnline(true);absorbMem(full);M().visto=Date.now();store.set('mem',mem);let body=clean(full).trim();
+    if(mode==='voice'){body=noEcho(body,heard).trim();}
     if(speakBuf.trim())speakChunk(speakBuf);if(cur)cur.remove();
     const utext=mode==='watch'?'(Capri miró la pantalla automáticamente)':mode==='idle'?'(silencio)':mode==='voice'?(heard?heard+' (por voz)':'(mensaje de voz)'):(extra?userText+' (con captura de pantalla)':userText);
     history.push({role:'user',text:utext});history.push({role:'model',text:'['+curState+'] '+body});store.set('history',history.slice(-60));
+    if(body&&mode!=='watch')opBtn(mode==='idle'?'(Capri habló sola, sin que yo le preguntara nada)':utext,body);
     if(!body){setState('observando');log('nada interesante en pantalla','g');}
+    if(body&&mode==='user')window.medAfter?.();
   }catch(e){if(cur)cur.remove();showError(e);}
-  busy=false;bump();setTimeout(hideBubble,5000);afterTalk();}
+  fragNow=null;busy=false;bump();setTimeout(hideBubble,5000);afterTalk();}
 function afterTalk(){const w=setInterval(()=>{if(isSpeaking())return;clearInterval(w);core('DORMANT');if(cfg.hands&&!recording&&!busy)setTimeout(()=>{if(cfg.hands&&!recording&&!busy)startRec(true)},400);},300);}
 function showError(e){setState('glitch_fuerte');let m;
   if(e.message==='NOKEY')m='La hermosa yo no tiene cerebro todavía~ Abre ⚙, pega tu API key y elige un modelo.';
@@ -698,18 +931,18 @@ async function startRec(auto){if(recording||busy)return;window.speechSynthesis?.
   try{micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});}
   catch(e){line('s','(No me diste permiso del micrófono. Revisa el candado 🔒 junto a la dirección.)');cfg.hands=false;btns();return;}
   recording=true;chunks=[];mediaRec=new MediaRecorder(micStream);mediaRec.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};mediaRec.onstop=onRecStop;mediaRec.start(250);
-  $('mic').classList.add('rec');$('mic').textContent='■';mmic.textContent='■';$('inrow').classList.add('listening');setState('escuchando');core('LISTENING');log('micrófono abierto','y');bump();
+  $('mic').classList.add('rec');$('mic').innerHTML=ico('stop');mmic.innerHTML=ico('stop');$('inrow').classList.add('listening');setState('escuchando');core('LISTENING');log('micrófono abierto','y');bump();
   actx=actx||new (window.AudioContext||window.webkitAudioContext)();const src=actx.createMediaStreamSource(micStream);anal=actx.createAnalyser();anal.fftSize=512;src.connect(anal);
   const data=new Uint8Array(anal.fftSize);let spoke=false,lastLoud=performance.now(),t0=performance.now();const bars=[...$('bars').children];
   const thr=0.06-cfg.sens*0.005; // sensibilidad
   clearInterval(vadTimer);vadTimer=setInterval(()=>{anal.getByteTimeDomainData(data);let s=0;for(const v of data){const x=(v-128)/128;s+=x*x;}const rms=Math.sqrt(s/data.length);
     bars.forEach((b,i)=>b.style.height=Math.min(20,3+rms*400*rnd(.5,1.2))+'px');
     const now=performance.now();if(rms>thr){spoke=true;lastLoud=now;}
-    if(spoke&&now-lastLoud>1400)stopRec();                // dejó de hablar
+    if(spoke&&now-lastLoud>1000)stopRec();                // dejó de hablar
     else if(!spoke&&now-t0>(auto?12000:8000))stopRec(true);  // nunca habló
     else if(now-t0>45000)stopRec();},60);}
 function stopRec(discard){if(!recording)return;recording=false;clearInterval(vadTimer);mediaRec.discard=!!discard;try{mediaRec.stop();}catch(e){}micStream.getTracks().forEach(t=>t.stop());
-  $('mic').classList.remove('rec');$('mic').textContent='🎤';mmic.textContent='🎤';$('inrow').classList.remove('listening');log('micrófono cerrado','g');}
+  $('mic').classList.remove('rec');$('mic').innerHTML=ico('mic');mmic.innerHTML=ico('mic');$('inrow').classList.remove('listening');log('micrófono cerrado','g');}
 async function onRecStop(){const discard=mediaRec.discard;if(discard||!chunks.length){setState('observando');core('DORMANT');if(cfg.hands)line('s','(No te escuché… dale al 🎤 o vuelve a activar 🎙 cuando quieras.)');cfg.hands=false;btns();return;}
   try{const blob=new Blob(chunks,{type:mediaRec.mimeType||'audio/webm'});const wav=await toWav16k(await blob.arrayBuffer());
     await respond(VOICE_PROMPT(cfg.name||'Kiga'),{inlineData:{mimeType:'audio/wav',data:b64(wav)}},'voice');}
@@ -765,7 +998,7 @@ async function startWatch(){try{stream=await navigator.mediaDevices.getDisplayMe
   stream.getVideoTracks()[0].addEventListener('ended',stopWatch);line('s','(Capri ahora ve tu pantalla. Pregúntale "¿qué ves?")');setState('mirada_intensa');log('feed de pantalla conectado','y');lastSig=null;schedule();}
 function stopWatch(){watching=false;clearTimeout(watchTimer);if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;$('noise').style.display='';$('feedSt').textContent='OFF';$('bWatch').classList.remove('act');log('feed de pantalla desconectado','w');}
 function schedule(){clearTimeout(watchTimer);if(watching)watchTimer=setTimeout(autoLook,(cfg.every||60)*1000);}
-function grab(){if(!vid.videoWidth)return null;const W=1024,s=Math.min(1,W/vid.videoWidth);const c=document.createElement('canvas');c.width=Math.round(vid.videoWidth*s);c.height=Math.round(vid.videoHeight*s);
+function grab(W=1024){if(!vid.videoWidth)return null;const s=Math.min(1,W/vid.videoWidth);const c=document.createElement('canvas');c.width=Math.round(vid.videoWidth*s);c.height=Math.round(vid.videoHeight*s);
   c.getContext('2d').drawImage(vid,0,0,c.width,c.height);const t=document.createElement('canvas');t.width=32;t.height=18;const tx=t.getContext('2d');tx.drawImage(c,0,0,32,18);
   const d=tx.getImageData(0,0,32,18).data,sig=[];for(let i=0;i<d.length;i+=4)sig.push((d[i]+d[i+1]+d[i+2])/3);return {b64:c.toDataURL('image/jpeg',0.7).split(',')[1],sig};}
 function changed(sig){if(!lastSig)return true;let s=0;for(let i=0;i<sig.length;i++)s+=Math.abs(sig[i]-lastSig[i]);return s/sig.length>6;}
@@ -773,9 +1006,13 @@ async function autoLook(){if(!watching)return;if(!busy&&!recording&&!q.value){co
 
 // ================= CHAT =================
 async function send(v){v=v.trim();if(!v||busy)return;askNotif();window.speechSynthesis?.cancel();bump();line('u',v);const k=v.toLowerCase();
-  if(k==='help'){line('c','CAPRI');line('t',"Háblame normal o por voz (🎤 / Ctrl+Espacio), choom~\n  ¿qué ves? — miro tu pantalla (activa 👁 primero)\n  estudio — abro tu biblioteca\n  sal — me salgo a pasear por la pantalla\n  limpiar — borro mi memoria del chat\n  ajustes — configuración");setState('presumida');return;}
+  if(k==='help'){line('c','CAPRI');line('t',"Háblame normal o por voz (🎤 / Ctrl+Espacio), choom~\n  ¿qué ves? — miro tu pantalla (activa 👁 primero)\n  estudio — abro tu biblioteca\n  médico — abro tu reservorio médico\n  sal — me salgo a pasear por la pantalla\n  recuerdos — lo que sé de ti\n  olvida <algo> — borro ese recuerdo\n  fragmentos — los ecos de mi mosaico\n  limpiar — borro mi memoria del chat\n  ajustes — configuración");setState('presumida');return;}
   if(k==='limpiar'){history=[];store.set('history',[]);term.innerHTML='';line('s','(Memoria borrada.)');setState('glitch_fuerte');return;}
-  if(k==='ajustes'){openCfg();return;}if(k==='estudio'){openLib();return;}
+  if(k==='recuerdos'){M();line('c','CAPRI');const a=animoNow();line('t',(mem.hechos.length?'Esto es lo que la hermosa yo sabe de ti~\n'+mem.hechos.map(h=>'  · ['+(MEMCATS[h.c]||h.c)+'] '+h.t).join('\n'):'…todavía no sé casi nada de ti. Cuéntame cosas, choom.')+'\n  ánimo: '+(a?a.n+' '+Math.round(a.i)+'/10'+(a.why?' ('+a.why+')':''):'normal'));setState('presumida');return;}
+  if(k.startsWith('olvida ')){M();const n=mem.hechos.length;forget(v.slice(7));store.set('mem',mem);line('c','CAPRI');line('t',mem.hechos.length<n?'…listo. Eso ya no existe en mí. Creo.':'mmm no encontré ese recuerdo.');setState('glitch_entrada');return;}
+  if(k==='fragmentos'){line('c','CAPRI');line('t',frags.length?'…ecos que viven en mí: '+frags.map(f=>f.name).join(', ')+'. No les hagas caso. Los tengo controlados. Casi siempre.':'nadie más vive aquí. solo la hermosa yo~ (puedes cargar fragmentos en ⚙)');setState('mirada_intensa');return;}
+  if(k.startsWith('despierta ')){const f=frags.find(f=>f.name.toLowerCase()===k.slice(10).trim());if(f)fragForce=f;}
+  if(k==='ajustes'){openCfg();return;}if(k==='estudio'){openLib();return;}if(/^m[eé]dico$/.test(k)){openMed();return;}
   if(k==='sal'){wander();setState('risa_malvada');return;}
   let extra=null;if(watching&&/(ves|ver|pantalla|mira|checa|esto)/i.test(v)){const g=grab();if(g){extra={inlineData:{mimeType:'image/jpeg',data:g.b64}};lastSig=g.sig;}}
   await respond(v,extra,'user');if(watching)schedule();}
@@ -784,17 +1021,21 @@ q.addEventListener('keydown',e=>{if(e.key==='Enter'){const v=q.value;q.value='';
 // ================= AJUSTES Y BOTONES =================
 function syncLbl(){$('vRateV').textContent=(+$('cRate').value).toFixed(2);$('vPitchV').textContent=(+$('cPitch').value).toFixed(2);$('vSensV').textContent=$('cSens').value;}
 function openCfg(){$('cKey').value=cfg.key;$('cName').value=cfg.name;$('cEvery').value=String(cfg.every);$('cIdle').value=String(cfg.idle);$('cNotif').value=cfg.notif?'1':'0';
-  $('cRate').value=cfg.rate;$('cPitch').value=cfg.pitch;$('cSens').value=cfg.sens;syncLbl();loadVoices();
-  const ms=cfg.models?.length?cfg.models:(cfg.model?[cfg.model]:[]);if(ms.length)$('cModel').innerHTML=ms.map(m=>`<option value="${m}">${m}</option>`).join('');$('cModel').value=cfg.model;$('modal').classList.add('show');}
+  $('cRate').value=cfg.rate;$('cPitch').value=cfg.pitch;$('cFx').value=cfg.fx||'off';$('cSens').value=cfg.sens;syncLbl();loadVoices();
+  const ms=cfg.models?.length?cfg.models:(cfg.model?[cfg.model]:[]);if(ms.length)$('cModel').innerHTML=ms.map(m=>`<option value="${m}">${m}</option>`).join('');$('cModel').value=cfg.model;renderFrags();
+  $('cClaude').value=cfg.claudeKey||'';$('cClaudeModel').value=cfg.claudeModel||'claude-opus-5-5';$('cClaudeSpent').textContent=usd(claudeSpent);$('modal').classList.add('show');}
 $('cRate').oninput=$('cPitch').oninput=$('cSens').oninput=syncLbl;
-$('cTest').onclick=()=>{window.speechSynthesis?.cancel();const keep={voiceName:cfg.voiceName,rate:cfg.rate,pitch:cfg.pitch};
-  cfg.voiceName=$('cVoice').value;cfg.rate=+$('cRate').value;cfg.pitch=+$('cPitch').value;speakChunk('¡Ehhh, choom! La hermosa yo estrenando voz. ¿Verdad que suena preciosa?',true);Object.assign(cfg,keep);};
+$('cFrag').onclick=()=>$('fragFile').click();$('fragFile').onchange=async e=>{for(const f of e.target.files)await addFrag(f);e.target.value='';};
+$('cTest').onclick=()=>{window.speechSynthesis?.cancel();fxOn=false;const keep={voiceName:cfg.voiceName,rate:cfg.rate,pitch:cfg.pitch,fx:cfg.fx};
+  cfg.voiceName=$('cVoice').value;cfg.rate=+$('cRate').value;cfg.pitch=+$('cPitch').value;cfg.fx=$('cFx').value;speakChunk('¡Ehhh, choom! La hermosa yo estrenando voz.',true);speakChunk('¿Damos un paseo? Vamos a divertirnos un rato.',true);Object.assign(cfg,keep);};
+// Preset: la mejor voz femenina en español del equipo, aguda y con un pelín de prisa, con efectos suaves
+$('cPreset').onclick=()=>{const v=bestVoice();$('cVoice').value=v&&/^es/i.test(v.lang)?v.name:'';$('cRate').value=1.05;$('cPitch').value=1.35;$('cFx').value='suave';syncLbl();$('cTest').click();};
 $('cLoad').onclick=async()=>{const key=$('cKey').value.trim();if(!key)return;$('cLoad').textContent='Conectando…';
   try{const ms=await listModels(key);if(!ms.length)throw new Error('No encontré modelos.');cfg.models=ms;
     $('cModel').innerHTML=ms.map(m=>`<option value="${m}">${m}</option>`).join('');$('cModel').value=ms.includes(cfg.model)?cfg.model:rankForFree(ms)[0];$('cLoad').textContent='✔ Conectado';setOnline(true);}
   catch(e){$('cLoad').textContent='✖ '+(/key/i.test(e.message)?'Key inválida':e.message).slice(0,60);setOnline(false);}};
 $('cClose').onclick=()=>{cfg.key=$('cKey').value.trim();cfg.model=$('cModel').value;cfg.name=$('cName').value.trim()||'Kiga';cfg.every=+$('cEvery').value;cfg.idle=+$('cIdle').value;cfg.notif=$('cNotif').value==='1';askNotif();
-  cfg.voiceName=$('cVoice').value;cfg.rate=+$('cRate').value;cfg.pitch=+$('cPitch').value;cfg.sens=+$('cSens').value;store.set('cfg',cfg);$('modal').classList.remove('show');$('mdl').textContent=cfg.model||'—';
+  cfg.voiceName=$('cVoice').value;cfg.rate=+$('cRate').value;cfg.pitch=+$('cPitch').value;cfg.fx=$('cFx').value;cfg.sens=+$('cSens').value;cfg.claudeKey=$('cClaude').value.trim();cfg.claudeModel=$('cClaudeModel').value;store.set('cfg',cfg);$('modal').classList.remove('show');$('mdl').textContent=cfg.model||'—';
   if(cfg.key&&cfg.model)setOnline(true);if(watching)schedule();bump();};
 $('cWipe').onclick=()=>{history=[];store.set('history',[]);term.innerHTML='';line('s','(Memoria borrada.)');};
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('show');}));
@@ -806,7 +1047,7 @@ $('drop').onclick=()=>$('file').click();$('file').onchange=e=>{addFiles([...e.ta
 $('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('over');};$('drop').ondragleave=()=>$('drop').classList.remove('over');
 $('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('over');addFiles([...e.dataTransfer.files]);};
 $('bCfg').onclick=openCfg;$('bWatch').onclick=()=>watching?stopWatch():startWatch();
-function btns(){$('bVoice').innerHTML=cfg.voice?'<span class="gl">🔊</span><span class="tx">VOZ</span>':'<span class="gl">🔇</span><span class="tx">VOZ</span>';$('bVoice').classList.toggle('act',cfg.voice);$('bAlive').classList.toggle('act',cfg.alive);
+function btns(){$('bVoice').innerHTML=cfg.voice?'<span class="gl">'+ico('voz')+'</span><span class="tx">VOZ</span>':'<span class="gl">'+ico('silencio')+'</span><span class="tx">VOZ</span>';$('bVoice').classList.toggle('act',cfg.voice);$('bAlive').classList.toggle('act',cfg.alive);
   $('bStudy').classList.toggle('act',cfg.study);$('bHands').classList.toggle('act',cfg.hands);}
 $('bVoice').onclick=()=>{cfg.voice=!cfg.voice;store.set('cfg',cfg);btns();if(!cfg.voice)window.speechSynthesis?.cancel();};
 $('bAlive').onclick=()=>{cfg.alive=!cfg.alive;store.set('cfg',cfg);btns();if(cfg.alive)wander();else{sprite.style.opacity=0;hideBubble();}};
@@ -850,7 +1091,7 @@ const _coreMini=core;core=function(m){_coreMini(m);$('chipTag').textContent='CAP
   if(m==='TALKING')openMini();else if(m==='DORMANT')starT=setTimeout(function back(){if(document.activeElement===mq||mq.value||recording||busy||isSpeaking()){starT=setTimeout(back,5000);return;}toStar();},15000);};
 // en la app de escritorio, los clics atraviesan la pantalla salvo donde está Capri
 if(window.capriDesk){let deskLast=null,mx=-1,my=-1;const deskCheck=()=>{const el=mx<0?null:document.elementFromPoint(mx,my);
-    const on=!document.body.classList.contains('desk')||!!drag||!!(el&&el.closest('#mini,.modal.show'));if(on!==deskLast){deskLast=on;capriDesk.hit(on);}};
+    const on=!document.body.classList.contains('desk')||!!drag||!!window.deskPetDrag?.()||!!(el&&el.closest('#mini,.modal.show'))||!!window.deskPetHit?.(mx,my);if(on!==deskLast){deskLast=on;capriDesk.hit(on);}};
   window.deskHit=()=>{deskLast=null;deskCheck();};addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;deskCheck();});}
 $('bMini').onclick=minimize;$('mExpand').onclick=expand;
 $('mHide').onclick=()=>{if(pipWin)pipWin.close();else toStar();};
@@ -865,7 +1106,7 @@ const PET='assets/pet/',petEl=$('pet'),petSay=$('petSay'),miniPet=$('miniPet');l
 const PET_IDLE=['sentada_pierna','sentada_mira','meditar','apoyada'];
 const PET_TALK={emocionada:'pelota',presumida:'enamorada',sonrisa_traviesa:'risa_brazos',risa_malvada:'risa_brazos',sorpresa:'confundida',glitch_entrada:'confundida',glitch_fuerte:'confundida',
  hipnosis:'meditar',mirada_intensa:'apoyada',enojada:'cursor',observando:'sentada_mira',pensando:'laptop',escuchando:'asomada'};
-Object.keys(PET_TALK).concat(PET_IDLE,['bostezo','voltereta']).forEach(n=>{const i=new Image();i.src=PET+n+'.png';});
+Object.values(PET_TALK).concat(PET_IDLE,['bostezo','voltereta']).forEach(n=>{const i=new Image();i.src=PET+n+'.png';});
 function petPose(n,lockMs,force){if(force)petLock=0;else if(Date.now()<petLock&&!lockMs)return;if(lockMs)petLock=Date.now()+lockMs;if(n===petPoseNow)return;petPoseNow=n;
   petEl.src=miniPet.src=PET+n+'.png';petEl.className='pet '+n+(['meditar','sentada_pierna','sentada_mira','apoyada','bostezo'].includes(n)?' breathe':'');}
 function petIdle(){const sleepy=new Date().getHours()<7||Date.now()-lastAct>6*60000;petPose(sleepy?'bostezo':pick(PET_IDLE));}
@@ -882,7 +1123,7 @@ setInterval(()=>{if(busy||recording||isSpeaking()||Date.now()<petLock)return;
   if(cfg.alive&&Math.random()<.18){petPose('voltereta',1800);petEl.classList.remove('hop');void petEl.offsetWidth;petEl.classList.add('hop');setTimeout(petIdle,1900);}else petIdle();},22000);
 // reloj y cinta de la barra
 setInterval(()=>{const d=new Date();$('mclk').textContent=String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');},1000);
-function ticker(){$('ticker').textContent=[`estado → ${LABEL[curState]}`,`ánimo: ${MOOD[curState]}`,cfg.study?'modo estudio: ON':'modo estudio: off',cfg.alive?'vida propia: ON':'vida propia: off',pick(AMB),pick(AMB)].join('  ·  ');}
+function ticker(){$('ticker').textContent=[`estado → ${LABEL[curState]}`,`ánimo: ${animoNow()?animoNow().n+' '+Math.round(animoNow().i)+'/10':MOOD[curState]}`,cfg.study?'modo estudio: ON':'modo estudio: off',cfg.alive?'vida propia: ON':'vida propia: off',pick(AMB),pick(AMB)].join('  ·  ');}
 setInterval(ticker,28000);setTimeout(ticker,1500);
 $('bMini2').onclick=()=>$('bMini').click();$('bMore2').onclick=()=>$('bMore').click();
 if(innerWidth>=1400){$('side').classList.remove('hide');$('bMore').classList.add('act');}
@@ -956,10 +1197,13 @@ let bootDone;const bootP=new Promise(r=>bootDone=r);
 // ================= ARRANQUE =================
 (async()=>{await openDB();docs=await dbAll();})();
 $('mdl').textContent=cfg.model||'—';setState('glitch_entrada');core('DORMANT');ambient();setTimeout(aliveLoop,15000);bump();
-history.slice(-8).forEach(h=>{if(h.role==='user'){if(!/^\((Capri miró|silencio|mensaje de voz)/.test(h.text))line(/ \(por voz\)$/.test(h.text)?'u mic':'u',h.text.replace(/ \(por voz\)$/,''));}else{const b=clean(h.text).trim();if(b){line('c','CAPRI');line('t',b);}}});
-bootP.then(()=>setTimeout(()=>{setState(cfg.key&&cfg.model?'presumida':'sonrisa_traviesa');line('c','CAPRI');
+let lastQ='';history.slice(-8).forEach(h=>{if(h.role==='user'){const cm=h.text.match(/^\(Claude le dio .*? sobre tu última respuesta: ([\s\S]*)\)$/);if(cm){term.querySelector('.op:last-of-type')?.remove();line('c cl','CLAUDE // 2ª OPINIÓN');line('t cl',cm[1]);return;}lastQ=h.text;if(!/^\((Capri miró|silencio|mensaje de voz)/.test(h.text))line(/ \(por voz\)$/.test(h.text)?'u mic':'u',h.text.replace(/ \(por voz\)$/,''));}else{const b=clean(h.text).trim();if(b){line('c','CAPRI');line('t',b);if(!/^\((Capri miró|silencio)/.test(lastQ))opBtn(lastQ.replace(/ \(por voz\)$/,''),b);}}});
+const RETURN_PROMPT=(n,t)=>`(${n} acaba de abrir la app${t?' después de '+t+' sin hablarte':''}. Salúdale por tu cuenta como tú lo harías, 1 o 2 frases, según tu ánimo y lo que recuerdas de ${n}. Si te dejó mucho tiempo, que se note.)`;
+{const away=M().visto?Date.now()-mem.visto:0;if(cfg.key&&cfg.model&&(!mem.visto||away>2*36e5)){bootP.then(()=>setTimeout(()=>{if(!busy)respond(RETURN_PROMPT(cfg.name||'Kiga',mem.visto?ago(away):''),null,'idle');},800));}
+else bootP.then(()=>setTimeout(()=>{setState(cfg.key&&cfg.model?'presumida':'sonrisa_traviesa');line('c','CAPRI');
   line('t',cfg.key&&cfg.model?pick([`…sistema arriba. Ah, eres tú~`,`¡VOLVISTE! digo… hola. Normal. Tranqui.`,`la hermosa yo ha despertado. tiemblen, procesadores.`,`ehh ${cfg.name}, ¿me extrañaste? obvio sí.`]):"¡Sistema en línea~! Pero sin cerebro. Abre ⚙, pega tu API key de Google y dale «Conectar».");
-  if(cfg.key&&cfg.model)setOnline(true);if(cfg.alive)setTimeout(wander,2500);},350));
+  if(cfg.key&&cfg.model)setOnline(true);if(cfg.alive)setTimeout(wander,2500);},350));}
 if(DESK){if(cfg.key&&cfg.model)minimize();else expand();}
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
-</script></body></html>
+</script>
+<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="redaccion.js"></script><script src="voz.js"></script><script src="cerebro.js"></script><script src="hud.js"></script><script type="module" src="holo3d.js"></script><script src="desk.js"></script></body></html>
