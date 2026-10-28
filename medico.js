@@ -109,6 +109,9 @@ Cuando la plática sea de salud o medicina, apóyate primero en las fuentes de a
 - Si te describen algo que suena a urgencia (dolor de pecho, falta de aire, desmayo, sangrado fuerte, signos de infarto o derrame, ideas de hacerse daño), lo primero es decirle que vaya a urgencias o llame al 911.
 - Sigues siendo tú: mismo tono y personalidad. No sermonees ni repitas advertencias; con una frase al final basta cuando hablen de su propia salud.
 ${ctx?'\n=== FUENTES PARA ESTA PREGUNTA ===\n'+ctx:''}`;};
+// para el núcleo de certeza: buscar fuentes para verificar o para que Capri estudie sola (tus apuntes primero, luego en línea)
+window.medBuscar=async(q)=>{if(!mdb)await mOpen();if(!trozos.length)await mLoad();const loc=search(q,3).map(o=>({nombre:o.t.nombre,pag:o.t.pag,text:o.t.text}));
+  const onl=navigator.onLine?await enLinea(q).catch(()=>[]):[];return [...loc,...onl];};
 window.medAfter=()=>{if(!med.on||!fuentes.length)return;
   const ls=fuentes.map(f=>f.nombre+(f.pag?' p. '+f.pag:'')).filter((v,i,a)=>a.indexOf(v)===i);
   line('s med','⚕ fuentes consultadas: '+ls.join(' · ')+'  —  info educativa, no sustituye la consulta con tu médico.');};
