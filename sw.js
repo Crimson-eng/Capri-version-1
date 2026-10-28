@@ -1,6 +1,6 @@
 // Guarda la app en el dispositivo para que abra rápido y funcione sin internet (menos el cerebro).
 // Sube VERSION cada vez que cambies archivos para que los celulares descarguen lo nuevo.
-const VERSION='capri-v27';
+const VERSION='capri-v28';
 const SHELL=[
   './',
   './index.html',
@@ -28,6 +28,7 @@ const SHELL=[
   './voz.js',
   './cerebro.js',
   './aprende.js',
+  './hilos.js',
   './hud.js',
   './holo3d.js',
   './vendor/three.module.min.js',

@@ -5,8 +5,8 @@
 // - Ella sola: cuando llevas 4 min sin usarla, revisa respuestas importantes contra tus apuntes con Gemini como maestro
 //   (máx. 8 al día, nunca con Claude) y guarda lo que estuvo mal como regla para no repetirlo.
 // - Cada lección es de un cerebro (gemini, gpu, claude) y solo se usa con los cerebros que tienes activados.
-// - Importancia: cada plática y lección lleva una calificación 0–3 (0 = «hola», «jaja»… no se guarda); la memoria de
-//   pláticas busca primero y borra al último lo importante (ver cerebro.js).
+// - Importancia: cada plática y lección lleva una calificación 0–3 (0 = «hola», «jaja»…). Todo se guarda en su hilo
+//   (ver cerebro.js / hilos.js); la importancia solo decide qué sale primero al buscar y qué se borra al último.
 // - Si el expediente está abierto, avisa cuando lo que estudias se relaciona con alguno de tus pacientes (nada va a la IA).
 // Todo vive en este dispositivo: IndexedDB «capri-entreno».
 (()=>{

@@ -140,9 +140,25 @@ respond=async(userText,extra,mode)=>{modoAct=mode||'user';preRec=recordar([{text
 
 // ---------- memoria buscable ----------
 let mems=[],db=null;
-const idb=()=>db||(db=new Promise((res,rej)=>{const o=indexedDB.open('capri-cerebro',1);o.onupgradeneeded=()=>o.result.createObjectStore('m',{keyPath:'id',autoIncrement:true});o.onsuccess=()=>res(o.result);o.onerror=()=>rej(o.error);}));
-const tx=async(mode,fn)=>{const d=await idb();return new Promise((res,rej)=>{const t=d.transaction('m',mode);const r=fn(t.objectStore('m'));t.oncomplete=()=>res(r?.result);t.onerror=()=>rej(t.error);});};
-tx('readonly',s=>s.getAll()).then(a=>{mems=a||[];pinta();}).catch(()=>{});
+// v2 (2.9.1): además de las pláticas ('m'), un resumen por día ('dias')
+const idb=()=>db||(db=new Promise((res,rej)=>{const o=indexedDB.open('capri-cerebro',2);o.onupgradeneeded=()=>{const d=o.result;if(!d.objectStoreNames.contains('m'))d.createObjectStore('m',{keyPath:'id',autoIncrement:true});
+  if(!d.objectStoreNames.contains('dias'))d.createObjectStore('dias',{keyPath:'dia'});};o.onsuccess=()=>res(o.result);o.onerror=()=>rej(o.error);}));
+const tx=async(mode,fn,st='m')=>{const d=await idb();return new Promise((res,rej)=>{const t=d.transaction(st,mode);const r=fn(t.objectStore(st));t.oncomplete=()=>res(r?.result);t.onerror=()=>rej(t.error);});};
+let dias=[];   // [{dia:'2026-10-28', resumen, n, ts}]
+tx('readonly',s=>s.getAll()).then(a=>{mems=a||[];for(const m of mems){m.dia=m.dia||diaDe(m.ts);m.hilo=m.hilo||hiloDe(m.t);}pinta();}).catch(()=>{});
+tx('readonly',s=>s.getAll(),'dias').then(a=>{dias=a||[];}).catch(()=>{});
+
+// ---------- hilos de memoria ----------
+// Todo se guarda (también la plática trivial del día a día), pero cada plática va a su hilo y cada día tiene su resumen,
+// para que Capri recuerde tu vida diaria («¿qué te conté ayer?») sin revolverla con lo que estudias.
+const HILOS={dia:'Día a día',personal:'Sobre ti y tu gente',estudio:'Estudio y salud',planes:'Planes y pendientes'};
+const diaDe=ts=>{const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
+const sinAcento=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+function hiloDe(txt){const u=sinAcento(String(txt).split('\nCapri:')[0]);
+  if(/medic|salud|enferm|sintom|dolor|fiebre|diagnost|tratamiento|farmac|dosis|paciente|clinic|anatom|fisiolog|patolog|cirug|guardia|examen|parcial|apuntes|estudi|clase|tarea de|maestr|profe|universidad|escuela|ingles|toefl/.test(u))return 'estudio';
+  if(/manana|pasado manana|tengo que|tengo cita|debo |recuerdame|pendiente|no se me olvide|el (lunes|martes|miercoles|jueves|viernes|sabado|domingo)|a las \d|entrega|planeo|voy a ir|la proxima semana/.test(u))return 'planes';
+  if(/\bmi (mama|papa|madre|padre|herman|novi|amig|abuel|tio|tia|prim|pareja|esposa|esposo|hij|famil|jefe|compa)|me siento|estoy (triste|feliz|cansad|enojad|estresad|aburrid|nervios|ansios)|me gusta|odio|mi cumple|me paso|me dijo|me dijeron/.test(u))return 'personal';
+  return 'dia';}
 const norm=v=>{let n=0;for(const x of v)n+=x*x;n=Math.sqrt(n)||1;return Float32Array.from(v,x=>x/n);};
 // los embeddings van en el procesador (num_gpu 0) para no sacar de la tarjeta al modelo que platica: con 4 GB no caben los dos
 async function embed(texts){if(!ok||!cer.emb)return null;
@@ -155,21 +171,60 @@ async function guardaPlatica(){if(!cer.aprende)return;const a=history.at(-1),u=h
   if(!a||!u||a.role!=='model'||u.role!=='user'||/^\(/.test(u.text))return;
   const txt=(cfg.name||'Kiga')+': '+u.text.slice(0,500)+'\nCapri: '+clean(a.text).replace(/^\[[a-z_]+\]\s*/i,'').slice(0,600);
   if(txt===ultimaGuardada)return;ultimaGuardada=txt;
-  const imp=window.capriImportancia?window.capriImportancia(txt):1;if(!imp)return;   // «hola», «jaja»…: no vale la pena recordarlo
-  const e={t:txt,ts:Date.now(),imp};try{const v=await embed([txt]);if(v?.[0])e.v=v[0];}catch(_){}
+  const imp=window.capriImportancia?window.capriImportancia(txt):1;   // la plática trivial también se guarda (hilo «Día a día»), solo pesa menos al buscar
+  const e={t:txt,ts:Date.now(),imp,dia:diaDe(Date.now()),hilo:hiloDe(txt)};try{const v=await embed([txt]);if(v?.[0])e.v=v[0];}catch(_){}
   try{e.id=await tx('readwrite',s=>s.add(e));}catch(_){}mems.push(e);
-  if(mems.length>3000){const viejo=mems.slice(0,600).sort((a,b)=>((a.imp??1)-(b.imp??1))||(a.ts-b.ts))[0];mems=mems.filter(m=>m!==viejo);tx('readwrite',s=>s.delete(viejo.id)).catch(()=>{});}   // se va primero lo viejo y poco importante
+  if(mems.length>20000){const viejo=mems.slice(0,2000).sort((a,b)=>((a.imp??1)-(b.imp??1))||(a.ts-b.ts))[0];mems=mems.filter(m=>m!==viejo);tx('readwrite',s=>s.delete(viejo.id)).catch(()=>{});}   // se va primero lo viejo y poco importante
   pinta();if(++nuevas>=6)setTimeout(destila,4000);}
 async function recordar(parts){if(!cer.aprende||!mems.length)return '';
   const q=parts.filter(p=>p.text).map(p=>p.text).join(' ').slice(-500)||(history.at(-1)?.role==='user'?history.at(-1).text:'');
   if(q.length<8||modoAct==='watch')return '';
-  const viejas=mems.filter(m=>Date.now()-m.ts>15*60e3);if(!viejas.length)return '';  // lo reciente ya va en la plática
+  const porDia=deDias(q);if(porDia)return porDia;
+  const viejas=mems.filter(m=>Date.now()-m.ts>15*60e3);if(!viejas.length)return primeraDelDia();  // lo reciente ya va en la plática
   let top=[];const qv=viejas.some(m=>m.v)?await embed([q]).catch(()=>null):null;
   if(qv?.[0])top=viejas.filter(m=>m.v&&m.v.length===qv[0].length).map(m=>[cos(qv[0],m.v),m]).filter(x=>x[0]>.5);
   else{const W=palabras(q);if(W.size)top=viejas.map(m=>{const P=palabras(m.t);let n=0;for(const w of W)if(P.has(w))n++;return [n/Math.sqrt(W.size*Math.max(1,P.size)),m];}).filter(x=>x[0]>.18);}
-  top=top.map(([s,m])=>[s*(.85+.08*(m.imp??1)),m]).sort((a,b)=>b[0]-a[0]).slice(0,3);if(!top.length)return '';   // a igual parecido, gana lo importante
+  top=top.map(([s,m])=>[s*(.85+.08*(m.imp??1)),m]).sort((a,b)=>b[0]-a[0]).slice(0,3);if(!top.length)return primeraDelDia();   // a igual parecido, gana lo importante
   return `(Recuerdos de pláticas pasadas con ${cfg.name||'Kiga'} que pueden venir al caso. Úsalos solo si ayudan, sin decir que los buscaste:\n`+
-    top.map(([,m])=>'- '+new Date(m.ts).toLocaleDateString('es-MX',{day:'numeric',month:'short'})+': '+m.t.replace(/\n/g,' / ')).join('\n')+')';}
+    top.map(([,m])=>'- '+new Date(m.ts).toLocaleDateString('es-MX',{day:'numeric',month:'short'})+' ['+(HILOS[m.hilo]||'')+']: '+m.t.replace(/\n/g,' / ')).join('\n')+')'+(primeraDelDia()?'\n'+primeraDelDia():'');}
+// «¿qué te conté ayer?», «el lunes», «hace 3 días», «la semana pasada»: se trae ese día completo (su resumen y sus pláticas)
+const DSEM=['domingo','lunes','martes','miercoles','jueves','viernes','sabado'];
+function diasPedidos(q){const u=sinAcento(q),hoy=new Date();hoy.setHours(12,0,0,0);const d=n=>diaDe(hoy.getTime()-n*864e5);
+  if(!/(te (conte|dije|platique|hable)|hablamos|platicamos|paso|hice|fui|que onda con|recuerdas|te acuerdas|como me fue)/.test(u)&&!/\b(ayer|antier|anteayer|hace \d+ dias?|la semana pasada|el (lunes|martes|miercoles|jueves|viernes|sabado|domingo)( pasado)?)\b/.test(u))return null;
+  if(/\bantier|anteayer\b/.test(u))return [d(2)];if(/\bayer\b/.test(u))return [d(1)];
+  const h=u.match(/hace (\d+) dias?/);if(h)return [d(+h[1])];if(/la semana pasada/.test(u))return [7,8,9,10,11,12,13].map(d);
+  const w=u.match(/\bel (lunes|martes|miercoles|jueves|viernes|sabado|domingo)\b/);if(w){let n=(hoy.getDay()-DSEM.indexOf(w[1])+7)%7||7;return [d(n)];}
+  if(/\bhoy|en la manana|hace rato\b/.test(u))return [d(0)];return null;}
+function deDias(q){const ds=diasPedidos(q);if(!ds)return '';const out=[];
+  for(const dia of ds){const r=dias.find(x=>x.dia===dia),ms=mems.filter(m=>m.dia===dia).slice(-8);if(!r&&!ms.length)continue;
+    out.push(`${new Date(dia+'T12:00').toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'})}:`+(r?.resumen?'\nResumen: '+r.resumen:'')+(ms.length?'\n'+ms.map(m=>'- '+m.t.replace(/\n/g,' / ').slice(0,400)).join('\n'):''));}
+  if(!out.length)return `(${cfg.name||'Kiga'} pregunta por un día del que no tienes pláticas guardadas: dilo con honestidad, no inventes.)`;
+  return `(Lo que platicaron ese día, de tus hilos de memoria. Úsalo con naturalidad, sin decir que lo buscaste:\n${out.join('\n\n')})`;}
+// en la primera plática del día, Capri tiene presente cómo le fue ayer (o el último día que hablaron)
+let primeraDada=store.get('hiloPrimera','');
+function primeraDelDia(){const hoy=diaDe(Date.now());if(primeraDada===hoy)return '';const r=dias.filter(x=>x.dia<hoy&&x.resumen).sort((a,b)=>b.dia.localeCompare(a.dia))[0];
+  primeraDada=hoy;store.set('hiloPrimera',hoy);if(!r)return '';
+  return `(Lo último de su vida que tienes en tus hilos, del ${new Date(r.dia+'T12:00').toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'})}: ${r.resumen}. Si viene al caso, pregúntale cómo siguió.)`;}
+// resumen de cada día ya terminado: con tu GPU si está (gratis y privado); si no, Gemini. Uno a la vez, cuando no estás usando a Capri.
+let resumiendo=false;
+async function resumeDia(dia,forzar){if(resumiendo)return false;const ms=mems.filter(m=>m.dia===dia);if(!ms.length)return false;
+  const ya=dias.find(x=>x.dia===dia);if(ya&&!forzar&&ya.n===ms.length)return false;resumiendo=true;
+  const name=cfg.name||'Kiga',txt=ms.map(m=>m.t.replace(/\n/g,' / ').slice(0,500)).join('\n').slice(-12000);
+  const sys=`Resume en 3 a 6 frases cortas, en tercera persona, el día de ${name} según sus pláticas con Capri: qué hizo, cómo se sintió, con quién estuvo, qué le preocupaba y qué quedó pendiente. Incluye detalles concretos (nombres, lugares, horas). Nada inventado. Solo el resumen, sin título.`;
+  try{let r='';
+    if(listo()){const j=await (await fetch(OLL+'/api/chat',{method:'POST',body:JSON.stringify({model:cer.modelo,stream:false,keep_alive:VIVO,...(/qwen3|deepseek-r1/i.test(cer.modelo)?{think:false}:{}),options:{temperature:.2,num_predict:260,num_ctx:ctxDe()},messages:[{role:'system',content:sys},{role:'user',content:txt.slice(-ctxDe()*2.5)}]})})).json();
+      r=(j.message?.content||'').replace(/<think>[\s\S]*?<\/think>/g,'').trim();}
+    else if(cfg.key&&cfg.model&&typeof gemUna==='function')r=(await gemUna([{text:sys+'\n\nPLÁTICAS:\n'+txt}],{temperature:.2,maxOutputTokens:400})).text;
+    if(!r)return false;const d={dia,resumen:r.replace(/\s+/g,' ').trim(),n:ms.length,ts:Date.now()};
+    await tx('readwrite',s=>s.put(d),'dias');dias=dias.filter(x=>x.dia!==dia).concat(d);log('🧵 resumí el '+dia+' ('+ms.length+' plática(s))','g');return true;}
+  catch(e){log('resumen del día: '+String(e.message).slice(0,40),'w');return false;}finally{resumiendo=false;}}
+setInterval(async()=>{if(busy||Date.now()-lastAct<3*60e3)return;const hoy=diaDe(Date.now());
+  const pend=[...new Set(mems.map(m=>m.dia))].filter(d=>d<hoy&&!dias.some(x=>x.dia===d&&x.n===mems.filter(m=>m.dia===d).length)).sort().reverse()[0];if(pend)resumeDia(pend);},90e3);
+// para la ventana de hilos (hilos.js)
+window.hilosInfo=()=>({HILOS,mems,dias,diaDe});
+window.hilosResumir=d=>resumeDia(d,true);
+window.hilosBorrar=async id=>{mems=mems.filter(m=>m.id!==id);await tx('readwrite',s=>s.delete(id)).catch(()=>{});pinta();};
+window.hilosCambiar=async(id,h)=>{const m=mems.find(x=>x.id===id);if(!m)return;m.hilo=h;await tx('readwrite',s=>s.put(m)).catch(()=>{});};
 // cada 6 pláticas, la GPU relee lo último y saca datos nuevos y duraderos de ti para su memoria de siempre
 async function destila(){if(!listo()||busy||!cer.aprende||nuevas<6)return;nuevas=0;const name=cfg.name||'Kiga';
   const ult=mems.slice(-6).map(m=>m.t).join('\n---\n'),ya=(M().hechos||[]).map(h=>'- '+h.t).join('\n');
