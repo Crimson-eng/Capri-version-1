@@ -66,6 +66,38 @@ const cmd = (name, extra = {}) => send('desk:cmd', { name, ...extra });
 const EXE = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
 const newer = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number);
   for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+// ---------- modo portátil (USB) ----------
+// Si junto al .exe hay una carpeta «CapriData», TODO lo de Capri (memoria, pláticas, apuntes, expediente, keys, sesión de
+// claude.ai, respaldos) se guarda ahí y no en la PC: te la llevas en la USB y en la PC donde la conectes no queda nada.
+// Para pasarte a la USB: menú de la bandeja → «Llevar mis datos junto al .exe»; se copian al volver a abrir Capri.
+const DIR_EXE = process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath);
+const DATA_USB = path.join(DIR_EXE, 'CapriData');
+const DATA_PC = app.getPath('userData');
+const PORTATIL = fs.existsSync(DATA_USB);
+if (PORTATIL) {
+  const marca = path.join(DATA_USB, '.copiar-desde');
+  if (fs.existsSync(marca)) {   // primera vez: se copian los datos de esta PC (Capri estaba cerrada, así que nada está en uso)
+    try { const src = fs.readFileSync(marca, 'utf8').trim(); if (src && fs.existsSync(src) && path.resolve(src) !== path.resolve(DATA_USB))
+      fs.cpSync(src, DATA_USB, { recursive: true, force: false, errorOnExist: false, filter: (f) => !/[\\/](Cache|Code Cache|GPUCache|DawnCache|GrShaderCache|ShaderCache|Crashpad|SingletonLock|SingletonCookie|SingletonSocket|lockfile)([\\/]|$)/.test(f) }); }
+    catch (e) { console.error('no pude copiar los datos a la USB:', e.message); }
+    try { fs.unlinkSync(marca); } catch {}
+  }
+  app.setPath('userData', DATA_USB);
+  app.setPath('crashDumps', path.join(DATA_USB, 'Crashpad'));
+}
+const carpetaDatos = (...p) => PORTATIL ? path.join(DATA_USB, ...p) : path.join(app.getPath('documents'), 'Capri', ...p);
+function llevarAUsb() {
+  const { dialog } = require('electron');
+  if (PORTATIL) return shell.openPath(DATA_USB);
+  const r = dialog.showMessageBoxSync({ type: 'question', buttons: ['Sí, llevarlos', 'Cancelar'], defaultId: 0, cancelId: 1, title: 'Capri portátil',
+    message: 'Guardar los datos de Capri junto al .exe',
+    detail: `Se crea la carpeta:\n${DATA_USB}\n\nAl volver a abrir Capri desde ahí, se copia tu memoria, apuntes, expediente y ajustes de esta PC y desde entonces todo se guarda en esa carpeta (llévala junto con el .exe en tu USB).\n\nCapri se va a cerrar para copiar todo sin que nada esté en uso.` });
+  if (r !== 0) return;
+  try { fs.mkdirSync(DATA_USB, { recursive: true }); fs.writeFileSync(path.join(DATA_USB, '.copiar-desde'), DATA_PC); }
+  catch (e) { return dialog.showErrorBox('No pude crear la carpeta', e.message + '\n\n¿La USB está protegida contra escritura?'); }
+  app.relaunch({ execPath: EXE }); app.quit();
+}
+
 // si ya hay una Capri abierta, le avisamos qué versión somos: si somos más nuevas, ella se cierra y nos abre a nosotras
 if (!app.requestSingleInstanceLock({ version: app.getVersion(), exe: EXE })) app.quit();
 app.setAppUserModelId('com.crimson.capri');
@@ -178,7 +210,8 @@ function rebuildMenu() {
     { label: 'Poseer mis ventanas', type: 'checkbox', checked: p.possess, enabled: process.platform === 'win32',
       click: (it) => setPrefs({ possess: it.checked }) },
     { type: 'separator' },
-    { label: 'Iniciar con Windows', type: 'checkbox', checked: app.getLoginItemSettings({ path: EXE }).openAtLogin,
+    { label: PORTATIL ? '💾 Datos en la USB: abrir carpeta' : '💾 Llevar mis datos junto al .exe (USB)', click: llevarAUsb },
+    { label: 'Iniciar con Windows', enabled: !PORTATIL, type: 'checkbox', checked: app.getLoginItemSettings({ path: EXE }).openAtLogin,
       click: (it) => app.setLoginItemSettings({ openAtLogin: it.checked, path: EXE }) },
     { label: 'Recargar', click: () => { if (win) { offline = false; ready = false; win.loadURL(deskURL()); } } },
     { type: 'separator' },
@@ -410,7 +443,7 @@ ipcMain.handle('tec', async (_e, a) => {
   if (a.type === 'rescatar') {
     const v = d.volumenes.find((x) => x.letra === letra), stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
     const nombre = (String(v?.etiqueta || '').replace(/[^\w -]/g, '').trim() || 'USB-' + letra) + '-' + stamp;
-    const dst = path.join(app.getPath('documents'), 'Capri-rescate', nombre);
+    const dst = PORTATIL ? carpetaDatos('Rescate', nombre) : path.join(app.getPath('documents'), 'Capri-rescate', nombre);
     const r = await psx(USB_RESCUE, { CAPRI_L: letra, CAPRI_DST: dst });
     if (r.code >= 0 && fs.existsSync(dst)) shell.openPath(dst);
     return { ok: r.code >= 0 && r.code < 8, code: r.code, out: tail(r.out, 1500), dest: dst, why: r.code >= 8 ? 'parcial' : r.code < 0 ? 'error' : '' };
@@ -471,7 +504,7 @@ ipcMain.handle('rip:bajar', async (_e, url) => {
 // respaldo automático del expediente (ya viene cifrado): Documentos\Capri\Respaldos, se quedan los 30 más nuevos
 ipcMain.handle('respaldo:guardar', async (_e, nombre, texto) => {
   try {
-    const dir = path.join(app.getPath('documents'), 'Capri', 'Respaldos');
+    const dir = carpetaDatos('Respaldos');
     fs.mkdirSync(dir, { recursive: true });
     const n = String(nombre || 'expediente.capriexp').replace(/[^\w.-]/g, '_');
     if (!/\.capriexp$/.test(n)) return { ok: false, why: 'nombre' };
@@ -481,8 +514,9 @@ ipcMain.handle('respaldo:guardar', async (_e, nombre, texto) => {
     return { ok: true, dir };
   } catch (e) { return { ok: false, why: 'error', msg: e.message }; }
 });
-ipcMain.handle('respaldo:abrir', () => { const dir = path.join(app.getPath('documents'), 'Capri', 'Respaldos'); fs.mkdirSync(dir, { recursive: true }); shell.openPath(dir); return true; });
+ipcMain.handle('respaldo:abrir', () => { const dir = carpetaDatos('Respaldos'); fs.mkdirSync(dir, { recursive: true }); shell.openPath(dir); return true; });
 ipcMain.on('claude:open', openClaude);
+ipcMain.handle('capri:portatil', () => ({ portatil: PORTATIL, dir: PORTATIL ? DATA_USB : DATA_PC }));
 ipcMain.on('retry', () => { if (win) { offline = false; ready = false; win.loadURL(deskURL()); } });
 
 app.whenReady().then(async () => {
