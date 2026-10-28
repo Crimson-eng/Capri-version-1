@@ -1,6 +1,6 @@
 // Guarda la app en el dispositivo para que abra rápido y funcione sin internet (menos el cerebro).
 // Sube VERSION cada vez que cambies archivos para que los celulares descarguen lo nuevo.
-const VERSION='capri-v25';
+const VERSION='capri-v30';
 const SHELL=[
   './',
   './index.html',
@@ -17,6 +17,7 @@ const SHELL=[
   './expediente.js',
   './biblioteca.js',
   './rip.js',
+  './lectura.js',
   './vendor/lectores/pdf.min.js',
   './vendor/lectores/pdf.worker.min.js',
   './vendor/lectores/mammoth.browser.min.js',
@@ -24,8 +25,14 @@ const SHELL=[
   './vendor/lectores/xlsx.full.min.js',
   './vendor/leaflet/leaflet.js',
   './vendor/leaflet/leaflet.css',
+  './vozlocal.js',
   './voz.js',
   './cerebro.js',
+  './aprende.js',
+  './hilos.js',
+  './asocia.js',
+  './boveda.js',
+  './boveda.html',
   './hud.js',
   './holo3d.js',
   './vendor/three.module.min.js',
@@ -64,6 +71,7 @@ self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.
 self.addEventListener('fetch',e=>{const u=new URL(e.request.url);
   if(e.request.method!=='GET'||u.origin!==location.origin)return; // Gemini, fuentes y librerías van directo a internet
   if(e.request.mode==='navigate'){ // la página: primero internet (para tener lo último), si no hay, la guardada
-    e.respondWith(fetch(e.request).then(r=>{const c=r.clone();caches.open(VERSION).then(x=>x.put('./index.html',c));return r;}).catch(()=>caches.match('./index.html')));return;}
+    const k=/\/(index\.html)?$/.test(u.pathname)?'./index.html':u.pathname;   // boveda.html se guarda como ella misma, no como index
+    e.respondWith(fetch(e.request).then(r=>{const c=r.clone();if(r.ok)caches.open(VERSION).then(x=>x.put(k,c));return r;}).catch(()=>caches.match(k).then(r=>r||caches.match('./index.html'))));return;}
   e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));});
 self.addEventListener('notificationclick',e=>{e.notification.close();e.waitUntil(self.clients.matchAll({type:'window'}).then(cs=>cs.length?cs[0].focus():self.clients.openWindow('./')));});

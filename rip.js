@@ -314,7 +314,7 @@ async function ocrLocal(buf,mime,av=()=>{}){
       const r=await reconoce(c,m=>av('Página '+i+'/'+pdf.numPages+' · '+m));text+=`\n[Página ${i}]\n`+r.text;sum+=r.conf;ws.push(...r.ws);}
     return {text:text.trim(),conf:sum/Math.max(1,pdf.numPages),ws};}
   return reconoce(new Blob([buf],{type:mime||'image/png'}),av);}
-window.ocrLocal=ocrLocal;
+window.ocrLocal=ocrLocal;window.ocrImagen=reconoce;   // una sola página (canvas o imagen): la lectura completa de PDFs la usa para las páginas sin texto
 let ocrRes=null;
 function vOcr(){const r=ocrRes,modo=store.get('ripOcr','local');
   return `<h3>Lector de escaneos</h3><div class="sub">fotos de apuntes, estudios y PDF escaneados</div>

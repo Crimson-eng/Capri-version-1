@@ -223,10 +223,10 @@ function verVista(v){vista=v;modal.querySelectorAll('.tabs [data-v]').forEach(b=
   const V=$('mdView'),L=visto();V.querySelector('iframe')?.remove();$('mdMap').style.display=v==='mapa'?'':'none';$('mdCams').style.display=v==='cams'?'':'none';
   if(v==='mapa')pintaMapa();
   if(v==='waze'){if(!L){$('mdTraf').textContent='Elige un lugar arriba para ver Waze.';return;}
-    const f=document.createElement('iframe');f.src=`https://embed.waze.com/es/iframe?zoom=14&lat=${L.lat}&lon=${L.lon}&pin=1`;f.allowFullscreen=true;f.title='Waze en vivo';V.appendChild(f);}
+    const f=document.createElement('iframe');f.credentialless=true;f.src=`https://embed.waze.com/es/iframe?zoom=14&lat=${L.lat}&lon=${L.lon}&pin=1`;f.allowFullscreen=true;f.title='Waze en vivo';V.appendChild(f);}
   if(v==='cams'){V.style.display='none';cargaCams();}else V.style.display='';}
 function verCam(c){const V=$('mdView');V.style.display='';V.querySelector('iframe')?.remove();$('mdMap').style.display='none';
-  if(c.player){const f=document.createElement('iframe');f.src=c.player;f.allowFullscreen=true;f.title=c.t;V.appendChild(f);}else window.open(c.url,'_blank');}
+  if(c.player){const f=document.createElement('iframe');f.credentialless=true;f.src=c.player;f.allowFullscreen=true;f.title=c.t;V.appendChild(f);}else window.open(c.url,'_blank');}
 async function cargaCams(){const box=$('mdCams'),L=visto();
   if(!L){box.innerHTML='<div class="note">Elige un lugar arriba.</div>';return;}
   if(!mu.wy){box.innerHTML='<div class="note">Pon tu llave gratis de Windy abajo para ver las cámaras públicas de tu zona. Mientras, puedes verlas en <a href="https://www.windy.com/webcams" target="_blank" rel="noopener">windy.com/webcams</a>.</div>';return;}

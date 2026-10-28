@@ -1,6 +1,7 @@
 // Capri de escritorio: una ventana transparente, encima de todo, del tamaño de la pantalla.
 // Mini Capri ronda por ella; donde no está Capri, los clics pasan a tus otras ventanas.
-const { app, BrowserWindow, Tray, Menu, ipcMain, screen, session, desktopCapturer, shell, nativeImage, globalShortcut } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, screen, session, desktopCapturer, shell, nativeImage, globalShortcut, safeStorage } = require('electron');
+const crypto = require('crypto');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -33,7 +34,9 @@ function serveWeb() {
       if (file !== WEB && !file.startsWith(WEB + path.sep)) { res.writeHead(403); return res.end(); }
       fs.readFile(file, (err, data) => {
         if (err) { res.writeHead(404); return res.end(); }
-        res.writeHead(200, { 'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+        // aislamiento de origen: deja a la voz local usar varios núcleos (SharedArrayBuffer); «credentialless» deja pasar fuentes, mapas y cámaras
+        res.writeHead(200, { 'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-cache',
+          'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'credentialless' });
         res.end(data);
       });
     });
@@ -66,8 +69,140 @@ const cmd = (name, extra = {}) => send('desk:cmd', { name, ...extra });
 const EXE = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;
 const newer = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number);
   for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+// ---------- modo portátil (USB) ----------
+// Si junto al .exe hay una carpeta «CapriData», TODO lo de Capri (memoria, pláticas, apuntes, expediente, keys, sesión de
+// claude.ai, respaldos) se guarda ahí y no en la PC: te la llevas en la USB y en la PC donde la conectes no queda nada.
+// Para pasarte a la USB: menú de la bandeja → «Llevar mis datos junto al .exe»; se copian al volver a abrir Capri.
+const DIR_EXE = process.env.PORTABLE_EXECUTABLE_DIR || path.dirname(process.execPath);
+const DATA_USB = path.join(DIR_EXE, 'CapriData');
+const DATA_PC = app.getPath('userData');
+const PORTATIL = fs.existsSync(DATA_USB);
+if (PORTATIL) {
+  const marca = path.join(DATA_USB, '.copiar-desde');
+  if (fs.existsSync(marca)) {   // primera vez: se copian los datos de esta PC (Capri estaba cerrada, así que nada está en uso)
+    try { const src = fs.readFileSync(marca, 'utf8').trim(); if (src && fs.existsSync(src) && path.resolve(src) !== path.resolve(DATA_USB))
+      fs.cpSync(src, DATA_USB, { recursive: true, force: false, errorOnExist: false, filter: (f) => !/[\\/](Cache|Code Cache|GPUCache|DawnCache|GrShaderCache|ShaderCache|Crashpad|SingletonLock|SingletonCookie|SingletonSocket|lockfile)([\\/]|$)/.test(f) }); }
+    catch (e) { console.error('no pude copiar los datos a la USB:', e.message); }
+    try { fs.unlinkSync(marca); } catch {}
+  }
+  app.setPath('userData', DATA_USB);
+  app.setPath('crashDumps', path.join(DATA_USB, 'Crashpad'));
+}
+const carpetaDatos = (...p) => PORTATIL ? path.join(DATA_USB, ...p) : path.join(app.getPath('documents'), 'Capri', ...p);
+function llevarAUsb() {
+  const { dialog } = require('electron');
+  if (PORTATIL) return shell.openPath(DATA_USB);
+  const r = dialog.showMessageBoxSync({ type: 'question', buttons: ['Sí, llevarlos', 'Cancelar'], defaultId: 0, cancelId: 1, title: 'Capri portátil',
+    message: 'Guardar los datos de Capri junto al .exe',
+    detail: `Se crea la carpeta:\n${DATA_USB}\n\nAl volver a abrir Capri desde ahí, se copia tu memoria, apuntes, expediente y ajustes de esta PC y desde entonces todo se guarda en esa carpeta (llévala junto con el .exe en tu USB).\n\nCapri se va a cerrar para copiar todo sin que nada esté en uso.` });
+  if (r !== 0) return;
+  try { fs.mkdirSync(DATA_USB, { recursive: true }); fs.writeFileSync(path.join(DATA_USB, '.copiar-desde'), DATA_PC); }
+  catch (e) { return dialog.showErrorBox('No pude crear la carpeta', e.message + '\n\n¿La USB está protegida contra escritura?'); }
+  app.relaunch({ execPath: EXE }); app.quit();
+}
+
 // si ya hay una Capri abierta, le avisamos qué versión somos: si somos más nuevas, ella se cierra y nos abre a nosotras
-if (!app.requestSingleInstanceLock({ version: app.getVersion(), exe: EXE })) app.quit();
+const LOCK = app.requestSingleInstanceLock({ version: app.getVersion(), exe: EXE });
+if (!LOCK) app.quit();
+
+// ---------- bóveda: todo cifrado con tu llave (boveda.js hace el cifrado; aquí solo se guardan los archivos ya cifrados) ----------
+// Con la bóveda activa, la ventana de Capri usa una sesión que vive solo en la RAM ('capri-ram'): su IndexedDB y su
+// localStorage nunca tocan el disco. Lo único que se escribe es la carpeta Boveda con los archivos cifrados (AES-256-GCM).
+const BOVEDA = path.join(app.getPath('userData'), 'Boveda');
+const META = path.join(BOVEDA, 'meta.json');
+const BOVEDA_ON = fs.existsSync(META);
+// lo que Chromium guarda en claro de una sesión normal; se borra la primera vez que Capri abre ya cifrada
+const PLANO = ['IndexedDB', 'Local Storage', 'Session Storage', 'WebStorage', 'Service Worker', 'blob_storage', 'databases', 'Cookies', 'Cookies-journal', 'Partitions', 'Network Persistent State', 'TransportSecurity'];
+if (LOCK && BOVEDA_ON) {
+  const marca = path.join(BOVEDA, '.borrar-plano');
+  if (fs.existsSync(marca)) {
+    let op = {}; try { op = JSON.parse(fs.readFileSync(marca, 'utf8')); } catch {}
+    const dirs = [app.getPath('userData')]; if (op.borrarPC && PORTATIL && path.resolve(DATA_PC) !== path.resolve(DATA_USB)) dirs.push(DATA_PC);
+    for (const d of dirs) for (const n of PLANO) { try { fs.rmSync(path.join(d, n), { recursive: true, force: true }); } catch (e) { console.error('[capri] no pude borrar', n, e.message); } }
+    try { fs.unlinkSync(marca); } catch {}
+  }
+}
+const nombreOk = (n) => typeof n === 'string' && n.length < 240 && /^[A-Za-z0-9._~%!'()#-]+$/.test(n) && !/^\.+$/.test(n);
+const escribeAtomico = async (f, data) => { const t = f + '.tmp'; await fs.promises.writeFile(t, data); await fs.promises.rename(t, f); };
+ipcMain.on('boveda:activa', (e) => { e.returnValue = BOVEDA_ON; });
+ipcMain.handle('boveda:info', () => {
+  let meta = null; try { meta = JSON.parse(fs.readFileSync(META, 'utf8')); } catch {}
+  return { activa: BOVEDA_ON, creada: !!meta, meta, dir: BOVEDA, portatil: PORTATIL };
+});
+ipcMain.handle('boveda:lista', () => { try { return fs.readdirSync(BOVEDA).filter((f) => f.endsWith('.enc')); } catch { return []; } });
+ipcMain.handle('boveda:leer', (e, n) => { if (!nombreOk(n)) throw new Error('nombre'); return fs.promises.readFile(path.join(BOVEDA, n)); });
+ipcMain.handle('boveda:escribir', async (e, n, bytes) => {
+  if (!nombreOk(n) || !n.endsWith('.enc') || !(bytes instanceof Uint8Array)) throw new Error('nombre');
+  await fs.promises.mkdir(BOVEDA, { recursive: true });
+  await escribeAtomico(path.join(BOVEDA, n), Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength));
+  return true;
+});
+ipcMain.handle('boveda:borrar', (e, n) => { if (!nombreOk(n) || !n.endsWith('.enc')) throw new Error('nombre'); fs.rmSync(path.join(BOVEDA, n), { force: true }); return true; });
+ipcMain.handle('boveda:meta', async (e, meta, op = {}) => {
+  if (!meta || meta.v !== 1 || typeof meta.wrapL !== 'string' || typeof meta.wrapR !== 'string') throw new Error('meta');
+  await fs.promises.mkdir(BOVEDA, { recursive: true });
+  await escribeAtomico(META, JSON.stringify(meta, null, 1));
+  if (!BOVEDA_ON) fs.writeFileSync(path.join(BOVEDA, '.borrar-plano'), JSON.stringify({ borrarPC: !!(op && op.borrarPC) }));
+  return true;
+});
+// antes de cerrar, la página guarda cifrado lo último que cambió (máx. 30 s, por si la USB es lenta)
+let escucha = false, cerrando = false;
+ipcMain.on('boveda:escucha', (e) => { if (win && e.sender === win.webContents) escucha = true; });
+function vaciarBoveda() {
+  return new Promise((res) => {
+    if (!BOVEDA_ON || !escucha || !win || win.isDestroyed()) return res();
+    const t = setTimeout(res, 30000);
+    ipcMain.once('boveda:listo', () => { clearTimeout(t); res(); });
+    send('boveda:flush');
+  });
+}
+// tu sesión de claude.ai: con bóveda vive en la RAM, así que la página la guarda cifrada aparte (claude.enc) y la vuelve a meter al abrir
+let claudeCambio = false;
+const esCapri = (e) => win && e.sender === win.webContents;
+ipcMain.handle('boveda:claudeSacar', async (e, todo) => {
+  if (!BOVEDA_ON || !esCapri(e) || (!claudeCambio && !todo)) return null;
+  claudeCambio = false;
+  const cs = await session.fromPartition('claude-ram').cookies.get({});
+  return cs.map((c) => ({ url: 'https://' + String(c.domain || '').replace(/^\./, '') + (c.path || '/'), name: c.name, value: c.value,
+    domain: c.hostOnly ? undefined : c.domain, path: c.path, secure: c.secure, httpOnly: c.httpOnly, expirationDate: c.expirationDate, sameSite: c.sameSite }));
+});
+ipcMain.handle('boveda:claudeMeter', async (e, cs) => {
+  if (!BOVEDA_ON || !esCapri(e) || !Array.isArray(cs)) return 0;
+  const ses = session.fromPartition('claude-ram'), ahora = Date.now() / 1000; let n = 0;
+  for (const c of cs.slice(0, 400)) {
+    if (!c || typeof c.url !== 'string' || !/^https:\/\/([\w-]+\.)*[\w-]+\//.test(c.url) || (c.expirationDate && c.expirationDate < ahora)) continue;
+    try { await ses.cookies.set(c); n++; } catch {}
+  }
+  setTimeout(() => { claudeCambio = false; }, 500);
+  return n;
+});
+// «Recordarme en esta PC»: la llave maestra se guarda protegida por Windows (DPAPI, solo tu usuario de esta PC la abre)
+// en la carpeta de Capri de ESTA PC, nunca en la USB. En otra PC, o con otro usuario, te vuelve a pedir la llave.
+const RECUERDA = path.join(DATA_PC, 'Recordar');
+// (CAPRI_PRUEBA_RECORDAR=1 solo para las pruebas en Linux sin llavero: ahí la protección sería texto plano)
+const PRUEBA_REC = process.env.CAPRI_PRUEBA_RECORDAR === '1' && process.platform === 'linux';
+const protegeOk = () => PRUEBA_REC || (safeStorage.isEncryptionAvailable() && (process.platform !== 'linux' || safeStorage.getSelectedStorageBackend() !== 'basic_text'));
+function archivoRecuerda() {
+  try { const m = JSON.parse(fs.readFileSync(META, 'utf8')); return path.join(RECUERDA, crypto.createHash('sha256').update(m.salt + ':' + m.creado).digest('hex').slice(0, 20) + '.llave'); } catch { return null; }
+}
+ipcMain.handle('boveda:recordar', async (e, raw) => {
+  const f = archivoRecuerda(); if (!BOVEDA_ON || !esCapri(e) || !f || typeof raw !== 'string' || !protegeOk()) return false;
+  await fs.promises.mkdir(RECUERDA, { recursive: true }); await escribeAtomico(f, safeStorage.encryptString(raw)); return true;
+});
+ipcMain.handle('boveda:recordada', async (e) => {
+  const f = archivoRecuerda(); if (!BOVEDA_ON || !esCapri(e) || !f || !protegeOk()) return null;
+  try { return safeStorage.decryptString(await fs.promises.readFile(f)); } catch { return null; }
+});
+ipcMain.handle('boveda:recordando', () => { const f = archivoRecuerda(); return { puede: protegeOk(), si: !!f && fs.existsSync(f) }; });
+ipcMain.handle('boveda:olvidar', () => { const f = archivoRecuerda(); if (f) fs.rmSync(f, { force: true }); return true; });
+ipcMain.on('boveda:reiniciar', () => { app.relaunch({ execPath: EXE }); app.quit(); });
+ipcMain.on('boveda:salir', () => app.quit());
+app.on('before-quit', (e) => {
+  if (cerrando || !BOVEDA_ON) return;
+  e.preventDefault(); cerrando = true;
+  vaciarBoveda().then(() => app.quit());
+});
+const sesionCapri = () => BOVEDA_ON ? session.fromPartition('capri-ram') : session.defaultSession;
 app.setAppUserModelId('com.crimson.capri');
 
 function deskURL() {
@@ -101,10 +236,13 @@ function createWindow() {
       contextIsolation: true, nodeIntegration: false, sandbox: true,
       backgroundThrottling: false, // que siga rondando y hablando sola
       autoplayPolicy: 'no-user-gesture-required', // la voz de Gemini suena aunque no le hayas dado clic
+      ...(BOVEDA_ON ? { partition: 'capri-ram' } : {}), // con bóveda: nada de la página se escribe al disco
     },
   });
   setMode('desk');
-  win.loadURL(deskURL());
+  // con bóveda, primero la pantalla de la llave; ella abre a Capri ya descifrada
+  win.loadURL(BOVEDA_ON ? CAPRI_URL + 'boveda.html?next=' + encodeURIComponent(deskURL()) : deskURL());
+  win.webContents.on('did-navigate', () => { escucha = false; });
   // solo se muestra cuando la página confirma que sabe ser mini Capri de escritorio;
   // si no (versión vieja o sin red), se muestra un aviso en vez de tapar la pantalla
   win.webContents.on('did-finish-load', () => {
@@ -135,7 +273,8 @@ function openClaude() {
   claudeWin = new BrowserWindow({
     width: Math.min(1100, wa.width - 80), height: Math.min(860, wa.height - 60), minWidth: 420, minHeight: 500,
     title: 'Capri // Claude', icon: path.join(__dirname, 'icon.png'), backgroundColor: '#0c0b12', autoHideMenuBar: true,
-    webPreferences: { partition: 'persist:claude', contextIsolation: true, nodeIntegration: false, sandbox: true },
+    // con bóveda la sesión de claude.ai vive en la RAM y se guarda cifrada en la bóveda (claude.enc)
+    webPreferences: { partition: BOVEDA_ON ? 'claude-ram' : 'persist:claude', contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
   const wc = claudeWin.webContents;
   // sin la marca "Electron" en el agente, para que el inicio de sesión lo trate como un navegador normal
@@ -178,7 +317,9 @@ function rebuildMenu() {
     { label: 'Poseer mis ventanas', type: 'checkbox', checked: p.possess, enabled: process.platform === 'win32',
       click: (it) => setPrefs({ possess: it.checked }) },
     { type: 'separator' },
-    { label: 'Iniciar con Windows', type: 'checkbox', checked: app.getLoginItemSettings({ path: EXE }).openAtLogin,
+    { label: PORTATIL ? '💾 Datos en la USB: abrir carpeta' : '💾 Llevar mis datos junto al .exe (USB)', click: llevarAUsb },
+    ...(BOVEDA_ON ? [{ label: '🔐 Bloquear Capri (guarda y pide la llave)', click: () => run('window.Boveda&&Boveda.bloquear()') }] : []),
+    { label: 'Iniciar con Windows', enabled: !PORTATIL, type: 'checkbox', checked: app.getLoginItemSettings({ path: EXE }).openAtLogin,
       click: (it) => app.setLoginItemSettings({ openAtLogin: it.checked, path: EXE }) },
     { label: 'Recargar', click: () => { if (win) { offline = false; ready = false; win.loadURL(deskURL()); } } },
     { type: 'separator' },
@@ -410,7 +551,7 @@ ipcMain.handle('tec', async (_e, a) => {
   if (a.type === 'rescatar') {
     const v = d.volumenes.find((x) => x.letra === letra), stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, '');
     const nombre = (String(v?.etiqueta || '').replace(/[^\w -]/g, '').trim() || 'USB-' + letra) + '-' + stamp;
-    const dst = path.join(app.getPath('documents'), 'Capri-rescate', nombre);
+    const dst = PORTATIL ? carpetaDatos('Rescate', nombre) : path.join(app.getPath('documents'), 'Capri-rescate', nombre);
     const r = await psx(USB_RESCUE, { CAPRI_L: letra, CAPRI_DST: dst });
     if (r.code >= 0 && fs.existsSync(dst)) shell.openPath(dst);
     return { ok: r.code >= 0 && r.code < 8, code: r.code, out: tail(r.out, 1500), dest: dst, why: r.code >= 8 ? 'parcial' : r.code < 0 ? 'error' : '' };
@@ -471,7 +612,7 @@ ipcMain.handle('rip:bajar', async (_e, url) => {
 // respaldo automático del expediente (ya viene cifrado): Documentos\Capri\Respaldos, se quedan los 30 más nuevos
 ipcMain.handle('respaldo:guardar', async (_e, nombre, texto) => {
   try {
-    const dir = path.join(app.getPath('documents'), 'Capri', 'Respaldos');
+    const dir = carpetaDatos('Respaldos');
     fs.mkdirSync(dir, { recursive: true });
     const n = String(nombre || 'expediente.capriexp').replace(/[^\w.-]/g, '_');
     if (!/\.capriexp$/.test(n)) return { ok: false, why: 'nombre' };
@@ -481,15 +622,29 @@ ipcMain.handle('respaldo:guardar', async (_e, nombre, texto) => {
     return { ok: true, dir };
   } catch (e) { return { ok: false, why: 'error', msg: e.message }; }
 });
-ipcMain.handle('respaldo:abrir', () => { const dir = path.join(app.getPath('documents'), 'Capri', 'Respaldos'); fs.mkdirSync(dir, { recursive: true }); shell.openPath(dir); return true; });
+ipcMain.handle('respaldo:abrir', () => { const dir = carpetaDatos('Respaldos'); fs.mkdirSync(dir, { recursive: true }); shell.openPath(dir); return true; });
 ipcMain.on('claude:open', openClaude);
+ipcMain.handle('capri:portatil', () => ({ portatil: PORTATIL, dir: PORTATIL ? DATA_USB : DATA_PC }));
+// voces locales (Piper): el modelo .onnx se baja una vez y se queda en la carpeta Voces junto a tus datos (en modo USB, en la USB).
+// No son datos tuyos, así que no van en la bóveda: así Capri habla desde que arranca, sin descifrar nada.
+const VOCES = () => path.join(app.getPath('userData'), 'Voces');
+const vozOk = (n) => typeof n === 'string' && /^[A-Za-z0-9_.-]{3,80}\.onnx(\.json)?$/.test(n);
+ipcMain.handle('voz:lista', () => { try { return fs.readdirSync(VOCES()).filter(vozOk); } catch { return []; } });
+ipcMain.handle('voz:leer', (e, n) => { if (!vozOk(n)) throw new Error('nombre'); return fs.promises.readFile(path.join(VOCES(), n)); });
+ipcMain.handle('voz:guardar', async (e, n, bytes) => {
+  if (!vozOk(n) || !(bytes instanceof Uint8Array) || bytes.byteLength > 200 * 1024 * 1024) throw new Error('nombre');
+  await fs.promises.mkdir(VOCES(), { recursive: true });
+  await escribeAtomico(path.join(VOCES(), n), Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)); return true;
+});
+ipcMain.handle('voz:borrar', (e, n) => { if (!vozOk(n)) throw new Error('nombre'); fs.rmSync(path.join(VOCES(), n), { force: true }); return true; });
 ipcMain.on('retry', () => { if (win) { offline = false; ready = false; win.loadURL(deskURL()); } });
 
 app.whenReady().then(async () => {
   // que al prender la PC se abra esta versión y no una vieja
   if (process.platform === 'win32' && EXE !== process.execPath && app.getLoginItemSettings().openAtLogin) {
     app.setLoginItemSettings({ openAtLogin: false }); app.setLoginItemSettings({ openAtLogin: true, path: EXE }); }
-  const ses = session.defaultSession;
+  if (PRUEBA_REC) safeStorage.setUsePlainTextEncryption?.(true);
+  const ses = sesionCapri();
   // micrófono, notificaciones, pantalla completa y ubicación (módulo Mundo) sí; lo demás no
   const ok = ['media', 'notifications', 'fullscreen', 'clipboard-sanitized-write', 'display-capture', 'geolocation'];
   ses.setPermissionRequestHandler((wc, perm, cb) => cb(ok.includes(perm)));
@@ -499,10 +654,11 @@ app.whenReady().then(async () => {
     desktopCapturer.getSources({ types: ['screen'] }).then((s) => cb(s[0] ? { video: s[0] } : {})).catch(() => cb({}));
   });
   // la ventana de claude.ai: puede pedir notificaciones y portapapeles, nada más
-  const cses = session.fromPartition('persist:claude');
+  const cses = session.fromPartition(BOVEDA_ON ? 'claude-ram' : 'persist:claude');
   const cok = ['notifications', 'clipboard-sanitized-write', 'clipboard-read', 'fullscreen'];
   cses.setPermissionRequestHandler((wc, perm, cb) => cb(cok.includes(perm)));
   cses.setPermissionCheckHandler((wc, perm) => cok.includes(perm));
+  if (BOVEDA_ON) cses.cookies.on('changed', () => { claudeCambio = true; });
   await serveWeb();
   createWindow();
   createTray();
@@ -513,7 +669,7 @@ app.whenReady().then(async () => {
 app.on('will-quit', () => { globalShortcut.unregisterAll(); watch?.stop(); });
 
 app.on('second-instance', (_e, _argv, _cwd, data) => {
-  if (data && data.version && newer(data.version, app.getVersion())) { app.relaunch({ execPath: data.exe, args: [] }); app.exit(0); return; }
+  if (data && data.version && newer(data.version, app.getVersion())) { vaciarBoveda().then(() => { cerrando = true; app.relaunch({ execPath: data.exe, args: [] }); app.exit(0); }); return; }
   run('expand()');
 });
 app.on('window-all-closed', () => app.quit());

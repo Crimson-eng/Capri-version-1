@@ -1,0 +1,5 @@
+Voz local de Capri (vozlocal.js)
+- onnxruntime-web 1.18.0 (ort.wasm.min.js, ort-wasm*.wasm) — MIT License, Copyright (c) Microsoft Corporation. https://github.com/microsoft/onnxruntime
+- @diffusionstudio/piper-wasm 1.0.0 (piper_phonemize.*) — MIT License. https://github.com/diffusionstudio/piper-wasm
+  piper_phonemize (rhasspy, MIT) compilado a WebAssembly, con espeak-ng y sus datos (piper_phonemize.data) — GPL-3.0. https://github.com/espeak-ng/espeak-ng
+- Las voces (.onnx) no vienen aquí: se bajan de https://huggingface.co/rhasspy/piper-voices (cada una con su MODEL_CARD y licencia).

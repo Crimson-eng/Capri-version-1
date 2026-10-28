@@ -6,6 +6,30 @@ contextBridge.exposeInMainWorld('capriDesk', {
   mode: (m) => ipcRenderer.send('mode', m === 'full' ? 'full' : 'desk'),
   retry: () => ipcRenderer.send('retry'),
   openClaude: () => ipcRenderer.send('claude:open'),  // tu cuenta de claude.ai en una ventana de Capri
+  portatil: () => ipcRenderer.invoke('capri:portatil'),  // ¿los datos están en la USB (CapriData junto al .exe)?
+  // voces locales (Piper) guardadas en la carpeta Voces
+  voz: { lista: () => ipcRenderer.invoke('voz:lista'), leer: (n) => ipcRenderer.invoke('voz:leer', n),
+    guardar: (n, b) => ipcRenderer.invoke('voz:guardar', n, b), borrar: (n) => ipcRenderer.invoke('voz:borrar', n) },
+  // bóveda: la página cifra; aquí solo se leen y escriben sus archivos ya cifrados (carpeta Boveda)
+  boveda: {
+    activa: ipcRenderer.sendSync('boveda:activa'),
+    info: () => ipcRenderer.invoke('boveda:info'),
+    lista: () => ipcRenderer.invoke('boveda:lista'),
+    leer: (n) => ipcRenderer.invoke('boveda:leer', n),
+    escribir: (n, bytes) => ipcRenderer.invoke('boveda:escribir', n, bytes),
+    borrar: (n) => ipcRenderer.invoke('boveda:borrar', n),
+    crearMeta: (meta, op) => ipcRenderer.invoke('boveda:meta', meta, op),
+    reiniciar: () => ipcRenderer.send('boveda:reiniciar'),
+    salir: () => ipcRenderer.send('boveda:salir'),
+    alCerrar: (fn) => { ipcRenderer.removeAllListeners('boveda:flush'); ipcRenderer.on('boveda:flush', () => fn()); ipcRenderer.send('boveda:escucha'); },
+    listo: () => ipcRenderer.send('boveda:listo'),
+    claudeSacar: (todo) => ipcRenderer.invoke('boveda:claudeSacar', !!todo),   // tu sesión de claude.ai (para guardarla cifrada)
+    claudeMeter: (cs) => ipcRenderer.invoke('boveda:claudeMeter', cs),
+    recordar: (raw) => ipcRenderer.invoke('boveda:recordar', raw),           // «Recordarme en esta PC»
+    recordada: () => ipcRenderer.invoke('boveda:recordada'),
+    recordando: () => ipcRenderer.invoke('boveda:recordando'),
+    olvidar: () => ipcRenderer.invoke('boveda:olvidar'),
+  },
   // Capri rondando por el escritorio
   menu: () => ipcRenderer.send('menu'),               // clic derecho sobre ella
   getCfg: () => ipcRenderer.invoke('cfg:get'),

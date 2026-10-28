@@ -219,7 +219,7 @@ function renderM(){if(!vM.classList.contains('on'))return;const a=medCk('medOn')
   vM.querySelectorAll('.mdz button').forEach(b=>b.classList.toggle('on',(b.dataset.k||null)===zs));
   const cnt=counts();vM.querySelectorAll('.mdz b[data-n]').forEach(b=>{const n=cnt[b.dataset.n]||0;b.textContent=n||'';});
   const here=zs?mats.filter(m=>m.sis.includes(zs)):mats;
-  vM.querySelector('#mdMats').innerHTML=here.length?`<div class="sub" style="margin-top:10px">${zs?'Tus materiales de esta zona':'Todos tus materiales'}</div>`+here.slice(0,12).map(m=>`<div class="mat"><span>${esc(m.name)}</span><em>${m.sis.map(k=>ZN(k)[1].replace('Sistema ','')).join(' · ')||'general'}</em></div>`).join(''):(zs?'<div class="st" style="margin-top:8px">Aún no tienes materiales de esta zona.</div>':'');}
+  vM.querySelector('#mdMats').innerHTML=here.length?`<div class="sub" style="margin-top:10px">${zs?'Tus materiales de esta zona':'Todos tus materiales'}</div>`+here.map(m=>`<div class="mat" data-ver="${m.id}" title="Ver la lectura del documento" style="cursor:pointer"><span>👁 ${esc(m.name)}</span><em>${m.sis.map(k=>ZN(k)[1].replace('Sistema ','')).join(' · ')||'general'}</em></div>`).join(''):(zs?'<div class="st" style="margin-top:8px">Aún no tienes materiales de esta zona.</div>':'');}
 function counts(){const c={};for(const m of mats)for(const k of m.sis)c[k]=(c[k]||0)+1;return c;}
 function zone(k,fromHolo){zs=k||null;const z=zs&&ZN(zs);
   vM.querySelector('#mdSys').textContent=z?z[1]:'Cuerpo completo';vM.querySelector('#mdDesc').textContent=z?z[4]:'Toca un órgano o elige una zona. Tus materiales se acomodan solos en la parte del cuerpo de la que hablan.';
@@ -233,7 +233,7 @@ vM.querySelector('#mdOn').onclick=()=>flip('medOn');vM.querySelector('#mdOnl').o
 vM.querySelector('#mdLib').onclick=()=>medCk('bMed')?.click();
 vM.querySelector('#mdCli').onclick=()=>window.openClinica?.();
 function ask(t){if(!t.trim())return;const c=medCk('medOn');if(c&&!c.checked)flip('medOn');go('capri',true);setTimeout(()=>send(t),380);}
-vM.addEventListener('click',e=>{const b=e.target.closest('.mdz button');if(b)return zone(b.dataset.k);const g=e.target.closest('.zone');if(g)zone(ZONES[+g.dataset.z][0]);});
+vM.addEventListener('click',e=>{const mv=e.target.closest('[data-ver]');if(mv)return window.verLectura?.('med',mv.dataset.ver);const b=e.target.closest('.mdz button');if(b)return zone(b.dataset.k);const g=e.target.closest('.zone');if(g)zone(ZONES[+g.dataset.z][0]);});
 // el cuerpo 3D sustituye al dibujo plano cuando la compu soporta WebGL
 function mount3D(){const H=window.Holo3D;if(!H)return;
   if(vM.classList.contains('on')&&!vM.querySelector('#mdHolo canvas')){if(H.attach(vM.querySelector('#mdHolo'),'medico')){H.onPick(k=>zone(k,true));H.setCounts(counts());H.select(zs);}}
