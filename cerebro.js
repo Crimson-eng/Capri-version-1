@@ -64,7 +64,7 @@ function marca(quien){ultimo=quien;const el=$('mdl');if(el)el.textContent=quien=
 // ---------- pensar con Claude ----------
 let claudeFuera=0;
 const claudeOk=()=>cer.claude!=='off'&&!!cfg.claudeKey&&claudeSpent<cer.tope&&Date.now()>claudeFuera;
-function rutaClaude(parts){if(!claudeOk()||modoAct==='watch'||modoAct==='idle')return false;
+function rutaClaude(parts){if(!claudeOk()||window.cerebroSinGasto||modoAct==='watch'||modoAct==='idle')return false;
   if(parts.some(p=>p.inlineData&&/^audio/.test(p.inlineData.mimeType)))return false;   // Claude no oye audio: la voz sigue en Gemini
   if(cer.claude==='siempre')return true;
   const t=parts.map(p=>p.text||'').join(' ');
@@ -99,7 +99,7 @@ ask=async(parts,onText)=>{
   let algo=false;
   try{const t=await _ask(p2,x=>{algo=true;onText(x);});marca('nube');return t;}
   catch(e){const caido=e.status===429||e.status>=500||e.message==='NOKEY'||e instanceof TypeError;
-    if(!algo&&caido&&claudeOk()&&!parts.some(p=>p.inlineData&&/^audio/.test(p.inlineData.mimeType))){
+    if(!algo&&caido&&claudeOk()&&!window.cerebroSinGasto&&!parts.some(p=>p.inlineData&&/^audio/.test(p.inlineData.mimeType))){
       line('s','(Gemini no respondió; te contesto con Claude.)');try{return await claudeBrain(p2,onText);}catch(e2){claudeFallo(e2);}}
     if(algo||!caido||!listo()||cer.modo==='gemini'||parts.some(p=>p.inlineData))throw e;
     line('s','(Gemini no respondió'+(e.status===429?' (sin cupo)':e instanceof TypeError?' (sin internet)':'')+'; te contesto con el cerebro de tu GPU.)');
