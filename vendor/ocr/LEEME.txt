@@ -1,0 +1,1 @@
+Datos de idioma: tessdata_best (int) de Tesseract OCR, licencia Apache-2.0, vía @tesseract.js-data/spa y /eng 1.0.0.

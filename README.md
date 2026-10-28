@@ -15,6 +15,8 @@ Tu key, tu memoria y tus documentos se guardan solo en el navegador de cada disp
 | Archivo | Qué es |
 | --- | --- |
 | `index.html` | Toda la app (pantalla, voz, cerebro con Gemini, estudio) |
+| `rip.js` | Pestaña R.I.P: fuentes oficiales (GPC, NOM, Compendio), verificador de medicamentos, lector de escaneos, modo estudio, respaldo del expediente y calculadoras clínicas |
+| `vendor/ocr/` | Lector de escaneos (Tesseract.js, Apache-2.0) con español e inglés, para leer fotos y PDF escaneados sin internet |
 | `assets/*.webp` | Las animaciones de Capri |
 | `manifest.webmanifest`, `icons/` | Lo que permite instalarla como app |
 | `sw.js` | Guarda la app en el dispositivo para que abra rápido. Sube `VERSION` cuando cambies archivos |
