@@ -119,6 +119,7 @@ async function guardaDoc(f,t,inf,op={},viejo){const ps=partir(t),id=viejo?.id||'
   if(viejo)await borraTrozos(id);
   await tx((D,T)=>{D.put({...(viejo||{}),id,name:nombre,file:f.name,ext:ext(f.name),size:f.size,estante:est,active:viejo?viejo.active:true,chars:t.length,trozos:ps.length,pags:inf?.total||Math.max(0,...ps.map(p=>p.pag||0)),lectura:inf,added:viejo?.added||Date.now(),...(op.oficial?{oficial:op.oficial}:{})});
     ps.forEach((p,i)=>T.put({id:id+'_'+i,doc:id,nombre,pag:p.pag,text:p.text}));});
+  if(!op.oficial)dispatchEvent(new CustomEvent('capri:apuntes',{detail:{src:'bib',id,nombre,texto:t}}));   // asocia.js: ¿se parece a algún paciente?
   return {id,ps};}
 async function agregar(files,box,op={}){for(const f of files){const row=document.createElement('div');row.className='bb-prog';row.textContent='Leyendo '+f.name+'…';box?.prepend(row);
     try{const t0=performance.now(),{t,inf}=await leerX(f,m=>row.textContent=f.name+': '+m),{ps}=await guardaDoc(f,t,inf,op);

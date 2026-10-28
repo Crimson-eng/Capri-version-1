@@ -61,7 +61,8 @@ async function guardar(nombre,file,text,inf,viejo){const id=viejo?.id||'m'+Date.
     L.put({...(viejo||{}),id,name:nombre,file,active:viejo?viejo.active:true,trozos:ps.length,pags:inf.total||Math.max(0,...ps.map(p=>p.pag||0)),chars:text.length,lectura:inf,added:viejo?.added||Date.now()});
     ps.forEach((p,i)=>T.put({id:id+'_'+i,libro:id,nombre,pag:p.pag,text:p.text}));});
   log('reservorio médico: '+nombre+' ('+ps.length+' trozos'+(inf.total?', '+inf.conTexto+'/'+inf.total+' pág. con texto':'')+')','y');
-  if(inf.vacias?.length)line('s med','⚠ «'+nombre+'»: '+inf.vacias.length+' página(s) quedaron sin texto legible (p. '+window.rangosPag?.(inf.vacias)+'). Ábrelo en ⚕ MÉDICO → 👁 para revisarlo.');}
+  if(inf.vacias?.length)line('s med','⚠ «'+nombre+'»: '+inf.vacias.length+' página(s) quedaron sin texto legible (p. '+window.rangosPag?.(inf.vacias)+'). Ábrelo en ⚕ MÉDICO → 👁 para revisarlo.');
+  dispatchEvent(new CustomEvent('capri:apuntes',{detail:{src:'med',id,nombre,texto:text}}));}   // asocia.js: ¿se parece a algún paciente?
 // un archivo (no foto) → {text, inf}
 async function leerArchivo(f,av){const buf=await f.arrayBuffer(),e=f.name.split('.').pop().toLowerCase();
   if(e==='pdf')return pdfLeer(buf.slice(0),av);   // página por página; las escaneadas pasan solas por el lector

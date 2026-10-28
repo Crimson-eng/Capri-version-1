@@ -269,9 +269,19 @@ function vApoyo(p){const r=p.apoyo,al=alarmas(p);
       <div><b>Fuente:</b> ${d.fuentes.length?d.fuentes.map(fu).join(' · '):'<span class="warn">ninguno de tus apuntes lo respalda: es conocimiento general de la IA, verifícalo</span>'}</div></fieldset>`).join('')||'<div class="warn">No propuso diferenciales; agrega más datos del caso.</div>'}
    </div>`:''}`;}
 // para relacionar lo que estudias con tus pacientes (solo con el expediente abierto; nada de esto va a la IA)
-window.expRelacionados=texto=>{if(!ex||!llave)return null;const W=new Set(pals(expandir(texto)));if(W.size<2)return [];
-  return ex.pacs.map(p=>{const P=new Set(pals(expandir(textoPac(p)))),D=new Set(pals(expandir(dxDe(p))));let n=0,dx=0;for(const w of W)if(P.has(w)){n++;if(D.has(w))dx++;}return {p,n,dx};})
-    .filter(x=>x.dx>=1&&x.n>=2).sort((a,b)=>b.n-a.n).slice(0,3).map(x=>({id:x.p.id,nexp:x.p.nexp,dx:String(dxDe(x.p)).slice(0,50)}));};
+// op.max: con un documento largo (apuntes nuevos) solo cuentan sus palabras más repetidas, si no todo se parecería a todo
+// devuelve también POR QUÉ se relacionan (las palabras que comparten, primero las del diagnóstico) y hace cuántos días lo viste
+const legibles=t=>{const m=new Map();for(const w of String(t).match(/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{4,}/g)||[]){const k=pals(w)[0];if(k&&!m.has(k))m.set(k,w.toLowerCase());}return m;};
+window.expRelacionados=(texto,op={})=>{if(!ex||!llave)return null;let ws=pals(expandir(texto));
+  if(op.max){const f={};for(const w of ws)f[w]=(f[w]||0)+1;ws=Object.keys(f).sort((a,b)=>f[b]-f[a]).slice(0,op.max);}
+  const W=new Set(ws);if(W.size<2)return [];
+  return ex.pacs.map(p=>{const tp=expandir(textoPac(p)),P=new Set(pals(tp)),D=new Set(pals(expandir(dxDe(p))));const com=[];let dx=0;
+      for(const w of W)if(P.has(w)){com.push(w);if(D.has(w))dx++;}return {p,n:com.length,dx,com,D,tp};})
+    .filter(x=>x.dx>=1&&x.n>=2).sort((a,b)=>b.n-a.n).slice(0,3).map(x=>{const L=legibles(x.tp+' '+texto);
+      const por=x.com.sort((a,b)=>(x.D.has(b)-x.D.has(a))).slice(0,4).map(w=>L.get(w)||w);
+      const ult=Math.max(x.p.upd||0,x.p.ts||0,...(x.p.docs||[]).map(d=>Date.parse((d.fecha||'')+'T'+(d.hora||'12:00'))||0));
+      const ini=[x.p.nombre,x.p.ap1].filter(Boolean).map(w=>String(w).trim()[0]?.toUpperCase()+'.').join('');
+      return {id:x.p.id,nexp:x.p.nexp,ini,dx:String(dxDe(x.p)).slice(0,50),por,hace:ult?Math.max(0,Math.floor((Date.now()-ult)/864e5)):null};});};
 window.expAbrirPac=id=>{window.hudGo?.('expediente');setTimeout(()=>{if(!ex)return;const p=ex.pacs.find(x=>x.id===id);if(!p)return;pac=p;bit('abrió expediente (desde una plática)',p);vista={v:'pac'};render();},450);};
 
 // ---------- Capri acomoda lo que le dictas ----------

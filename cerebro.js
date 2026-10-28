@@ -184,9 +184,25 @@ async function recordar(parts){if(!cer.aprende||!mems.length)return '';
   let top=[];const qv=viejas.some(m=>m.v)?await embed([q]).catch(()=>null):null;
   if(qv?.[0])top=viejas.filter(m=>m.v&&m.v.length===qv[0].length).map(m=>[cos(qv[0],m.v),m]).filter(x=>x[0]>.5);
   else{const W=palabras(q);if(W.size)top=viejas.map(m=>{const P=palabras(m.t);let n=0;for(const w of W)if(P.has(w))n++;return [n/Math.sqrt(W.size*Math.max(1,P.size)),m];}).filter(x=>x[0]>.18);}
-  top=top.map(([s,m])=>[s*(.85+.08*(m.imp??1)),m]).sort((a,b)=>b[0]-a[0]).slice(0,3);if(!top.length)return primeraDelDia();   // a igual parecido, gana lo importante
+  top=top.map(([s,m])=>[s*(.85+.08*(m.imp??1)),m]).sort((a,b)=>b[0]-a[0]).slice(0,3);   // a igual parecido, gana lo importante
+  const oc=ocurrencia(q,new Set(top.map(x=>x[1]))),pd=primeraDelDia(),extra=[oc,pd].filter(Boolean).join('\n');
+  if(!top.length)return extra;
   return `(Recuerdos de pláticas pasadas con ${cfg.name||'Kiga'} que pueden venir al caso. Úsalos solo si ayudan, sin decir que los buscaste:\n`+
-    top.map(([,m])=>'- '+new Date(m.ts).toLocaleDateString('es-MX',{day:'numeric',month:'short'})+' ['+(HILOS[m.hilo]||'')+']: '+m.t.replace(/\n/g,' / ')).join('\n')+')'+(primeraDelDia()?'\n'+primeraDelDia():'');}
+    top.map(([,m])=>'- '+new Date(m.ts).toLocaleDateString('es-MX',{day:'numeric',month:'short'})+' ['+(HILOS[m.hilo]||'')+']: '+m.t.replace(/\n/g,' / ')).join('\n')+')'+(extra?'\n'+extra:'');}
+// ---------- asociaciones (2.10): como a una persona, algo de ahora le recuerda una plática de hace días ----------
+// Busca pláticas de hace más de un día que compartan algo poco común con lo de ahora (un nombre, un lugar, un tema raro),
+// y se la «trae a la mente» a Capri para que la saque con naturalidad o con una broma. Máx. una cada 20 min.
+let df=null,dfN=0,ultOcurr=+store.get('ocurrTs',0)||0,turnos=0;const pcache=new WeakMap();
+const pal=m=>{let p=pcache.get(m);if(!p){p=palabras(m.t);pcache.set(m,p);}return p;};
+function ocurrencia(q,ya){turnos++;if(mems.length<20||Date.now()-ultOcurr<20*60e3||turnos<3)return '';
+  if(!df||Math.abs(mems.length-dfN)>40){df=new Map();for(const m of mems)for(const w of pal(m))df.set(w,(df.get(w)||0)+1);dfN=mems.length;}
+  const raro=Math.max(3,mems.length*.02),W=[...palabras(q)].filter(w=>(df.get(w)||0)<=raro);if(!W.length)return '';
+  const idf=w=>Math.log(1+mems.length/(1+(df.get(w)||0)));let best=null,bs=0,com=[];
+  for(const m of mems){if(Date.now()-m.ts<20*3600e3||ya.has(m))continue;const P=pal(m),c=W.filter(w=>P.has(w));if(!c.length)continue;
+    const s=c.reduce((a,w)=>a+idf(w),0)*(.9+.05*(m.imp??1));if(s>bs){bs=s;best=m;com=c;}}
+  if(!best||bs<Math.log(1+mems.length/4))return '';
+  ultOcurr=Date.now();store.set('ocurrTs',ultOcurr);turnos=0;const dd=Math.max(1,Math.round((Date.now()-best.ts)/864e5)),name=cfg.name||'Kiga';
+  return `(Se te vino a la mente, como cuando a alguien algo le recuerda otra cosa: ${dd===1?'ayer':'hace '+dd+' días'} ${name} y tú platicaron esto: «${best.t.replace(/\n/g,' / ').slice(0,350)}». Lo que lo conecta con lo de ahora: ${com.slice(0,3).join(', ')}. Si de verdad conecta, sácalo con naturalidad y con tu humor («oye, esto me recordó cuando…», una broma ligera o preguntar cómo siguió). Si no viene al caso, ignóralo. No digas que lo buscaste.)`;}
 // «¿qué te conté ayer?», «el lunes», «hace 3 días», «la semana pasada»: se trae ese día completo (su resumen y sus pláticas)
 const DSEM=['domingo','lunes','martes','miercoles','jueves','viernes','sabado'];
 function diasPedidos(q){const u=sinAcento(q),hoy=new Date();hoy.setHours(12,0,0,0);const d=n=>diaDe(hoy.getTime()-n*864e5);

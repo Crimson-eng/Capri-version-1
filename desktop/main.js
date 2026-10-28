@@ -99,7 +99,68 @@ function llevarAUsb() {
 }
 
 // si ya hay una Capri abierta, le avisamos qué versión somos: si somos más nuevas, ella se cierra y nos abre a nosotras
-if (!app.requestSingleInstanceLock({ version: app.getVersion(), exe: EXE })) app.quit();
+const LOCK = app.requestSingleInstanceLock({ version: app.getVersion(), exe: EXE });
+if (!LOCK) app.quit();
+
+// ---------- bóveda: todo cifrado con tu llave (boveda.js hace el cifrado; aquí solo se guardan los archivos ya cifrados) ----------
+// Con la bóveda activa, la ventana de Capri usa una sesión que vive solo en la RAM ('capri-ram'): su IndexedDB y su
+// localStorage nunca tocan el disco. Lo único que se escribe es la carpeta Boveda con los archivos cifrados (AES-256-GCM).
+const BOVEDA = path.join(app.getPath('userData'), 'Boveda');
+const META = path.join(BOVEDA, 'meta.json');
+const BOVEDA_ON = fs.existsSync(META);
+// lo que Chromium guarda en claro de una sesión normal; se borra la primera vez que Capri abre ya cifrada
+const PLANO = ['IndexedDB', 'Local Storage', 'Session Storage', 'WebStorage', 'Service Worker', 'blob_storage', 'databases', 'Cookies', 'Cookies-journal', 'Partitions', 'Network Persistent State', 'TransportSecurity'];
+if (LOCK && BOVEDA_ON) {
+  const marca = path.join(BOVEDA, '.borrar-plano');
+  if (fs.existsSync(marca)) {
+    let op = {}; try { op = JSON.parse(fs.readFileSync(marca, 'utf8')); } catch {}
+    const dirs = [app.getPath('userData')]; if (op.borrarPC && PORTATIL && path.resolve(DATA_PC) !== path.resolve(DATA_USB)) dirs.push(DATA_PC);
+    for (const d of dirs) for (const n of PLANO) { try { fs.rmSync(path.join(d, n), { recursive: true, force: true }); } catch (e) { console.error('[capri] no pude borrar', n, e.message); } }
+    try { fs.unlinkSync(marca); } catch {}
+  }
+}
+const nombreOk = (n) => typeof n === 'string' && n.length < 240 && /^[A-Za-z0-9._~%!'()#-]+$/.test(n) && !/^\.+$/.test(n);
+const escribeAtomico = async (f, data) => { const t = f + '.tmp'; await fs.promises.writeFile(t, data); await fs.promises.rename(t, f); };
+ipcMain.on('boveda:activa', (e) => { e.returnValue = BOVEDA_ON; });
+ipcMain.handle('boveda:info', () => {
+  let meta = null; try { meta = JSON.parse(fs.readFileSync(META, 'utf8')); } catch {}
+  return { activa: BOVEDA_ON, creada: !!meta, meta, dir: BOVEDA, portatil: PORTATIL };
+});
+ipcMain.handle('boveda:lista', () => { try { return fs.readdirSync(BOVEDA).filter((f) => f.endsWith('.enc')); } catch { return []; } });
+ipcMain.handle('boveda:leer', (e, n) => { if (!nombreOk(n)) throw new Error('nombre'); return fs.promises.readFile(path.join(BOVEDA, n)); });
+ipcMain.handle('boveda:escribir', async (e, n, bytes) => {
+  if (!nombreOk(n) || !n.endsWith('.enc') || !(bytes instanceof Uint8Array)) throw new Error('nombre');
+  await fs.promises.mkdir(BOVEDA, { recursive: true });
+  await escribeAtomico(path.join(BOVEDA, n), Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength));
+  return true;
+});
+ipcMain.handle('boveda:borrar', (e, n) => { if (!nombreOk(n) || !n.endsWith('.enc')) throw new Error('nombre'); fs.rmSync(path.join(BOVEDA, n), { force: true }); return true; });
+ipcMain.handle('boveda:meta', async (e, meta, op = {}) => {
+  if (!meta || meta.v !== 1 || typeof meta.wrapL !== 'string' || typeof meta.wrapR !== 'string') throw new Error('meta');
+  await fs.promises.mkdir(BOVEDA, { recursive: true });
+  await escribeAtomico(META, JSON.stringify(meta, null, 1));
+  if (!BOVEDA_ON) fs.writeFileSync(path.join(BOVEDA, '.borrar-plano'), JSON.stringify({ borrarPC: !!(op && op.borrarPC) }));
+  return true;
+});
+// antes de cerrar, la página guarda cifrado lo último que cambió (máx. 30 s, por si la USB es lenta)
+let escucha = false, cerrando = false;
+ipcMain.on('boveda:escucha', (e) => { if (win && e.sender === win.webContents) escucha = true; });
+function vaciarBoveda() {
+  return new Promise((res) => {
+    if (!BOVEDA_ON || !escucha || !win || win.isDestroyed()) return res();
+    const t = setTimeout(res, 30000);
+    ipcMain.once('boveda:listo', () => { clearTimeout(t); res(); });
+    send('boveda:flush');
+  });
+}
+ipcMain.on('boveda:reiniciar', () => { app.relaunch({ execPath: EXE }); app.quit(); });
+ipcMain.on('boveda:salir', () => app.quit());
+app.on('before-quit', (e) => {
+  if (cerrando || !BOVEDA_ON) return;
+  e.preventDefault(); cerrando = true;
+  vaciarBoveda().then(() => app.quit());
+});
+const sesionCapri = () => BOVEDA_ON ? session.fromPartition('capri-ram') : session.defaultSession;
 app.setAppUserModelId('com.crimson.capri');
 
 function deskURL() {
@@ -133,10 +194,13 @@ function createWindow() {
       contextIsolation: true, nodeIntegration: false, sandbox: true,
       backgroundThrottling: false, // que siga rondando y hablando sola
       autoplayPolicy: 'no-user-gesture-required', // la voz de Gemini suena aunque no le hayas dado clic
+      ...(BOVEDA_ON ? { partition: 'capri-ram' } : {}), // con bóveda: nada de la página se escribe al disco
     },
   });
   setMode('desk');
-  win.loadURL(deskURL());
+  // con bóveda, primero la pantalla de la llave; ella abre a Capri ya descifrada
+  win.loadURL(BOVEDA_ON ? CAPRI_URL + 'boveda.html?next=' + encodeURIComponent(deskURL()) : deskURL());
+  win.webContents.on('did-navigate', () => { escucha = false; });
   // solo se muestra cuando la página confirma que sabe ser mini Capri de escritorio;
   // si no (versión vieja o sin red), se muestra un aviso en vez de tapar la pantalla
   win.webContents.on('did-finish-load', () => {
@@ -167,7 +231,8 @@ function openClaude() {
   claudeWin = new BrowserWindow({
     width: Math.min(1100, wa.width - 80), height: Math.min(860, wa.height - 60), minWidth: 420, minHeight: 500,
     title: 'Capri // Claude', icon: path.join(__dirname, 'icon.png'), backgroundColor: '#0c0b12', autoHideMenuBar: true,
-    webPreferences: { partition: 'persist:claude', contextIsolation: true, nodeIntegration: false, sandbox: true },
+    // con bóveda la sesión de claude.ai tampoco se guarda en disco (inicias sesión cada vez que abres Capri)
+    webPreferences: { partition: BOVEDA_ON ? 'claude-ram' : 'persist:claude', contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
   const wc = claudeWin.webContents;
   // sin la marca "Electron" en el agente, para que el inicio de sesión lo trate como un navegador normal
@@ -211,6 +276,7 @@ function rebuildMenu() {
       click: (it) => setPrefs({ possess: it.checked }) },
     { type: 'separator' },
     { label: PORTATIL ? '💾 Datos en la USB: abrir carpeta' : '💾 Llevar mis datos junto al .exe (USB)', click: llevarAUsb },
+    ...(BOVEDA_ON ? [{ label: '🔐 Bloquear Capri (guarda y pide la llave)', click: () => run('window.Boveda&&Boveda.bloquear()') }] : []),
     { label: 'Iniciar con Windows', enabled: !PORTATIL, type: 'checkbox', checked: app.getLoginItemSettings({ path: EXE }).openAtLogin,
       click: (it) => app.setLoginItemSettings({ openAtLogin: it.checked, path: EXE }) },
     { label: 'Recargar', click: () => { if (win) { offline = false; ready = false; win.loadURL(deskURL()); } } },
@@ -523,7 +589,7 @@ app.whenReady().then(async () => {
   // que al prender la PC se abra esta versión y no una vieja
   if (process.platform === 'win32' && EXE !== process.execPath && app.getLoginItemSettings().openAtLogin) {
     app.setLoginItemSettings({ openAtLogin: false }); app.setLoginItemSettings({ openAtLogin: true, path: EXE }); }
-  const ses = session.defaultSession;
+  const ses = sesionCapri();
   // micrófono, notificaciones, pantalla completa y ubicación (módulo Mundo) sí; lo demás no
   const ok = ['media', 'notifications', 'fullscreen', 'clipboard-sanitized-write', 'display-capture', 'geolocation'];
   ses.setPermissionRequestHandler((wc, perm, cb) => cb(ok.includes(perm)));
@@ -533,7 +599,7 @@ app.whenReady().then(async () => {
     desktopCapturer.getSources({ types: ['screen'] }).then((s) => cb(s[0] ? { video: s[0] } : {})).catch(() => cb({}));
   });
   // la ventana de claude.ai: puede pedir notificaciones y portapapeles, nada más
-  const cses = session.fromPartition('persist:claude');
+  const cses = session.fromPartition(BOVEDA_ON ? 'claude-ram' : 'persist:claude');
   const cok = ['notifications', 'clipboard-sanitized-write', 'clipboard-read', 'fullscreen'];
   cses.setPermissionRequestHandler((wc, perm, cb) => cb(cok.includes(perm)));
   cses.setPermissionCheckHandler((wc, perm) => cok.includes(perm));
@@ -547,7 +613,7 @@ app.whenReady().then(async () => {
 app.on('will-quit', () => { globalShortcut.unregisterAll(); watch?.stop(); });
 
 app.on('second-instance', (_e, _argv, _cwd, data) => {
-  if (data && data.version && newer(data.version, app.getVersion())) { app.relaunch({ execPath: data.exe, args: [] }); app.exit(0); return; }
+  if (data && data.version && newer(data.version, app.getVersion())) { vaciarBoveda().then(() => { cerrando = true; app.relaunch({ execPath: data.exe, args: [] }); app.exit(0); }); return; }
   run('expand()');
 });
 app.on('window-all-closed', () => app.quit());

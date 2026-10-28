@@ -107,9 +107,8 @@ ${F.length?'\nFUENTES:\n'+F.map((f,i)=>`[${i+1}] ${f.slice(0,1100)}`).join('\n')
 setInterval(autoentrena,60e3);
 
 // ---------- apuntes ↔ pacientes (solo en pantalla) ----------
-function relaciona(t){const r=window.expRelacionados?.(t);if(!r?.length)return;
-  const el=line('s med','🩺 Esto se relaciona con '+r.length+' paciente(s) de tu expediente: '+r.map(x=>x.nexp+(x.dx?' ('+x.dx+')':'')).join(' · ')+' — toca para abrir el primero y relacionarlo con tus apuntes');
-  el.style.cursor='pointer';el.onclick=()=>window.expAbrirPac?.(r[0].id);}
+// la frase («¿te acuerdas del px de hace unos días?…») la arma asocia.js, en tu equipo
+function relaciona(t){window.capriAsociaPac?.(t);}
 
 // ---------- en Ajustes ----------
 const box=document.createElement('div');box.innerHTML=`<h3>Entrenamiento de tus cerebros</h3><small id="apSt"></small>
