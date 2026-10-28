@@ -749,14 +749,15 @@ function dbAll(){return new Promise(res=>{if(!db)return res([]);const t=db.trans
 function dbPut(d){return new Promise(res=>{if(!db)return res();const t=db.transaction('docs','readwrite');t.objectStore('docs').put(d);t.oncomplete=res;t.onerror=res;});}
 function dbDel(id){return new Promise(res=>{if(!db)return res();const t=db.transaction('docs','readwrite');t.objectStore('docs').delete(id);t.oncomplete=res;t.onerror=res;});}
 function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('No pude cargar el lector (¿sin internet?)'));document.head.appendChild(s);});}
+async function lector(f,cdn){try{await loadScript('vendor/lectores/'+f);if(f==='pdf.min.js')window.__pdfLocal=true;}catch(e){await loadScript('https://cdnjs.cloudflare.com/ajax/libs/'+cdn);}}
 async function pdfText(buf){
-  if(!window.pdfjsLib){await loadScript('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
-    try{const w=await fetch('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js').then(r=>r.text());pdfjsLib.GlobalWorkerOptions.workerSrc=URL.createObjectURL(new Blob([w],{type:'text/javascript'}));}
-    catch(e){pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}}
+  // los lectores viajan con Capri (vendor/lectores): abren al instante y sin internet; si faltan, se bajan de cdnjs
+  if(!window.pdfjsLib){await lector('pdf.min.js','pdf.js/3.11.174/pdf.min.js');
+    pdfjsLib.GlobalWorkerOptions.workerSrc=window.__pdfLocal?'vendor/lectores/pdf.worker.min.js':'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}
   const pdf=await pdfjsLib.getDocument({data:buf}).promise;let out='';
   for(let i=1;i<=pdf.numPages;i++){const pg=await pdf.getPage(i);const tc=await pg.getTextContent();out+=`\n[Página ${i}]\n`+tc.items.map(t=>t.str+(t.hasEOL?'\n':' ')).join('');}
   return out.replace(/[ \t]+/g,' ').trim();}
-async function docxText(buf){if(!window.mammoth)await loadScript('https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js');return (await mammoth.extractRawText({arrayBuffer:buf})).value.trim();}
+async function docxText(buf){if(!window.mammoth)await lector('mammoth.browser.min.js','mammoth/1.6.0/mammoth.browser.min.js');return (await mammoth.extractRawText({arrayBuffer:buf})).value.trim();}
 const b64=buf=>{let s='';const a=new Uint8Array(buf);for(let i=0;i<a.length;i+=0x8000)s+=String.fromCharCode.apply(null,a.subarray(i,i+0x8000));return btoa(s);};
 async function addFiles(files){for(const f of files){const id=Date.now()+'_'+Math.random().toString(36).slice(2,7);const ext=f.name.split('.').pop().toLowerCase();
   const row=document.createElement('small');row.textContent='Leyendo '+f.name+'…';$('docs').appendChild(row);
@@ -1159,7 +1160,9 @@ setInterval(()=>{$('hfR').textContent='0x'+Math.floor(Math.random()*65535).toStr
 setInterval(()=>{$('hfL').textContent=pick(['NEURAL ACTIVITY','ENGRAM SYNC','RELIC PULSE','SOULKILLER: CONTENIDO','ECO SIGNAL']);},5000);
 // onda neural (se agita cuando habla o escucha)
 const wv=$('wave'),wx=wv.getContext('2d');let wph=0,wamp=.2;
-(function wave(){requestAnimationFrame(wave);if(document.hidden||!wv.offsetWidth)return;const d=devicePixelRatio||1,W=Math.round(wv.offsetWidth*d),H=Math.round(wv.offsetHeight*d);
+let wf=0;(function wave(){requestAnimationFrame(wave);if(document.hidden||!wv.offsetWidth||(document.body.dataset.view||'capri')!=='capri')return;
+  if(!['TALKING','LISTENING','THINKING'].includes(document.body.dataset.core)&&++wf%2)return; // en reposo basta con 30 cuadros por segundo
+  const d=devicePixelRatio||1,W=Math.round(wv.offsetWidth*d),H=Math.round(wv.offsetHeight*d);
   if(wv.width!==W||wv.height!==H){wv.width=W;wv.height=H;}const m=document.body.dataset.core;const tg=({TALKING:1,LISTENING:.7,THINKING:.5})[m]||(.16+joy/100);wamp+=(tg-wamp)*.05;wph+=m==='THINKING'?.2:.07;
   wx.clearRect(0,0,W,H);wx.fillStyle='rgba(255,59,85,.16)';for(let x=0;x<W;x+=14*d)wx.fillRect(x,H/2-1*d,1*d,2*d);
   for(let k=2;k>=0;k--){wx.beginPath();for(let x=0;x<=W;x+=3*d){const u=x/W,y=H/2+Math.sin(u*Math.PI*(5+k*3)+wph*(1+k*.7))*Math.sin(u*Math.PI)*H*.4*wamp*(k?.55:1)+(m==='THINKING'?(Math.random()-.5)*H*.1*wamp:0);x?wx.lineTo(x,y):wx.moveTo(x,y);}
@@ -1206,4 +1209,4 @@ else bootP.then(()=>setTimeout(()=>{setState(cfg.key&&cfg.model?'presumida':'son
 if(DESK){if(cfg.key&&cfg.model)minimize();else expand();}
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
-<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="redaccion.js"></script><script src="crimson.js"></script><script src="tecnico.js"></script><script src="saber.js"></script><script src="clinica.js"></script><script src="mundo.js"></script><script src="voz.js"></script><script src="cerebro.js"></script><script src="hud.js"></script><script type="module" src="holo3d.js"></script><script src="desk.js"></script></body></html>
+<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="redaccion.js"></script><script src="crimson.js"></script><script src="tecnico.js"></script><script src="saber.js"></script><script src="clinica.js"></script><script src="mundo.js"></script><script src="expediente.js"></script><script src="biblioteca.js"></script><script src="voz.js"></script><script src="cerebro.js"></script><script src="hud.js"></script><script type="module" src="holo3d.js"></script><script src="desk.js"></script></body></html>

@@ -6,7 +6,14 @@ const os = require('os');
 const fs = require('fs');
 const http = require('http');
 const { startWindowWatch } = require('./windows');
-const { spawn } = require('child_process');
+const { spawn, execFile } = require('child_process');
+
+// Aceleración por GPU: que Chromium dibuje con la tarjeta dedicada (en laptops con dos GPU usa la potente, no la integrada),
+// rasterice en la GPU y no la descarte por estar en listas viejas. El holograma 3D y las animaciones van más fluidos.
+app.commandLine.appendSwitch('force_high_performance_gpu');
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-zero-copy');
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
 
 // Capri viaja dentro de la app (carpeta web/, copiada al armar el .exe) y se sirve solo para esta PC
 // en una dirección fija, para que su key y su memoria no se pierdan entre versiones.
@@ -421,6 +428,31 @@ ipcMain.handle('cursor', () => {
   if (!win) return null;
   const p = screen.getCursorScreenPoint(), b = win.getBounds();
   return { x: p.x - b.x, y: p.y - b.y };
+});
+// qué tarjeta usa Capri para dibujar (para la prueba de velocidad)
+ipcMain.handle('gpu:info', async () => {
+  try {
+    const i = await app.getGPUInfo('basic');
+    return { devs: (i.gpuDevice || []).map((d) => ({ active: !!d.active, vendor: d.vendorId, device: d.deviceId })), st: app.getGPUFeatureStatus() };
+  } catch { return null; }
+});
+// Turbo de Ollama (solo con tu permiso, desde Ajustes): flash attention y caché de contexto a 8 bits ocupan la mitad de
+// memoria de video, así el modelo cabe entero en tu GTX 1650 y no se pasa al procesador. Se guarda para tu usuario y reinicia Ollama.
+const run1 = (cmd, args) => new Promise((r) => execFile(cmd, args, { windowsHide: true }, (e) => r(!e)));
+ipcMain.handle('ollama:turbo', async () => {
+  if (process.platform !== 'win32') return { ok: false, why: 'no-windows' };
+  const env = { OLLAMA_FLASH_ATTENTION: '1', OLLAMA_KV_CACHE_TYPE: 'q8_0' };
+  let ok = true;
+  for (const [k, v] of Object.entries(env)) ok = (await run1('setx', [k, v])) && ok;
+  await run1('taskkill', ['/IM', 'ollama app.exe', '/F']);
+  await run1('taskkill', ['/IM', 'ollama.exe', '/F']);
+  const appExe = path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Ollama', 'ollama app.exe');
+  const opts = { detached: true, stdio: 'ignore', windowsHide: true, env: { ...process.env, ...env } };
+  try {
+    if (fs.existsSync(appExe)) spawn(appExe, [], opts).unref();
+    else spawn('ollama', ['serve'], opts).unref();
+  } catch (e) { return { ok: false, why: 'no-ollama', msg: e.message }; }
+  return { ok };
 });
 ipcMain.on('claude:open', openClaude);
 ipcMain.on('retry', () => { if (win) { offline = false; ready = false; win.loadURL(deskURL()); } });

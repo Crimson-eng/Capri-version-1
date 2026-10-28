@@ -9,7 +9,7 @@
 // haya key y lo prendas; entonces lo pesado va a Claude, con un tope de gasto que tú pones.
 (()=>{
 const OLL='http://127.0.0.1:11434';
-const cer=Object.assign({modo:'auto',modelo:'',emb:'',aprende:true,claude:'off',tope:5},store.get('cerebro',{}));
+const cer=Object.assign({modo:'auto',modelo:'',emb:'',aprende:true,claude:'off',tope:5,turbo:true,ctx:{},medidas:[]},store.get('cerebro',{}));
 const save=()=>store.set('cerebro',cer);
 let ok=false,modelos=[],ultimo='',modoAct='user';
 const esEmb=n=>/embed|bge|minilm|e5-|gte|arctic/i.test(n);
@@ -19,8 +19,35 @@ async function ver(){
   catch(e){ok=false;modelos=[];}
   if(ok){if(!chats().some(m=>m.n===cer.modelo))cer.modelo=(chats().find(m=>/gemma/i.test(m.n))||chats()[0])?.n||'';
     if(!embs().some(m=>m.n===cer.emb))cer.emb=(embs().find(m=>/embeddinggemma/i.test(m.n))||embs()[0])?.n||'';save();}
-  pinta();return ok;}
+  pinta();if(ok&&cer.modelo&&cer.turbo&&cer.modo!=='gemini')calentar();return ok;}
 setInterval(ver,60000);setTimeout(ver,1500);
+
+// ---------- turbo GPU ----------
+// 1) El modelo se carga a la tarjeta en cuanto abres Capri (y se queda 2 h), así la primera respuesta no espera la carga.
+// 2) Todas las llamadas usan el MISMO tamaño de contexto: si cambia, Ollama vuelve a cargar el modelo entero (antes pasaba
+//    cada vez que Capri «destilaba» recuerdos: la siguiente respuesta tardaba segundos de más).
+// 3) Si el modelo no cabe entero en la memoria de video, una parte se va al procesador y todo va lento: Capri lo ve en
+//    /api/ps y baja el contexto (6144 → 4096 → 3072 → 2048) hasta que quepa todo en la GPU.
+const VIVO='2h',PASOS=[6144,4096,3072,2048];
+const ctxDe=()=>cer.ctx[cer.modelo]||PASOS[0];
+let caliente=0,calentando=null;
+async function enGPU(){try{const j=await (await fetch(OLL+'/api/ps',{signal:AbortSignal.timeout(2000)})).json();
+  const m=(j.models||[]).find(x=>x.name===cer.modelo||x.model===cer.modelo);return m?{pct:m.size?Math.round(100*m.size_vram/m.size):0,gb:m.size_vram/1e9}:null;}catch(e){return null;}}
+function calentar(forzar){if(calentando)return calentando;if(!forzar&&Date.now()-caliente<100*60e3)return Promise.resolve();
+  return calentando=(async()=>{const t0=performance.now();
+    try{for(let i=0;i<PASOS.length;i++){
+        const r=await fetch(OLL+'/api/generate',{method:'POST',body:JSON.stringify({model:cer.modelo,prompt:'',keep_alive:VIVO,options:{num_ctx:ctxDe()}})});
+        if(!r.ok)throw new Error('Error '+r.status);await r.text();const g=await enGPU();
+        if(!g||g.pct>=98||ctxDe()<=PASOS.at(-1)){caliente=Date.now();log('⚡ GPU lista: '+cer.modelo+(g?' · '+g.pct+'% en tarjeta':'')+' · contexto '+ctxDe()+' · '+Math.round(performance.now()-t0)+' ms','g');break;}
+        const sig=PASOS.find(n=>n<ctxDe());log('⚡ '+cer.modelo+' solo '+g.pct+'% en tu GPU: bajo el contexto a '+sig+' para que quepa','y');cer.ctx[cer.modelo]=sig;save();}}
+    catch(e){log('⚡ no pude precalentar: '+String(e.message).slice(0,40),'w');}finally{calentando=null;pinta();}})();}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&listo()&&cer.turbo&&cer.modo!=='gemini')calentar();});
+// para el expediente y otros módulos: pedirle a tu GPU una respuesta en JSON (nada sale de la PC)
+window.cerebroJSON=async(system,user)=>{if(!listo())return null;
+  const body={model:cer.modelo,stream:false,format:'json',keep_alive:VIVO,options:{temperature:.1,num_ctx:ctxDe()},messages:[{role:'system',content:system},{role:'user',content:user}]};
+  if(/qwen3|deepseek-r1/i.test(cer.modelo))body.think=false;
+  const r=await fetch(OLL+'/api/chat',{method:'POST',body:JSON.stringify(body),signal:AbortSignal.timeout(180000)});if(!r.ok)throw new Error('GPU: Error '+r.status);
+  const j=await r.json();const t=(j.message?.content||'').replace(/<think>[\s\S]*?<\/think>/g,'').trim();try{return JSON.parse(t);}catch(e){throw new Error('la GPU no devolvió JSON válido');}};
 const listo=()=>ok&&!!cer.modelo;
 window.cerebroInfo=()=>({ok,modelo:cer.modelo,modo:cer.modo,emb:cer.emb,mems:mems.length,ultimo,claude:cer.claude,claudeKey:!!cfg.claudeKey,gasto:claudeSpent,tope:cer.tope});
 
@@ -47,7 +74,7 @@ async function local(parts,onText){
   for(const h of history.slice(-12))msgs.push({role:h.role==='model'?'assistant':'user',content:h.text});
   msgs.push({role:'user',content:parts.filter(p=>p.text).map(p=>p.text).join('\n')});
   const m2=[];for(const m of msgs){const l=m2[m2.length-1];if(l&&l.role===m.role&&m.role!=='system')l.content+='\n'+m.content;else m2.push({...m});}
-  const body={model:cer.modelo,messages:m2,stream:true,keep_alive:'30m',options:{temperature:1,num_ctx:6144}};
+  const body={model:cer.modelo,messages:m2,stream:true,keep_alive:VIVO,options:{temperature:1,num_ctx:ctxDe()}};
   if(/qwen3|deepseek-r1/i.test(cer.modelo))body.think=false;
   const r=await fetch(OLL+'/api/chat',{method:'POST',body:JSON.stringify(body)});
   if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error('GPU: '+(j.error||'Error '+r.status));}
@@ -92,8 +119,9 @@ function claudeFallo(e){const m=String(e.message||'');
 
 // ---------- el que decide ----------
 const _ask=ask;
+let preRec=null;
 ask=async(parts,onText)=>{
-  const rec=await recordar(parts).catch(()=>'');const p2=rec?[{text:rec},...parts]:parts;
+  const rec=await (preRec||recordar(parts)).catch(()=>'');preRec=null;const p2=rec?[{text:rec},...parts]:parts;
   if(rutaClaude(parts)){let dijo=false;try{return await claudeBrain(p2,x=>{dijo=true;onText(x);});}catch(e){if(dijo)throw e;claudeFallo(e);}}
   if(rutaLocal(parts)){let dijo=false;try{return await local(p2,x=>{dijo=true;onText(x);});}catch(e){log(String(e.message).slice(0,60),'w');if(dijo||!cfg.key||!cfg.model)throw e;}}
   let algo=false;
@@ -105,7 +133,8 @@ ask=async(parts,onText)=>{
     line('s','(Gemini no respondió'+(e.status===429?' (sin cupo)':e instanceof TypeError?' (sin internet)':'')+'; te contesto con el cerebro de tu GPU.)');
     return local(p2,onText);}};
 const _respond=respond;
-respond=async(userText,extra,mode)=>{modoAct=mode||'user';try{return await _respond(userText,extra,mode);}finally{modoAct='user';guardaPlatica();}};
+// la búsqueda en recuerdos arranca ya, en paralelo con las fuentes médicas y la biblioteca, en vez de esperar a que terminen
+respond=async(userText,extra,mode)=>{modoAct=mode||'user';preRec=recordar([{text:userText}]);try{return await _respond(userText,extra,mode);}finally{modoAct='user';preRec=null;guardaPlatica();}};
 
 // ---------- memoria buscable ----------
 let mems=[],db=null;
@@ -141,8 +170,8 @@ async function recordar(parts){if(!cer.aprende||!mems.length)return '';
 // cada 6 pláticas, la GPU relee lo último y saca datos nuevos y duraderos de ti para su memoria de siempre
 async function destila(){if(!listo()||busy||!cer.aprende||nuevas<6)return;nuevas=0;const name=cfg.name||'Kiga';
   const ult=mems.slice(-6).map(m=>m.t).join('\n---\n'),ya=(M().hechos||[]).map(h=>'- '+h.t).join('\n');
-  try{const r=await fetch(OLL+'/api/chat',{method:'POST',body:JSON.stringify({model:cer.modelo,stream:false,keep_alive:'30m',...(/qwen3|deepseek-r1/i.test(cer.modelo)?{think:false}:{}),
-      options:{temperature:.2,num_predict:220,num_ctx:4096},messages:[{role:'system',content:`Extraes datos duraderos sobre ${name} de sus pláticas con Capri. Responde SOLO con líneas así: <<recuerda: categoria | dato corto en tercera persona>>. Categorías: nombre, gusto, persona, vivencia, dia, escuela, otro. Máximo 3 líneas. Nada que ya esté en la lista, nada inventado, nada sobre Capri. Si no hay nada nuevo responde NADA.`},
+  try{const r=await fetch(OLL+'/api/chat',{method:'POST',body:JSON.stringify({model:cer.modelo,stream:false,keep_alive:VIVO,...(/qwen3|deepseek-r1/i.test(cer.modelo)?{think:false}:{}),
+      options:{temperature:.2,num_predict:220,num_ctx:ctxDe()},messages:[{role:'system',content:`Extraes datos duraderos sobre ${name} de sus pláticas con Capri. Responde SOLO con líneas así: <<recuerda: categoria | dato corto en tercera persona>>. Categorías: nombre, gusto, persona, vivencia, dia, escuela, otro. Máximo 3 líneas. Nada que ya esté en la lista, nada inventado, nada sobre Capri. Si no hay nada nuevo responde NADA.`},
       {role:'user',content:`Ya se sabe:\n${ya||'(nada)'}\n\nPláticas recientes:\n${ult}`}]})});
     const j=await r.json();const out=(j.message?.content||'').replace(/<think>[\s\S]*?<\/think>/g,'');const n=(out.match(/<<\s*recuerda/gi)||[]).length;
     if(n){absorbMem(out.split('\n').filter(l=>/<<\s*recuerda/i.test(l)).slice(0,3).join('\n'));log('🧠 tu GPU le enseñó '+n+' cosa(s) nueva(s)','y');}}
@@ -170,6 +199,10 @@ const box=document.createElement('div');box.innerHTML=`<h3>Cerebro de tu GPU <sm
  <small>Para tu GTX 1650 (4 GB): instala Ollama de <b>ollama.com</b>, abre PowerShell y escribe <code>ollama pull gemma3:4b</code> y luego <code>ollama pull embeddinggemma</code> (para que busque por significado). Si la sientes lenta, prueba <code>ollama pull llama3.2:3b</code>. Todo se queda en tu PC.</small>
  <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" id="ceTry" style="width:auto;flex:1;padding:8px 10px">▶ Probar cerebro local</button><button class="btn" id="ceRe" style="width:auto;flex:1;padding:8px 10px">↻ Buscar Ollama</button><button class="btn" id="ceDel" style="width:auto;flex:1;padding:8px 10px">✖ Borrar memoria buscable</button></div>
  <small id="ceOut"></small>
+ <h3>Velocidad <small style="font-weight:400">· turbo GPU</small></h3>
+ <label>Turbo GPU<select id="ceTurbo"><option value="1">Activo: precalienta el modelo en tu tarjeta y ajusta el contexto para que quepa entero</option><option value="0">Apagado (como antes)</option></select></label>
+ <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" id="ceBench" style="width:auto;flex:1;padding:8px 10px">⚡ Medir velocidad</button><button class="btn" id="ceOllT" style="width:auto;flex:1;padding:8px 10px;display:none">🔧 Turbo de Ollama</button></div>
+ <small id="ceBenchOut"></small>
  <h3>Cerebro de Claude <small style="font-weight:400">· Anthropic</small></h3>
  <small id="ceClSt"></small>
  <label>Cuándo usa Claude<select id="ceCl"><option value="off">Apagado</option><option value="pesado">Para lo pesado (explicaciones, salud, estudio, imágenes)</option><option value="siempre">Siempre que se pueda (la voz sigue en Gemini)</option></select></label>
@@ -181,12 +214,12 @@ function pinta(){btn.classList.toggle('act',cer.modo!=='gemini'&&listo());const 
     :'✖ No encontré Ollama en tu PC (o está cerrado). Sin él, todo va a Gemini.';
   st.style.color=ok&&chats().length?'var(--grn)':'#ffb000';
   const s=$('ceMod');s.innerHTML=chats().map(m=>`<option value="${m.n}">${m.n} · ${m.gb.toFixed(1)} GB${m.gb>3.6?' (grande para 4 GB)':''}</option>`).join('')||'<option value="">(ninguno)</option>';s.value=cer.modelo;
-  $('ceModo').value=cer.modo;$('ceApr').value=cer.aprende?'1':'0';
+  $('ceModo').value=cer.modo;$('ceApr').value=cer.aprende?'1':'0';$('ceTurbo').value=cer.turbo?'1':'0';
   bCl.classList.toggle('act',claudeOk());$('ceCl').value=cer.claude;$('ceTope').value=cer.tope;
   const cs=$('ceClSt');cs.textContent=!cfg.claudeKey?'○ Listo para cuando tengas créditos: falta tu API key de Anthropic.':cer.claude==='off'?'○ Key puesta, pero Claude está apagado.':claudeSpent>=cer.tope?'✖ Llegó al tope: gastado '+usd(claudeSpent)+' de '+usd(cer.tope)+'.':Date.now()<claudeFuera?'✖ Claude no respondió hace poco (¿sin créditos?); lo vuelve a intentar en unos minutos.':'● Activo · gastado '+usd(claudeSpent)+' de '+usd(cer.tope)+' · modelo '+(cfg.claudeModel||'claude-opus-5-5');
   cs.style.color=claudeOk()?'var(--grn)':'#ffb000';}
 $('ceModo').onchange=()=>{cer.modo=$('ceModo').value;save();pinta();};
-$('ceMod').onchange=()=>{cer.modelo=$('ceMod').value;save();pinta();};
+$('ceMod').onchange=()=>{cer.modelo=$('ceMod').value;save();pinta();if(cer.turbo)calentar(true);};
 $('ceApr').onchange=()=>{cer.aprende=$('ceApr').value==='1';save();};
 $('ceRe').onclick=()=>ver();
 $('ceCl').onchange=()=>{cer.claude=$('ceCl').value;claudeFuera=0;save();pinta();};
@@ -198,5 +231,41 @@ $('ceTry').onclick=async()=>{const o=$('ceOut');if(!await ver()||!cer.modelo){o.
     o.textContent=clean(txt).trim()+'  ·  '+((performance.now()-t0)/1000).toFixed(1)+' s';}
   catch(e){o.textContent='No se pudo: '+e.message;}};
 $('bCfg')?.addEventListener('click',()=>setTimeout(ver,50));
+// ---------- prueba de velocidad: mide lo mismo antes y después, en tu PC ----------
+async function medir(){const o=$('ceBenchOut');const R={ts:Date.now(),turbo:cer.turbo};
+  // dibujo: cuadros por segundo de la página y con qué tarjeta dibuja
+  R.fps=await new Promise(res=>{let n=0;const t0=performance.now();(function f(t){n++;if(t-t0<1000)requestAnimationFrame(f);else res(Math.round(n*1000/(t-t0)));})(t0);});
+  const gi=await window.capriDesk?.gpuInfo?.().catch(()=>null);const act=gi?.devs?.find(d=>d.active)||gi?.devs?.[0];
+  R.dibuja=act?({0x10de:'NVIDIA',0x8086:'Intel',0x1002:'AMD'}[act.vendor]||'GPU '+act.vendor.toString(16)):(gi===undefined?'navegador':'?');
+  R.raster=gi?.st?.gpu_compositing||gi?.st?.rasterization||'';
+  if(!await ver()||!cer.modelo){R.nota='sin Ollama';}
+  else{if(cer.turbo)await calentar();const t0=performance.now();let pri=0,fin=null;o.textContent='Midiendo tu GPU con '+cer.modelo+'…';
+    try{const r=await fetch(OLL+'/api/chat',{method:'POST',body:JSON.stringify({model:cer.modelo,stream:true,keep_alive:cer.turbo?VIVO:'30m',...(/qwen3|deepseek-r1/i.test(cer.modelo)?{think:false}:{}),
+        options:{temperature:0,num_predict:96,num_ctx:cer.turbo?ctxDe():6144},messages:[{role:'user',content:'Describe en cinco frases cortas una ciudad de noche bajo la lluvia.'}]})});
+      const rd=r.body.getReader(),dc=new TextDecoder();let buf='';
+      while(true){const {value,done}=await rd.read();if(done)break;buf+=dc.decode(value,{stream:true});let i;
+        while((i=buf.indexOf('\n'))>=0){const ln=buf.slice(0,i).trim();buf=buf.slice(i+1);if(!ln)continue;const j=JSON.parse(ln);if(!pri&&j.message?.content)pri=performance.now()-t0;if(j.done)fin=j;}}
+      R.modelo=cer.modelo;R.primera=Math.round(pri);R.total=Math.round(performance.now()-t0);
+      if(fin){R.tps=fin.eval_duration?+(fin.eval_count/(fin.eval_duration/1e9)).toFixed(1):null;R.carga=Math.round((fin.load_duration||0)/1e6);R.lee=fin.prompt_eval_duration?Math.round(fin.prompt_eval_count/(fin.prompt_eval_duration/1e9)):null;}
+      const g=await enGPU();R.gpu=g?.pct??null;R.ctx=cer.turbo?ctxDe():6144;}
+    catch(e){R.nota='falló: '+String(e.message).slice(0,50);}}
+  cer.medidas=[...(cer.medidas||[]),R].slice(-12);save();pintaMedidas();return R;}
+const resumenMedida=R=>R.nota&&!R.modelo?`dibujo ${R.fps} fps (${R.dibuja}) · ${R.nota}`:
+  `${R.turbo?'turbo':'normal'} · 1ª palabra ${(R.primera/1000).toFixed(2)} s · ${R.tps??'?'} palabras/s (tokens) · carga ${R.carga??'?'} ms · ${R.gpu??'?'}% en GPU · contexto ${R.ctx} · dibujo ${R.fps} fps (${R.dibuja})`;
+function pintaMedidas(){const o=$('ceBenchOut');if(!o)return;const M=cer.medidas||[];
+  o.innerHTML=M.length?M.slice(-6).reverse().map(R=>`<div>${new Date(R.ts).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${esc(resumenMedida(R))}</div>`).join('')+
+    '<div style="color:var(--mut)">Para comparar: mide con Turbo apagado y luego encendido. La 1ª palabra baja sobre todo porque el modelo ya está cargado; las palabras/s suben cuando está 100% en GPU.</div>':'Aún no hay mediciones.';}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+$('ceTurbo').onchange=()=>{cer.turbo=$('ceTurbo').value==='1';save();if(cer.turbo)calentar(true);pinta();};
+$('ceBench').onclick=async()=>{const b=$('ceBench');b.disabled=true;b.textContent='⚡ Midiendo…';try{await medir();}finally{b.disabled=false;b.textContent='⚡ Medir velocidad';}};
+if(window.capriDesk?.turboOllama)$('ceOllT').style.display='';
+$('ceOllT').onclick=async()=>{if(!confirm('Turbo de Ollama: activa «flash attention» y guarda el contexto a 8 bits (OLLAMA_FLASH_ATTENTION=1 y OLLAMA_KV_CACHE_TYPE=q8_0 para tu usuario de Windows). Usa la mitad de memoria de video para el contexto, así el modelo cabe entero en tu tarjeta.\n\nSe va a cerrar y volver a abrir Ollama. ¿Seguimos?'))return;
+  const r=await window.capriDesk.turboOllama();$('ceOut').textContent=r?.ok?'🔧 Listo: Ollama se reinició con flash attention y caché a 8 bits. Mide otra vez en unos segundos.':'No se pudo ('+(r?.why||'error')+').';
+  caliente=0;setTimeout(()=>ver(),6000);};
+pintaMedidas();
+// en el chat: «velocidad» mide y te dice cómo va
+const _sendV=send;
+send=async v=>{const k=(v||'').trim().toLowerCase();if(/^(velocidad|prueba de velocidad)$/.test(k)&&!busy){line('u',v.trim());line('s','(⚡ Midiendo…)');const R=await medir();line('s','(⚡ '+resumenMedida(R)+')');return;}
+  await _sendV(v);if(k==='help')line('t','  velocidad — Mide qué tan rápido piensa tu GPU y con qué tarjeta dibuja Capri');};
 pinta();
 })();

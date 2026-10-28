@@ -148,6 +148,8 @@ function render(){const box=$('medDocs');
   box.querySelectorAll('button[data-del]').forEach(b=>b.onclick=async()=>{const l=libros.find(x=>x.id===b.dataset.del);if(confirm('¿Quitar «'+l.name+'» del reservorio?')){await mDel(l.id);render();}});
   $('medOn').checked=med.on;$('medOnline').checked=med.online;$('bMed')?.classList.toggle('act',med.on);}
 window.openMed=async()=>{await mLoad();render();modal.classList.add('show');};
+// la BIBLIOTECA manda aquí lo que ya leyó, para que Capri lo cite en temas de salud
+window.medGuardarTexto=async(nombre,file,text)=>{if(!mdb)await mOpen();await guardar(nombre,file,text);await mLoad();render();};
 $('medDrop').onclick=()=>$('medFile').click();$('medFile').onchange=e=>{addLibros([...e.target.files]);e.target.value='';};
 $('medDrop').ondragover=e=>{e.preventDefault();$('medDrop').classList.add('over');};$('medDrop').ondragleave=()=>$('medDrop').classList.remove('over');
 $('medDrop').ondrop=e=>{e.preventDefault();$('medDrop').classList.remove('over');addLibros([...e.dataTransfer.files]);};
