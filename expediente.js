@@ -147,12 +147,39 @@ async function sellar(obj,key=llave,salt=sal){const iv=crypto.getRandomValues(ne
 async function abrirSello(rec,key){return JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:fromB64(rec.iv)},key,fromB64(rec.ct))));}
 const nuevo=()=>({pacs:[],aud:[],cfg:{est:{},med:{},motor:'auto',nubeOk:false,lock:5},formatos:[],folio:0});
 async function cargar(){const rec=await kv('readonly',s=>s.get('datos')).catch(()=>null);existe=!!rec;}
-async function persistir(){if(!ex||!llave)return;ex.upd=Date.now();const rec=await sellar(ex);await kv('readwrite',s=>s.put(rec,'datos'));existe=true;}
+async function persistir(){if(!ex||!llave)return;ex.upd=Date.now();const rec=await sellar(ex);await kv('readwrite',s=>s.put(rec,'datos'));existe=true;
+  const rr=await sellarRec(ex).catch(()=>null);if(rr)await kv('readwrite',s=>s.put(rr,'datosRec'));dispatchEvent(new CustomEvent('exp:guardado'));}
 async function desbloquear(pass){const rec=await kv('readonly',s=>s.get('datos'));if(!rec)return false;
   try{const k=await derivar(pass,fromB64(rec.salt));ex=Object.assign(nuevo(),await abrirSello(rec,k));llave=k;sal=fromB64(rec.salt);toque();bit('abrió el expediente');return true;}catch(e){return false;}}
 async function crear(pass){sal=crypto.getRandomValues(new Uint8Array(16));llave=await derivar(pass,sal);ex=nuevo();bit('creó el expediente cifrado');await persistir();toque();}
 async function cambiarLlave(pass){sal=crypto.getRandomValues(new Uint8Array(16));llave=await derivar(pass,sal);bit('cambió la llave');await persistir();}
 function bloquear(motivo){if(!llave)return;ex=null;llave=null;vista={v:'lista'};pac=null;render();if(motivo)log('expediente: bloqueado ('+motivo+')','g');}
+// ---------- código de recuperación y respaldo automático (se manejan desde la pestaña R.I.P) ----------
+// El código es una llave AES al azar que solo existe en el papel de Kiga. Aquí se guarda importada «solo para cifrar»:
+// con ella Capri sella una copia cada vez que guardas, pero no puede abrirla; para abrirla hay que teclear el código.
+let recInfo=null;kv('readonly',s=>s.get('recKey')).then(k=>{recInfo=k?{id:k.id,ts:k.ts}:null;}).catch(()=>{});
+const B32='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const aB32=u=>{let bits='',o='';for(const b of u)bits+=b.toString(2).padStart(8,'0');for(let i=0;i+5<=bits.length;i+=5)o+=B32[parseInt(bits.slice(i,i+5),2)];return o.match(/.{4}/g).join('-');};
+const deB32=c=>{const t=c.toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/O/g,'0').replace(/I/g,'1');let bits='';for(const ch of t){const v=B32.indexOf(ch);if(v<0)throw new Error('ese código trae letras que no van ('+ch+')');bits+=v.toString(2).padStart(5,'0');}
+  if(bits.length<160)throw new Error('al código le faltan letras');return Uint8Array.from(bits.slice(0,160).match(/.{8}/g),b=>parseInt(b,2));};
+async function llaveDeCodigo(raw,uso){const k32=await crypto.subtle.digest('SHA-256',raw),h=new Uint8Array(await crypto.subtle.digest('SHA-256',k32));
+  return {key:await crypto.subtle.importKey('raw',k32,'AES-GCM',false,uso),id:[...h.slice(0,4)].map(b=>b.toString(16).padStart(2,'0')).join('')};}
+async function sellarRec(obj){const k=await kv('readonly',s=>s.get('recKey'));if(!k)return null;const iv=crypto.getRandomValues(new Uint8Array(12));
+  const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},k.key,enc.encode(JSON.stringify(obj)));return {id:k.id,iv:toB64(iv),ct:toB64(ct)};}
+window.expEstado=()=>({existe,abierto:!!(ex&&llave),codigo:recInfo,pacs:ex?ex.pacs.length:null});
+window.expCrearCodigo=async()=>{if(!ex||!llave)throw new Error('abre primero el expediente con tu llave');
+  const raw=crypto.getRandomValues(new Uint8Array(20)),{key,id}=await llaveDeCodigo(raw,['encrypt']);
+  await kv('readwrite',s=>s.put({key,id,ts:Date.now()},'recKey'));recInfo={id,ts:Date.now()};bit('creó código de recuperación');await persistir();return aB32(raw);};
+window.expRespaldo=async()=>{if(!ex||!llave)return null;return {app:'capri-expediente',v:2,fecha:Date.now(),pacs:ex.pacs.length,...await sellar(ex),rec:await sellarRec(ex)};};
+// con el código: abre la copia sellada (la de este equipo o la de un archivo de respaldo)
+window.expAbrirConCodigo=async(codigo,archivo)=>{const r=archivo?archivo.rec:await kv('readonly',s=>s.get('datosRec'));
+  if(!r)throw new Error(archivo?'ese respaldo no trae copia para código de recuperación':'en este equipo no hay copia sellada con código');
+  const {key,id}=await llaveDeCodigo(deB32(codigo),['decrypt']);if(r.id&&r.id!==id)throw new Error('ese no es el código de esta copia');
+  try{return JSON.parse(dec.decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:fromB64(r.iv)},key,fromB64(r.ct))));}catch(e){throw new Error('el código no abre esta copia');}};
+// lo recuperado entra así: si el expediente está abierto se suman los pacientes que falten; si no, queda como expediente con llave nueva
+window.expRecibir=async(datos,nuevaLlave)=>{if(ex&&llave){const nuevos=(datos.pacs||[]).filter(x=>!ex.pacs.some(y=>y.id===x.id));ex.pacs.push(...nuevos);bit('restauró con código ('+nuevos.length+' pacientes)');await persistir();render();return nuevos.length;}
+  if(!nuevaLlave||nuevaLlave.length<8)throw new Error('la llave nueva necesita mínimo 8 caracteres');
+  sal=crypto.getRandomValues(new Uint8Array(16));llave=await derivar(nuevaLlave,sal);ex=Object.assign(nuevo(),datos);bit('recuperó el expediente con código y puso llave nueva');await persistir();toque();vista={v:'lista'};render();return ex.pacs.length;};
 const toque=()=>{lockT=Date.now();};
 setInterval(()=>{if(llave&&ex&&Date.now()-lockT>(ex.cfg.lock||5)*60e3)bloquear('inactividad');},20e3);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)lockT=Math.min(lockT,Date.now()-((ex?.cfg.lock||5)-1)*60e3);});
@@ -271,14 +298,16 @@ function lado(){const ps=ex.pacs.slice().sort((a,b)=>(b.upd||b.ts)-(a.upd||a.ts)
    <button class="hbtn c" data-a="nuevo">+ Nuevo paciente</button></div>`;}
 function vLock(){
   if(!existe){H(`<div class="lock" style="grid-column:1/-1"><h3>Expediente clínico</h3><div class="sub">${NOM} · personas reales</div>
-    <div class="aviso">Aquí van datos de salud de personas reales: son <b>datos personales sensibles</b> (Ley Federal de Protección de Datos Personales en Posesión de los Particulares, 2025) y confidenciales (${NOM}, 5.5). Por eso este expediente se guarda <b>siempre cifrado</b> en este dispositivo con una llave que solo tú sabes. <b>Si la olvidas no hay forma de recuperarlo</b>: guarda respaldos cifrados.</div>
+    <div class="aviso">Aquí van datos de salud de personas reales: son <b>datos personales sensibles</b> (Ley Federal de Protección de Datos Personales en Posesión de los Particulares, 2025) y confidenciales (${NOM}, 5.5). Por eso este expediente se guarda <b>siempre cifrado</b> en este dispositivo con una llave que solo tú sabes. <b>Si la olvidas no hay forma de recuperarlo</b>, salvo con el código de recuperación que puedes crear en R.I.P → Respaldo (escríbelo en papel).</div>
     <label class="req"><span>Crea tu llave (mínimo 8 caracteres)</span><input type="password" id="exP1" autocomplete="new-password"></label>
     <label class="req"><span>Repítela</span><input type="password" id="exP2" autocomplete="new-password"></label>
     <div class="row"><button class="hbtn c" id="exCrear">Crear expediente cifrado</button></div><small class="warn" id="exMsg"></small></div>`);
     $e('exCrear').onclick=async()=>{const a=$e('exP1').value,b=$e('exP2').value;if(a.length<8)return $e('exMsg').textContent='Mínimo 8 caracteres.';if(a!==b)return $e('exMsg').textContent='No coinciden.';
       await crear(a);vista={v:'cfg',primera:true};render();};return;}
   H(`<div class="lock" style="grid-column:1/-1"><h3>🔒 Expediente bloqueado</h3><div class="sub">cifrado AES-256 · se cierra solo</div>
-   <label><span>Tu llave</span><input type="password" id="exPass" autocomplete="current-password"></label><div class="row"><button class="hbtn c" id="exOpen">Abrir</button></div><small class="warn" id="exMsg"></small></div>`);
+   <label><span>Tu llave</span><input type="password" id="exPass" autocomplete="current-password"></label><div class="row"><button class="hbtn c" id="exOpen">Abrir</button></div><small class="warn" id="exMsg"></small>
+   <small style="color:#c98d93">¿Olvidaste tu llave? <a href="#" id="exOlv" style="color:var(--hc)">Usa tu código de recuperación en R.I.P</a></small></div>`);
+  $e('exOlv').onclick=e=>{e.preventDefault();window.ripIr?.('respaldo');};
   const go=async()=>{const ok=await desbloquear($e('exPass').value);$e('exPass').value='';if(ok){await persistir();vista={v:'lista'};render();}else $e('exMsg').textContent='Esa no es la llave.';};
   $e('exOpen').onclick=go;$e('exPass').onkeydown=e=>{if(e.key==='Enter')go();};setTimeout(()=>$e('exPass')?.focus(),60);}
 function vLista(){const falta=!ex.cfg.med?.nombre||!ex.cfg.est?.nombre;

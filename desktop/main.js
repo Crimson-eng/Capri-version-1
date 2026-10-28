@@ -22,7 +22,7 @@ const WEB = path.join(__dirname, 'web');
 const PORT = 47823;
 let CAPRI_URL = process.env.CAPRI_URL || 'https://crimson-eng.github.io/Capri-version-1/';
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css', '.json': 'application/json',
-  '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
+  '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.wasm': 'application/wasm', '.gz': 'application/gzip' };
 
 function serveWeb() {
   return new Promise((resolve) => {
@@ -454,6 +454,34 @@ ipcMain.handle('ollama:turbo', async () => {
   } catch (e) { return { ok: false, why: 'no-ollama', msg: e.message }; }
   return { ok };
 });
+// R.I.P: bajar una fuente oficial o consultar una etiqueta de medicamento sin el bloqueo CORS del navegador.
+// Solo sitios de gobierno de México (*.gob.mx), openFDA, MedlinePlus y PubMed; nada más.
+const RIP_OK = /(^|\.)gob\.mx$|^api\.fda\.gov$|^medlineplus\.gov$|^(eutils\.)?ncbi\.nlm\.nih\.gov$|^wsearch\.nlm\.nih\.gov$/i;
+ipcMain.handle('rip:bajar', async (_e, url) => {
+  let u; try { u = new URL(String(url)); } catch { return { ok: false, why: 'url' }; }
+  if (!/^https?:$/.test(u.protocol) || !RIP_OK.test(u.hostname)) return { ok: false, why: 'sitio' };
+  try {
+    const r = await fetch(u, { signal: AbortSignal.timeout(60000), redirect: 'follow' });
+    if (!RIP_OK.test(new URL(r.url).hostname)) return { ok: false, why: 'sitio' };
+    const buf = Buffer.from(await r.arrayBuffer());
+    if (buf.length > 80 * 1024 * 1024) return { ok: false, why: 'grande' };
+    return { ok: r.ok, status: r.status, type: r.headers.get('content-type') || '', data: buf };
+  } catch (e) { return { ok: false, why: 'red', msg: e.message }; }
+});
+// respaldo automático del expediente (ya viene cifrado): Documentos\Capri\Respaldos, se quedan los 30 más nuevos
+ipcMain.handle('respaldo:guardar', async (_e, nombre, texto) => {
+  try {
+    const dir = path.join(app.getPath('documents'), 'Capri', 'Respaldos');
+    fs.mkdirSync(dir, { recursive: true });
+    const n = String(nombre || 'expediente.capriexp').replace(/[^\w.-]/g, '_');
+    if (!/\.capriexp$/.test(n)) return { ok: false, why: 'nombre' };
+    fs.writeFileSync(path.join(dir, n), String(texto));
+    const viejos = fs.readdirSync(dir).filter((f) => f.endsWith('.capriexp')).sort().reverse().slice(30);
+    for (const f of viejos) fs.unlinkSync(path.join(dir, f));
+    return { ok: true, dir };
+  } catch (e) { return { ok: false, why: 'error', msg: e.message }; }
+});
+ipcMain.handle('respaldo:abrir', () => { const dir = path.join(app.getPath('documents'), 'Capri', 'Respaldos'); fs.mkdirSync(dir, { recursive: true }); shell.openPath(dir); return true; });
 ipcMain.on('claude:open', openClaude);
 ipcMain.on('retry', () => { if (win) { offline = false; ready = false; win.loadURL(deskURL()); } });
 

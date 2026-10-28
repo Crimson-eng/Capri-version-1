@@ -15,6 +15,9 @@ contextBridge.exposeInMainWorld('capriDesk', {
   tec: (a) => ipcRenderer.invoke('tec', a),              // taller técnico: revisar y reparar memorias USB
   gpuInfo: () => ipcRenderer.invoke('gpu:info'),          // qué tarjeta de video usa para dibujar
   turboOllama: () => ipcRenderer.invoke('ollama:turbo'),  // flash attention + caché a 8 bits (con tu permiso)
+  ripBajar: (url) => ipcRenderer.invoke('rip:bajar', url),          // R.I.P: fuente oficial o etiqueta (solo sitios permitidos)
+  guardarRespaldo: (n, t) => ipcRenderer.invoke('respaldo:guardar', n, t), // respaldo cifrado del expediente
+  abrirRespaldos: () => ipcRenderer.invoke('respaldo:abrir'),
   windowsNow: () => ipcRenderer.invoke('windows:get'),
   onWindows: on('desk:windows'),                      // tus ventanas (solo Windows): dónde sentarse
   onCfg: on('desk:cfg'),

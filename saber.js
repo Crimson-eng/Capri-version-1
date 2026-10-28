@@ -190,6 +190,9 @@ $('sbFile').onchange=async()=>{const f=$('sbFile').files[0];$('sbFile').value=''
     save();render();line('s','(🧠 Núcleo de certeza restaurado: '+n+' cosa(s) nuevas.)');}catch(e){line('s','(Ese archivo no es un respaldo del núcleo de certeza.)');}};
 function openSaber(){render();modal.classList.add('show');}
 window.openSaber=openSaber;
+// para la pestaña R.I.P (modo estudio): las mismas tarjetas que «repaso», calificadas igual
+window.saberTarjeta=(tema,p,r,f)=>tarjeta(tema,p,r,f);window.saberCalificar=(id,nota)=>calificar(id,nota);
+window.saberTarjetas=()=>sab.tarjetas;window.saberVencidas=()=>vencidas();
 window.saberInfo=()=>({auto:sab.auto,datos:sab.datos.length,tarjetas:sab.tarjetas.length,hoy:vencidas().length,cola:sab.cola.length,mejoras:sab.mejoras.filter(x=>x.estado==='activa').length});
 
 // ---------- comandos ----------

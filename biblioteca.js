@@ -2,8 +2,8 @@
 // Pestaña BIBLIOTECA del HUD: le metes documentos de casi cualquier formato y Capri los lee una vez, los parte en trozos
 // y los guarda en este dispositivo (IndexedDB «capri-biblioteca»). Cuando le preguntas algo, busca los trozos que vienen
 // al caso (BM25, como el reservorio médico) y se los pasa al cerebro con nombre y página para que cite.
-// Formatos: PDF (también escaneados, con tu key), Word (.docx y .doc viejo), OpenDocument (.odt .ods .odp), PowerPoint (.pptx),
-// Excel (.xlsx .xls .csv), RTF, EPUB, HTML, texto/Markdown/JSON/código e imágenes o fotos de apuntes (con tu key).
+// Formatos: PDF (también escaneados), Word (.docx y .doc viejo), OpenDocument (.odt .ods .odp), PowerPoint (.pptx),
+// Excel (.xlsx .xls .csv), RTF, EPUB, HTML, texto/Markdown/JSON/código e imágenes o fotos de apuntes (las lee Capri en tu PC, o Gemini si lo eliges).
 // Los lectores viajan con Capri en vendor/lectores, así abren sin internet. Nada de esto se sube al repo.
 (()=>{
 const DB='capri-biblioteca',CHUNK=1100,OVER=160,TOPK=5;
@@ -26,7 +26,7 @@ function texto(buf){const u=new Uint8Array(buf);if(u[0]===0xFF&&u[1]===0xFE)retu
   try{return new TextDecoder('utf-8',{fatal:true}).decode(u);}catch(e){return new TextDecoder('windows-1252').decode(u);}}
 const LEER={
  pdf:async(buf,f,av)=>{const t=await pdfText(buf.slice(0));if(t.replace(/\[Página \d+\]/g,'').trim().length>=200)return t;
-   if(f.size>18e6)throw new Error('es un PDF escaneado de más de 18 MB; pártelo en pedazos.');av('Pasando a texto (escaneado)…');return ocr(buf,'application/pdf');},
+   av('Pasando a texto (escaneado)…');return ocrElige(buf,'application/pdf',av,f);},
  docx:buf=>docxText(buf),
  doc:async buf=>{ // Word 97-2003: el texto se saca de la tabla de piezas del archivo (con el lector CFB de SheetJS); si falla, se rescata lo legible
    try{const t=await docBinario(buf);if(t.replace(/\s/g,'').length>=20)return t;}catch(e){}
@@ -71,7 +71,11 @@ async function docBinario(buf){await cargaLib('xlsx.full.min.js','xlsx/0.18.5/xl
   return out.replace(/\r/g,'\n').replace(/\x07/g,'\t').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g,'').replace(/\x13[^\x14\x15]*\x14?|\x15/g,'').replace(/\n{3,}/g,'\n\n').trim();}
 function html(s){const d=new DOMParser().parseFromString(s,/^\s*<\?xml/.test(s)&&!/<html/i.test(s)?'text/xml':'text/html');d.querySelectorAll('script,style,noscript').forEach(e=>e.remove());
   d.querySelectorAll('p,div,br,li,h1,h2,h3,h4,h5,h6,tr,section,article').forEach(e=>e.append('\n'));return (d.body||d.documentElement).textContent.replace(/[ \t]+/g,' ').replace(/\n\s*\n\s*\n+/g,'\n\n').trim();}
-// fotos y escaneos: Gemini los pasa a texto una sola vez (con tu key); desde ahí se buscan sin gastar nada
+// fotos y escaneos: se pasan a texto una sola vez y desde ahí se buscan sin gastar nada.
+// De entrada con el lector de Capri (Tesseract, en tu PC, sin internet; ver rip.js); con Gemini si lo eliges en R.I.P (mejor con letra a mano).
+async function ocrElige(buf,mime,av,f){const gem=store.get('ripOcr','local')==='gemini'&&cfg.key&&cfg.model;
+  if(!gem&&window.ocrLocal){const r=await window.ocrLocal(buf,mime,av);return r.text;}
+  if(f&&f.size>18e6)throw new Error('es un escaneo de más de 18 MB; pártelo en pedazos.');av('Leyendo con Gemini…');return ocr(buf,mime);}
 async function ocr(buf,mime){if(!cfg.key||!cfg.model)throw new Error('para leer imágenes o escaneos conecta tu API key de Gemini en ⚙.');
   const r=await fetch(API+'models/'+encodeURIComponent(cfg.model)+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':cfg.key},
     body:JSON.stringify({contents:[{role:'user',parts:[{inlineData:{mimeType:mime,data:b64(buf)}},{text:'Transcribe fielmente todo el texto de este documento o imagen (puede ser a mano). No resumas ni corrijas; respeta términos técnicos, cifras y abreviaturas. Si es un PDF de varias páginas, antes de cada página escribe [Página N]. Si hay tablas, escríbelas en filas. Si es una foto sin texto, descríbela en dos líneas.'}]}],generationConfig:{temperature:0}})});
@@ -79,7 +83,7 @@ async function ocr(buf,mime){if(!cfg.key||!cfg.model)throw new Error('para leer 
   return (j.candidates?.[0]?.content?.parts||[]).filter(p=>!p.thought&&p.text).map(p=>p.text).join('').trim();}
 const MIME={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',gif:'image/gif',bmp:'image/bmp',heic:'image/heic',heif:'image/heif'};
 async function leer(f,av=()=>{}){const e=ext(f.name),buf=await f.arrayBuffer();
-  if(IMG.test(e)){av('Leyendo la imagen con Gemini…');return ocr(buf,MIME[e]);}
+  if(IMG.test(e)){av('Leyendo la imagen…');return ocrElige(buf,MIME[e],av,f);}
   const fn=LEER[e]||(f.type.startsWith('text/')||!e||buf.byteLength<5e6&&!/[\x00-\x08]/.test(texto(buf.slice(0,4000)))?LEER.txt:null);
   if(!fn)throw new Error('ese formato ('+(e||'sin extensión')+') todavía no lo sé leer.');
   const t=String(await fn(buf,f,av)||'').replace(/\r/g,'').trim();if(t.replace(/\[Página \d+\]/g,'').trim().length<20)throw new Error('no trae texto que pueda leer.');return t;}
@@ -100,14 +104,14 @@ function partir(text){const out=[];const pages=text.split(/\n?\[Página (\d+)\]\
 const ADIV={Medicina:/paciente|diagn[oó]st|cl[ií]nic|s[ií]ntoma|tratamiento|f[aá]rmaco|anatom|fisiolog|patolog|enfermedad|m[eé]dic/gi,Inglés:/\b(the|and|of|to|is|in|that|it|with|for)\b/gi,
  Informática:/c[oó]digo|programa|servidor|linux|windows|red\b|python|javascript|base de datos|algoritmo|archivo/gi,Formatos:/nombre del paciente|firma|c[eé]dula|expediente|folio|fecha de|_{5,}/gi};
 function adivina(nombre,t){const s=(nombre+' '+t.slice(0,60000));let best='General',n=0;for(const [k,re] of Object.entries(ADIV)){const m=(s.match(re)||[]).length/(k==='Inglés'?6:1);if(m>n&&m>=8){n=m;best=k;}}return best;}
-async function agregar(files,box){for(const f of files){const row=document.createElement('div');row.className='bb-prog';row.textContent='Leyendo '+f.name+'…';box?.prepend(row);
+async function agregar(files,box,op={}){for(const f of files){const row=document.createElement('div');row.className='bb-prog';row.textContent='Leyendo '+f.name+'…';box?.prepend(row);
     try{const t0=performance.now(),t=await leer(f,m=>row.textContent=f.name+': '+m),ps=partir(t),id='b'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-      const est=bib.estante&&bib.estante!=='Todo'?bib.estante:adivina(f.name,t);
-      await tx((D,T)=>{D.put({id,name:f.name.replace(/\.[^.]+$/,''),file:f.name,ext:ext(f.name),size:f.size,estante:est,active:true,chars:t.length,trozos:ps.length,pags:Math.max(0,...ps.map(p=>p.pag||0)),added:Date.now()});
+      const est=op.estante||(bib.estante&&bib.estante!=='Todo'?bib.estante:adivina(f.name,t));
+      await tx((D,T)=>{D.put({id,name:f.name.replace(/\.[^.]+$/,''),file:f.name,ext:ext(f.name),size:f.size,estante:est,active:true,chars:t.length,trozos:ps.length,pags:Math.max(0,...ps.map(p=>p.pag||0)),added:Date.now(),...(op.oficial?{oficial:op.oficial}:{})});
         ps.forEach((p,i)=>T.put({id:id+'_'+i,doc:id,nombre:f.name.replace(/\.[^.]+$/,''),pag:p.pag,text:p.text}));});
       log('biblioteca: '+f.name+' ('+ps.length+' trozos, '+Math.round(performance.now()-t0)+' ms)','y');}
     catch(e){row.classList.add('err');row.textContent='✖ '+f.name+': '+e.message;setTimeout(()=>row.remove(),9000);continue;}row.remove();}
-  await carga();render();}
+  await carga();render();op.listo?.();}
 
 // ---------- búsqueda (BM25) ----------
 const STOP=new Set('de la que el en los del se las por un para con una su al lo como mas pero sus le ya o este si porque esta entre cuando muy sin sobre tambien me hasta hay donde quien desde todo nos durante todos uno les ni contra otros ese eso ante ellos e esto mi antes algunos unos yo otro otras otra the and of to in is for on that with are be this as'.split(' '));
@@ -125,7 +129,8 @@ function buscar(q,k=TOPK,soloDoc){if(!idx)armar();const qs=[...new Set(words(q))
 let foco=null; // documento del que estás platicando ahora
 async function prepara(q){ctx='';fuentes=[];if(!bib.on||!q||q.length<4||!docs.some(d=>d.active))return;const t0=performance.now();
   // solo pasan trozos que de verdad vienen al caso: un «hola» no carga nada y no hace más lenta la respuesta
-  const r=buscar(q,TOPK,foco?.id);const fuerte=r.filter(o=>foco?o.s>.8:o.s>1.6&&o.cov>=.34);if(!fuerte.length)return;
+  // las fuentes oficiales (GPC, NOM, Compendio) las cita R.I.P aparte, con su clave y año
+  const ofi=new Set(docs.filter(d=>d.oficial).map(d=>d.id));const r=buscar(q,TOPK*2,foco?.id).filter(o=>foco||!ofi.has(o.t.doc)).slice(0,TOPK);const fuerte=r.filter(o=>foco?o.s>.8:o.s>1.6&&o.cov>=.34);if(!fuerte.length)return;
   fuentes=fuerte.map(o=>({nombre:o.t.nombre,pag:o.t.pag,text:o.t.text}));
   ctx=fuentes.map((f,i)=>`[B${i+1}] ${f.nombre}${f.pag?', p. '+f.pag:''}\n${f.text}`).join('\n\n');log('biblioteca: '+fuentes.length+' trozo(s) en '+Math.round(performance.now()-t0)+' ms','g');}
 const _prep=window.medPrepare;window.medPrepare=async q=>{await Promise.all([_prep?_prep(q):null,prepara(q).catch(()=>{})]);};  // en paralelo: no suma espera
@@ -166,7 +171,7 @@ function render(){if(!sec)return;const cnt=e=>docs.filter(d=>e==='Todo'||d.estan
    <label style="display:flex;gap:8px;align-items:flex-start;margin-top:14px;font:12px var(--mono);color:#c98d93"><input type="checkbox" id="bbOn" ${bib.on?'checked':''} style="margin-top:3px"> Capri consulta la biblioteca al contestar</label></div>
   <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
    <div class="drop" id="bbDrop">Arrastra documentos aquí o haz clic para elegir${bib.estante!=='Todo'?' · van a «'+esc(bib.estante)+'»':''}
-    <small>PDF · WORD (DOCX, DOC) · EXCEL (XLSX, XLS, CSV) · POWERPOINT (PPTX) · ODT/ODS/ODP · RTF · EPUB · HTML · TXT/MD/JSON · FOTOS Y ESCANEOS (con tu key)</small></div>
+    <small>PDF · WORD (DOCX, DOC) · EXCEL (XLSX, XLS, CSV) · POWERPOINT (PPTX) · ODT/ODS/ODP · RTF · EPUB · HTML · TXT/MD/JSON · FOTOS Y ESCANEOS (los lee Capri en tu PC)</small></div>
    <input type="file" id="bbFile" multiple accept="${ACEPTA}" style="display:none"><div id="bbProg"></div>
    <input id="bbQ" placeholder="Buscar dentro de tus documentos…" value="${esc(q)}">
    ${hits.length?`<div>${hits.map(o=>`<div class="hit" data-id="${o.t.doc}"><b>${esc(o.t.nombre)}${o.t.pag?' · p. '+o.t.pag:''}</b><br>${marca(o.t.text,q)}</div>`).join('')}</div>`:q.trim().length>2?'<small style="color:#a0565e">Sin resultados.</small>':''}
@@ -182,7 +187,7 @@ function prev(){const d=docs.find(x=>x.id===sel);if(!d)return `<div class="pv"><
    <div class="row"><select id="bbEst">${[...new Set([...ESTANTES,d.estante])].map(e=>`<option ${e===d.estante?'selected':''}>${esc(e)}</option>`).join('')}<option value="+">+ nuevo estante…</option></select></div>
    <div class="row">${window.medGuardarTexto?'<button class="mini" data-a="med">⚕ Al reservorio médico</button>':''}${typeof dbPut==='function'?'<button class="mini" data-a="estudio">Al modo estudio</button>':''}<button class="mini" data-a="txt">⬇ Texto</button><button class="mini" data-a="del">✕ Quitar</button></div>
    <div class="tx">${esc(tx.slice(0,2400))}${d.chars>2400?'…':''}</div></div>`;}
-const textoDe=id=>trozos.filter(t=>t.doc===id).sort((a,b)=>+a.id.split('_')[1]-+b.id.split('_')[1]).map((t,i,a)=>(t.pag&&t.pag!==a[i-1]?.pag?`\n[Página ${t.pag}]\n`:'')+(i?t.text.slice(OVER):t.text)).join('');
+const textoDe=id=>trozos.filter(t=>t.doc===id).sort((a,b)=>+a.id.split('_')[1]-+b.id.split('_')[1]).map((t,i,a)=>(t.pag&&t.pag!==a[i-1]?.pag?`\n[Página ${t.pag}]\n`:'')+(i&&t.pag===a[i-1].pag&&a[i-1].text.length>=CHUNK?t.text.slice(OVER):(i?'\n':'')+t.text)).join('');  // solo se quita el traslape dentro de la misma página
 function preguntar(t){window.hudGo?.('capri',true);setTimeout(()=>send(t),380);}
 async function accion(a,el){const d=docs.find(x=>x.id===sel);
   if(a==='sinfoco'){foco=null;return render();}
@@ -217,5 +222,12 @@ const _send=send;
 send=async v=>{const k=(v||'').trim().toLowerCase();if(/^(biblioteca|libros|documentos)$/.test(k)&&!busy){line('u',v.trim());window.openBiblioteca();return;}
   await _send(v);if(k==='help')line('t','  biblioteca — Tus documentos (PDF, Word, Excel, PowerPoint…) para que Capri los consulte');};
 carga();
+// para R.I.P: fuentes oficiales, modo estudio y lector de escaneos
+window.bibAgregar=(files,op)=>agregar(files,null,op);
+window.bibDocs=async()=>{if(!bdb)await carga();return docs;};
+window.bibTexto=id=>textoDe(id);
+window.bibBuscar=async(q,k,soloDoc)=>{if(!bdb)await carga();return buscar(q,k,soloDoc);};
+window.bibQuitar=id=>borra(id);
+window.bibFoco=d=>{foco=d?{id:d.id,name:d.name}:null;};
 window.__bibTest={leer,partir,buscar:(q,k)=>buscar(q,k),carga,adivina};
 })();
