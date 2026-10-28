@@ -6,7 +6,7 @@
 // Excel (.xlsx .xls .csv), RTF, EPUB, HTML, texto/Markdown/JSON/código e imágenes o fotos de apuntes (las lee Capri en tu PC, o Gemini si lo eliges).
 // Los lectores viajan con Capri en vendor/lectores, así abren sin internet. Nada de esto se sube al repo.
 (()=>{
-const DB='capri-biblioteca',CHUNK=1100,OVER=160,TOPK=5;
+const DB='capri-biblioteca',CHUNK=1100,OVER=160,TOPK=7;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const bib=Object.assign({on:true,estante:'Todo'},store.get('bib',{}));const saveB=()=>store.set('bib',bib);
 const ESTANTES=['Medicina','Estudio','Formatos','Inglés','Informática','General'];
@@ -25,8 +25,7 @@ const xmlTxt=x=>x.replace(/<\/(?:text:p|text:h|w:p|a:p|p|div|h\d|li|tr|br)>|<(?:
 function texto(buf){const u=new Uint8Array(buf);if(u[0]===0xFF&&u[1]===0xFE)return new TextDecoder('utf-16le').decode(u);if(u[0]===0xFE&&u[1]===0xFF)return new TextDecoder('utf-16be').decode(u);
   try{return new TextDecoder('utf-8',{fatal:true}).decode(u);}catch(e){return new TextDecoder('windows-1252').decode(u);}}
 const LEER={
- pdf:async(buf,f,av)=>{const t=await pdfText(buf.slice(0));if(t.replace(/\[Página \d+\]/g,'').trim().length>=200)return t;
-   av('Pasando a texto (escaneado)…');return ocrElige(buf,'application/pdf',av,f);},
+ pdf:(buf,f,av)=>pdfLeer(buf.slice(0),av),   // página por página: las que vienen escaneadas pasan solas por el lector (ver index.html)
  docx:buf=>docxText(buf),
  doc:async buf=>{ // Word 97-2003: el texto se saca de la tabla de piezas del archivo (con el lector CFB de SheetJS); si falla, se rescata lo legible
    try{const t=await docBinario(buf);if(t.replace(/\s/g,'').length>=20)return t;}catch(e){}
@@ -42,7 +41,8 @@ const LEER={
      if(nt){const y=(await nt.async('string')).match(/<a:t>[^<]*<\/a:t>/g)||[];if(y.length)out+='\n(Notas: '+y.map(xmlTxt).join(' ')+')';}}
    return out.trim();},
  xlsx:async buf=>{await cargaLib('xlsx.full.min.js','xlsx/0.18.5/xlsx.full.min.js','XLSX');const wb=XLSX.read(buf,{type:'array'});
-   return wb.SheetNames.map((n,i)=>`[Página ${i+1}]\nHoja «${n}»\n`+XLSX.utils.sheet_to_csv(wb.Sheets[n],{blankrows:false}).slice(0,400000)).join('\n');},
+   const rec=[],text=wb.SheetNames.map((n,i)=>{const c=XLSX.utils.sheet_to_csv(wb.Sheets[n],{blankrows:false});if(c.length>2e6)rec.push(n);return `[Página ${i+1}]\nHoja «${n}»\n`+c.slice(0,2e6);}).join('\n');
+   return {text,inf:informeTexto(text,rec.length?{recortado:'hojas muy grandes, solo los primeros 2 millones de caracteres: '+rec.join(', ')}:{})};},
  rtf:buf=>{let s=new TextDecoder('windows-1252').decode(new Uint8Array(buf));
    s=s.replace(/\{\\\*[^{}]*(\{[^{}]*\}[^{}]*)*\}/g,'').replace(/\{\\(?:fonttbl|colortbl|stylesheet|info|pict)[\s\S]*?\}\s*\}/g,'')
     .replace(/\\'([0-9a-f]{2})/gi,(_,h)=>new TextDecoder('windows-1252').decode(new Uint8Array([parseInt(h,16)]))).replace(/\\u(-?\d+)\??/g,(_,n)=>String.fromCharCode(n<0?65536+ +n:+n))
@@ -82,11 +82,16 @@ async function ocr(buf,mime){if(!cfg.key||!cfg.model)throw new Error('para leer 
   const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error?.message||('Error '+r.status));
   return (j.candidates?.[0]?.content?.parts||[]).filter(p=>!p.thought&&p.text).map(p=>p.text).join('').trim();}
 const MIME={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',gif:'image/gif',bmp:'image/bmp',heic:'image/heic',heif:'image/heif'};
-async function leer(f,av=()=>{}){const e=ext(f.name),buf=await f.arrayBuffer();
-  if(IMG.test(e)){av('Leyendo la imagen…');return ocrElige(buf,MIME[e],av,f);}
+// devuelve {t: texto con [Página N], inf: informe de lectura (páginas totales, vacías, leídas con OCR)}
+async function leerX(f,av=()=>{}){const e=ext(f.name),buf=await f.arrayBuffer();
+  if(IMG.test(e)){av('Leyendo la imagen…');const t=String(await ocrElige(buf,MIME[e],av,f)||'').trim();if(t.length<20)throw new Error('no trae texto que pueda leer.');
+    return {t,inf:{v:1,total:1,conTexto:1,vacias:[],ocr:[1],metodo:store.get('ripOcr','local')==='gemini'&&cfg.key?'gemini':'ocr',fecha:Date.now()}};}
   const fn=LEER[e]||(f.type.startsWith('text/')||!e||buf.byteLength<5e6&&!/[\x00-\x08]/.test(texto(buf.slice(0,4000)))?LEER.txt:null);
   if(!fn)throw new Error('ese formato ('+(e||'sin extensión')+') todavía no lo sé leer.');
-  const t=String(await fn(buf,f,av)||'').replace(/\r/g,'').trim();if(t.replace(/\[Página \d+\]/g,'').trim().length<20)throw new Error('no trae texto que pueda leer.');return t;}
+  const r=await fn(buf,f,av),t=String((r&&typeof r==='object'?r.text:r)||'').replace(/\r/g,'').trim();
+  if(t.replace(/\[Página \d+\]/g,'').trim().length<20)throw new Error(r?.inf?.total?'sus '+r.inf.total+' páginas no traen texto que pueda leer'+(r.inf.err?' ('+r.inf.err+')':'')+'.':'no trae texto que pueda leer.');
+  return {t,inf:r&&typeof r==='object'&&r.inf||informeTexto(t)};}
+const leer=async(f,av)=>(await leerX(f,av)).t;
 window.bibLeer=f=>leer(f);
 
 // ---------- base de datos ----------
@@ -95,26 +100,37 @@ const open=()=>bdb?Promise.resolve():new Promise(res=>{try{const r=indexedDB.ope
   r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('docs',{keyPath:'id'});d.createObjectStore('trozos',{keyPath:'id'}).createIndex('doc','doc');};
   r.onsuccess=()=>{bdb=r.result;res();};r.onerror=()=>res();}catch(e){res();}});
 const all=s=>new Promise(res=>{if(!bdb)return res([]);const t=bdb.transaction(s).objectStore(s).getAll();t.onsuccess=()=>res(t.result||[]);t.onerror=()=>res([]);});
-const tx=fn=>new Promise(res=>{if(!bdb)return res();const t=bdb.transaction(['docs','trozos'],'readwrite');fn(t.objectStore('docs'),t.objectStore('trozos'));t.oncomplete=res;t.onerror=res;});
+const tx=fn=>new Promise((res,rej)=>{if(!bdb)return rej(new Error('no pude abrir la base de la biblioteca'));const t=bdb.transaction(['docs','trozos'],'readwrite');fn(t.objectStore('docs'),t.objectStore('trozos'));t.oncomplete=()=>res();
+  t.onabort=t.onerror=()=>rej(new Error(/quota/i.test(t.error?.name||'')?'ya no cabe en el disco del navegador; quita documentos que no uses':'no se pudo guardar ('+(t.error?.name||'error')+')'));});   // antes un error aquí perdía el documento sin avisar
 async function carga(){await open();docs=(await all('docs')).sort((a,b)=>b.added-a.added);trozos=await all('trozos');idx=null;}
 async function borra(id){await tx((D,T)=>{D.delete(id);const r=T.index('doc').openKeyCursor(IDBKeyRange.only(id));r.onsuccess=()=>{const c=r.result;if(c){T.delete(c.primaryKey);c.continue();}};});await carga();}
+const borraTrozos=id=>tx((D,T)=>{const r=T.index('doc').openKeyCursor(IDBKeyRange.only(id));r.onsuccess=()=>{const c=r.result;if(c){T.delete(c.primaryKey);c.continue();}};});
 function partir(text){const out=[];const pages=text.split(/\n?\[Página (\d+)\]\n?/);
-  const push=(t,pag)=>{t=t.replace(/[ \t]+/g,' ').replace(/\n{2,}/g,'\n').trim();for(let i=0;i<t.length;i+=CHUNK-OVER){const c=t.slice(i,i+CHUNK);if(c.length>30)out.push({pag,text:c});if(i+CHUNK>=t.length)break;}};
+  const push=(t,pag)=>{t=t.replace(/[ \t]+/g,' ').replace(/\n{2,}/g,'\n').trim();for(let i=0;i<t.length;i+=CHUNK-OVER){const c=t.slice(i,i+CHUNK);if(c.trim().length>=10)out.push({pag,text:c});if(i+CHUNK>=t.length)break;}};
   if(pages.length>1){if(pages[0].trim())push(pages[0],null);for(let i=1;i<pages.length;i+=2)push(pages[i+1]||'',+pages[i]);}else push(text,null);return out;}
 const ADIV={Medicina:/paciente|diagn[oó]st|cl[ií]nic|s[ií]ntoma|tratamiento|f[aá]rmaco|anatom|fisiolog|patolog|enfermedad|m[eé]dic/gi,Inglés:/\b(the|and|of|to|is|in|that|it|with|for)\b/gi,
  Informática:/c[oó]digo|programa|servidor|linux|windows|red\b|python|javascript|base de datos|algoritmo|archivo/gi,Formatos:/nombre del paciente|firma|c[eé]dula|expediente|folio|fecha de|_{5,}/gi};
 function adivina(nombre,t){const s=(nombre+' '+t.slice(0,60000));let best='General',n=0;for(const [k,re] of Object.entries(ADIV)){const m=(s.match(re)||[]).length/(k==='Inglés'?6:1);if(m>n&&m>=8){n=m;best=k;}}return best;}
+const avisoLectura=i=>!i?.total?'':i.vacias?.length?` · ⚠ ${i.conTexto} de ${i.total} páginas con texto (sin texto: ${rangos(i.vacias)})`:` · ${i.total} de ${i.total} páginas leídas`+(i.ocr?.length?` (${i.ocr.length} con OCR)`:'');
+const rangos=window.rangosPag=ns=>{const o=[];for(let i=0;i<ns.length;i++){let j=i;while(j+1<ns.length&&ns[j+1]===ns[j]+1)j++;o.push(j>i?ns[i]+'–'+ns[j]:''+ns[i]);i=j;}return o.length>12?o.slice(0,12).join(', ')+'…':o.join(', ');};
+// guarda (o reemplaza, si viene viejo) un documento ya leído
+async function guardaDoc(f,t,inf,op={},viejo){const ps=partir(t),id=viejo?.id||'b'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),nombre=viejo?.name||f.name.replace(/\.[^.]+$/,'');
+  const est=viejo?.estante||op.estante||(bib.estante&&bib.estante!=='Todo'?bib.estante:adivina(f.name,t));
+  if(viejo)await borraTrozos(id);
+  await tx((D,T)=>{D.put({...(viejo||{}),id,name:nombre,file:f.name,ext:ext(f.name),size:f.size,estante:est,active:viejo?viejo.active:true,chars:t.length,trozos:ps.length,pags:inf?.total||Math.max(0,...ps.map(p=>p.pag||0)),lectura:inf,added:viejo?.added||Date.now(),...(op.oficial?{oficial:op.oficial}:{})});
+    ps.forEach((p,i)=>T.put({id:id+'_'+i,doc:id,nombre,pag:p.pag,text:p.text}));});
+  return {id,ps};}
 async function agregar(files,box,op={}){for(const f of files){const row=document.createElement('div');row.className='bb-prog';row.textContent='Leyendo '+f.name+'…';box?.prepend(row);
-    try{const t0=performance.now(),t=await leer(f,m=>row.textContent=f.name+': '+m),ps=partir(t),id='b'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-      const est=op.estante||(bib.estante&&bib.estante!=='Todo'?bib.estante:adivina(f.name,t));
-      await tx((D,T)=>{D.put({id,name:f.name.replace(/\.[^.]+$/,''),file:f.name,ext:ext(f.name),size:f.size,estante:est,active:true,chars:t.length,trozos:ps.length,pags:Math.max(0,...ps.map(p=>p.pag||0)),added:Date.now(),...(op.oficial?{oficial:op.oficial}:{})});
-        ps.forEach((p,i)=>T.put({id:id+'_'+i,doc:id,nombre:f.name.replace(/\.[^.]+$/,''),pag:p.pag,text:p.text}));});
-      log('biblioteca: '+f.name+' ('+ps.length+' trozos, '+Math.round(performance.now()-t0)+' ms)','y');}
+    try{const t0=performance.now(),{t,inf}=await leerX(f,m=>row.textContent=f.name+': '+m),{ps}=await guardaDoc(f,t,inf,op);
+      log('biblioteca: '+f.name+' ('+ps.length+' trozos'+(inf?.total?', '+inf.conTexto+'/'+inf.total+' pág. con texto':'')+', '+Math.round(performance.now()-t0)+' ms)','y');
+      if(inf?.vacias?.length){row.classList.add('err');row.textContent='⚠ '+f.name+': '+inf.vacias.length+' página(s) sin texto legible ('+rangos(inf.vacias)+'). Ábrelo y toca «Ver lectura» para revisarlo.';setTimeout(()=>row.remove(),12000);continue;}}
     catch(e){row.classList.add('err');row.textContent='✖ '+f.name+': '+e.message;setTimeout(()=>row.remove(),9000);continue;}row.remove();}
   await carga();render();op.listo?.();}
 
 // ---------- búsqueda (BM25) ----------
-const STOP=new Set('de la que el en los del se las por un para con una su al lo como mas pero sus le ya o este si porque esta entre cuando muy sin sobre tambien me hasta hay donde quien desde todo nos durante todos uno les ni contra otros ese eso ante ellos e esto mi antes algunos unos yo otro otras otra the and of to in is for on that with are be this as'.split(' '));
+const STOP=new Set(('de la que el en los del se las por un para con una su al lo como mas pero sus le ya o este si porque esta entre cuando muy sin sobre tambien me hasta hay donde quien desde todo nos durante todos uno les ni contra otros ese eso ante ellos e esto mi antes algunos unos yo otro otras otra the and of to in is for on that with are be this as'+
+  // palabras de la pregunta que no dicen de qué tema es («según el documento, ¿qué es lo más importante?»): antes jalaban trozos al azar
+  ' dime dame segun documento documentos archivo libro libros apuntes biblioteca reservorio importante importantes principal principales resumen resume resumeme completo toda toda dice explica explicame').split(' '));
 const stem=w=>{if(/^\d+$/.test(w))return w;if(w.length>5&&w.endsWith('es'))w=w.slice(0,-2);else if(w.length>4&&w.endsWith('s'))w=w.slice(0,-1);return w.length>6?w.slice(0,6):w;};
 const words=s=>(String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').match(/[a-zñ0-9]{3,}/g)||[]).filter(w=>!STOP.has(w)).map(stem);
 function armar(){const act=new Set(docs.filter(d=>d.active).map(d=>d.id)),D=[],df=new Map();let tot=0;
@@ -137,7 +153,7 @@ const _prep=window.medPrepare;window.medPrepare=async q=>{await Promise.all([_pr
 const _prompt=window.medPrompt;window.medPrompt=()=>(_prompt?_prompt():'')+(ctx?`
 
 BIBLIOTECA DE ${(cfg.name||'Kiga').toUpperCase()}${foco?' (está platicando contigo del documento «'+foco.name+'»)':''}
-Si la pregunta tiene que ver con estos trozos de sus documentos, apóyate en ellos y cita así, sin markdown: (nombre del documento, p. N). Si no vienen al caso, ignóralos sin mencionarlos. No inventes lo que no dicen.
+Si la pregunta tiene que ver con estos trozos de sus documentos, apóyate en ellos y cita así, sin markdown: (nombre del documento, p. N). Si no vienen al caso, ignóralos sin mencionarlos. No inventes lo que no dicen. Son solo algunos trozos, no el documento entero: no los presentes como resumen completo.
 ${ctx}`:'');
 const _after=window.medAfter;window.medAfter=()=>{_after?.();if(!fuentes.length)return;
   line('s med','📚 de tu biblioteca: '+[...new Set(fuentes.map(f=>f.nombre+(f.pag?' p. '+f.pag:'')))].join(' · '));fuentes=[];};
@@ -175,17 +191,19 @@ function render(){if(!sec)return;const cnt=e=>docs.filter(d=>e==='Todo'||d.estan
    <input type="file" id="bbFile" multiple accept="${ACEPTA}" style="display:none"><div id="bbProg"></div>
    <input id="bbQ" placeholder="Buscar dentro de tus documentos…" value="${esc(q)}">
    ${hits.length?`<div>${hits.map(o=>`<div class="hit" data-id="${o.t.doc}"><b>${esc(o.t.nombre)}${o.t.pag?' · p. '+o.t.pag:''}</b><br>${marca(o.t.text,q)}</div>`).join('')}</div>`:q.trim().length>2?'<small style="color:#a0565e">Sin resultados.</small>':''}
-   <div class="ls">${vis.map(d=>`<div class="d${sel===d.id?' on':''}" data-id="${d.id}"><span class="fm">${esc(d.ext||'?')}</span><div style="min-width:0" class="${d.active?'':'off'}"><div class="nm">${esc(d.name)}</div><small>${esc(TIPOS[d.ext]||'Texto')} · ${d.pags?d.pags+' pág. · ':''}${fmtSize(d.size)} · ${esc(d.estante)}</small></div><small>${new Date(d.added).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}</small></div>`).join('')||'<small style="color:#a0565e;padding:10px 0">Aquí no hay documentos todavía.</small>'}</div></div>
+   <div class="ls">${vis.map(d=>`<div class="d${sel===d.id?' on':''}" data-id="${d.id}"><span class="fm">${esc(d.ext||'?')}</span><div style="min-width:0" class="${d.active?'':'off'}"><div class="nm">${esc(d.name)}</div><small>${esc(TIPOS[d.ext]||'Texto')} · ${d.pags?d.pags+' pág. · ':''}${fmtSize(d.size)} · ${esc(d.estante)}${d.lectura?.vacias?.length?' · <b style="color:var(--hr)" title="páginas sin texto">⚠ '+d.lectura.vacias.length+' sin texto</b>':''}</small></div><small>${new Date(d.added).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}</small></div>`).join('')||'<small style="color:#a0565e;padding:10px 0">Aquí no hay documentos todavía.</small>'}</div></div>
   <div id="bbPv">${prev()}</div></div>`;}
 function marca(t,q){const ws=new Set(words(q));const s=esc(t.slice(0,420));return s.replace(/[\p{L}\p{N}]{3,}/gu,w=>ws.has(stem(w.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'')))?'<mark>'+w+'</mark>':w)+(t.length>420?'…':'');}
 function prev(){const d=docs.find(x=>x.id===sel);if(!d)return `<div class="pv"><div class="sub">Documento</div><small style="color:#c98d93">Elige uno para verlo, platicar de él con Capri o mandarlo a otro módulo.${foco?'<br><br>Platicando de: <b style="color:var(--hc)">'+esc(foco.name)+'</b> <button class="mini" data-a="sinfoco">soltar</button>':''}</small></div>`;
   const tx=trozos.filter(t=>t.doc===d.id).sort((a,b)=>+a.id.split('_')[1]-+b.id.split('_')[1]).slice(0,4).map(t=>t.text).join(' ');
   return `<div class="pv"><div class="sub">${esc(TIPOS[d.ext]||'Documento')}</div><b style="color:#ffe3e6;font:600 15px var(--sans)">${esc(d.name)}</b>
-   <small style="color:#a0565e">${esc(d.file)} · ${d.trozos} trozos buscables · ${Math.round(d.chars/1000)}k caracteres</small>
+   <small style="color:#a0565e">${esc(d.file)} · ${d.trozos} trozos buscables · ${Math.round(d.chars/1000)}k caracteres${avisoLectura(d.lectura)}${d.lectura?'':' · leído antes de 2.8'}</small>
+   <div class="row"><button class="hbtn c" data-a="lectura">👁 Ver lectura completa</button></div>
    <div class="row"><button class="hbtn c" data-a="platicar">${foco?.id===d.id?'Platicando de esto':'Platicar de esto'}</button><button class="mini" data-a="resumen">Resúmelo</button><button class="mini" data-a="quiz">Hazme preguntas</button></div>
    <div class="row"><label style="display:flex;gap:6px;align-items:center;font:12px var(--mono)"><input type="checkbox" data-a="act" ${d.active?'checked':''}> Capri lo consulta</label></div>
    <div class="row"><select id="bbEst">${[...new Set([...ESTANTES,d.estante])].map(e=>`<option ${e===d.estante?'selected':''}>${esc(e)}</option>`).join('')}<option value="+">+ nuevo estante…</option></select></div>
    <div class="row">${window.medGuardarTexto?'<button class="mini" data-a="med">⚕ Al reservorio médico</button>':''}${typeof dbPut==='function'?'<button class="mini" data-a="estudio">Al modo estudio</button>':''}<button class="mini" data-a="txt">⬇ Texto</button><button class="mini" data-a="del">✕ Quitar</button></div>
+   <div class="sub">Inicio del documento · el texto entero está en «Ver lectura completa»</div>
    <div class="tx">${esc(tx.slice(0,2400))}${d.chars>2400?'…':''}</div></div>`;}
 const textoDe=id=>trozos.filter(t=>t.doc===id).sort((a,b)=>+a.id.split('_')[1]-+b.id.split('_')[1]).map((t,i,a)=>(t.pag&&t.pag!==a[i-1]?.pag?`\n[Página ${t.pag}]\n`:'')+(i&&t.pag===a[i-1].pag&&a[i-1].text.length>=CHUNK?t.text.slice(OVER):(i?'\n':'')+t.text)).join('');  // solo se quita el traslape dentro de la misma página
 function preguntar(t){window.hudGo?.('capri',true);setTimeout(()=>send(t),380);}
@@ -196,7 +214,8 @@ async function accion(a,el){const d=docs.find(x=>x.id===sel);
   if(a==='resumen'){foco={id:d.id,name:d.name};return preguntar('Resúmeme «'+d.name+'» con lo más importante, en puntos cortos.');}
   if(a==='quiz'){foco={id:d.id,name:d.name};return preguntar('Hazme 5 preguntas para repasar «'+d.name+'», una por una, y corrígeme.');}
   if(a==='act'){d.active=el.checked;idx=null;await tx(D=>D.put(d));return render();}
-  if(a==='med'){el.textContent='Mandando…';try{await window.medGuardarTexto(d.name,d.file,textoDe(d.id));el.textContent='✓ En el reservorio';}catch(e){el.textContent='✖ '+e.message;}return;}
+  if(a==='lectura')return window.verLectura?.('bib',d.id);
+  if(a==='med'){el.textContent='Mandando…';try{await window.medGuardarTexto(d.name,d.file,textoDe(d.id),d.lectura);el.textContent='✓ En el reservorio';}catch(e){el.textContent='✖ '+e.message;}return;}
   if(a==='estudio'){const t=textoDe(d.id);await dbPut({id:'bib_'+d.id,name:d.file,text:t,pdf:null,active:true,chars:t.length,size:d.size,added:Date.now()});if(typeof renderDocs==='function')await renderDocs();el.textContent='✓ En modo estudio';return;}
   if(a==='txt'){const u=URL.createObjectURL(new Blob([textoDe(d.id)],{type:'text/plain'})),l=document.createElement('a');l.href=u;l.download=d.name+'.txt';l.click();setTimeout(()=>URL.revokeObjectURL(u),2000);return;}
   if(a==='del'){if(!confirm('¿Quitar «'+d.name+'» de la biblioteca?'))return;if(foco?.id===d.id)foco=null;sel=null;await borra(d.id);return render();}}
@@ -229,5 +248,13 @@ window.bibTexto=id=>textoDe(id);
 window.bibBuscar=async(q,k,soloDoc)=>{if(!bdb)await carga();return buscar(q,k,soloDoc);};
 window.bibQuitar=id=>borra(id);
 window.bibFoco=d=>{foco=d?{id:d.id,name:d.name}:null;};
-window.__bibTest={leer,partir,buscar:(q,k)=>buscar(q,k),carga,adivina};
+// para la ventana de lectura (lectura.js)
+window.bibLectura=async id=>{if(!bdb)await carga();const d=docs.find(x=>x.id===id);if(!d)return null;
+  const ts=trozos.filter(t=>t.doc===id).sort((a,b)=>+a.id.split('_')[1]-+b.id.split('_')[1]);
+  return {id,name:d.name,file:d.file,lectura:d.lectura||null,chars:d.chars,trozos:ts.length,paginas:paginasDeTrozos(ts,CHUNK,OVER),donde:'Biblioteca'};};
+window.bibReleer=async(id,f,av)=>{const d=docs.find(x=>x.id===id);if(!d)throw new Error('ya no está en la biblioteca');
+  const {t,inf}=await leerX(f,av);await guardaDoc(f,t,inf,{},d);await carga();render();return inf;};
+window.bibActivos=()=>docs.filter(d=>d.active).map(d=>({id:d.id,name:d.name,chars:d.chars,lectura:d.lectura,oficial:!!d.oficial,added:d.added}));
+window.bibFocoActual=()=>foco;
+window.__bibTest={leer,leerX,partir,buscar:(q,k)=>buscar(q,k),carga,adivina};
 })();

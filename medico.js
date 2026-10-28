@@ -4,7 +4,7 @@
 // a Gemini, con libro y página para que los cite. Si está activado, también consulta MedlinePlus y PubMed en línea.
 // Nada de esto se sube al repo: el repo es público y los libros tienen derechos de autor.
 (()=>{
-const MED_DB='capri-medico',CHUNK=1100,OVER=180,TOPK=6,ONLINE_MS=2500;
+const MED_DB='capri-medico',CHUNK=1100,OVER=180,TOPK=8,ONLINE_MS=2500;
 const SALUD=/salud|m[eé]dic|enferm|s[ií]ntom|dolor|duele|fiebre|tos\b|gripa|gripe|infecci|presi[oó]n|az[uú]car|diabet|coraz[oó]n|pulm[oó]n|est[oó]mago|h[ií]gado|ri[ñn][oó]n|cerebr|nervi|hueso|m[uú]scul|piel|sangr|herida|quemad|alergi|medicament|pastilla|dosis|tratamiento|diagn[oó]st|v[oó]mit|diarrea|mareo|embaraz|vacun|virus|bacteri|c[aá]ncer|tumor|ansiedad|depresi|sue[ñn]o|insomnio|nutrici|dieta|anatom|fisiolog|patolog|farmac|cl[ií]nic|hospital|urgenci|sistema|[oó]rgano|c[eé]lula|hormona|tiroides|sindrome|síndrome/i;
 let mdb=null,libros=[],trozos=[],idx=null,ctx=null,fuentes=[];
 const med=Object.assign({on:false,online:true},store.get('med',{}));
@@ -16,14 +16,15 @@ function mOpen(){return new Promise(res=>{try{const r=indexedDB.open(MED_DB,1);
   r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('libros',{keyPath:'id'});d.createObjectStore('trozos',{keyPath:'id'}).createIndex('libro','libro');};
   r.onsuccess=()=>{mdb=r.result;res();};r.onerror=()=>res();}catch(e){res();}});}
 const mAll=s=>new Promise(res=>{if(!mdb)return res([]);const t=mdb.transaction(s).objectStore(s).getAll();t.onsuccess=()=>res(t.result||[]);t.onerror=()=>res([]);});
-const mTx=(fn)=>new Promise(res=>{if(!mdb)return res();const t=mdb.transaction(['libros','trozos'],'readwrite');fn(t.objectStore('libros'),t.objectStore('trozos'));t.oncomplete=res;t.onerror=res;});
+const mTx=(fn)=>new Promise((res,rej)=>{if(!mdb)return rej(new Error('no pude abrir la base del reservorio'));const t=mdb.transaction(['libros','trozos'],'readwrite');fn(t.objectStore('libros'),t.objectStore('trozos'));t.oncomplete=()=>res();
+  t.onabort=t.onerror=()=>rej(new Error(/quota/i.test(t.error?.name||'')?'ya no cabe en el disco del navegador; quita libros que no uses':'no se pudo guardar ('+(t.error?.name||'error')+')'));});   // antes un error aquí perdía el libro sin avisar
 async function mLoad(){libros=(await mAll('libros')).sort((a,b)=>a.added-b.added);trozos=await mAll('trozos');idx=null;dispatchEvent(new Event('med:libros'));}
 // para el holograma del HUD: el texto de cada material, para saber de qué parte del cuerpo habla
 window.medTextos=()=>libros.map(l=>({id:l.id,name:l.name,active:l.active,text:trozos.filter(t=>t.libro===l.id).map(t=>t.text).join(' ')}));
 async function mDel(id){await mTx((L,T)=>{L.delete(id);const r=T.index('libro').openKeyCursor(IDBKeyRange.only(id));r.onsuccess=()=>{const c=r.result;if(c){T.delete(c.primaryKey);c.continue();}};});await mLoad();}
 
 // ---------- texto → palabras ----------
-const STOP=new Set(('de la que el en los del se las por un para con una su al lo como mas pero sus le ya o este si porque esta entre cuando muy sin sobre tambien me hasta hay donde quien desde todo nos durante todos uno les ni contra otros ese eso ante ellos e esto mi antes algunos que unos yo otro otras otra el tanto esa estos mucho quienes nada muchos cual poco ella estar estas algunas algo nosotros mis tu te ti tus ellas es son fue ser ha han era puede pueden tiene tienen hacer the of and to in is are for with on by as at from or an be this that which it its was were not no can may into than also has have been se le lo da dar dame dime explica explicame quiero saber sabes cual cuales como que es son porque sirve tengo tiene siento capri trata tratan hace hacen pasa significa quiere dice dicen bueno malo cosa cosas').split(' '));
+const STOP=new Set(('de la que el en los del se las por un para con una su al lo como mas pero sus le ya o este si porque esta entre cuando muy sin sobre tambien me hasta hay donde quien desde todo nos durante todos uno les ni contra otros ese eso ante ellos e esto mi antes algunos que unos yo otro otras otra el tanto esa estos mucho quienes nada muchos cual poco ella estar estas algunas algo nosotros mis tu te ti tus ellas es son fue ser ha han era puede pueden tiene tienen hacer the of and to in is are for with on by as at from or an be this that which it its was were not no can may into than also has have been se le lo da dar dame dime segun documento documentos archivo libro libros apuntes reservorio biblioteca importante importantes principal principales resumen resume resumeme completo explica explicame quiero saber sabes cual cuales como que es son porque sirve tengo tiene siento capri trata tratan hace hacen pasa significa quiere dice dicen bueno malo cosa cosas').split(' '));
 function words(s){return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').match(/[a-zñ0-9]{3,}/g)?.filter(w=>!STOP.has(w)).map(stem)||[];}
 function stem(w){if(/^\d+$/.test(w))return w;if(w.length>5&&w.endsWith('es'))w=w.slice(0,-2);else if(w.length>4&&w.endsWith('s'))w=w.slice(0,-1);return w.length>6?w.slice(0,6):w;}
 
@@ -40,9 +41,11 @@ function search(q,k=TOPK){if(!idx)buildIdx();const qs=[...new Set(words(q))];if(
   for(const o of out){if(o.s<out[0].s*.35)break;const key=o.t.libro+'|'+o.t.pag;if(seen.has(key))continue;seen.add(key);res.push(o);if(res.length>=k)break;}return res;}
 
 // ---------- cargar libros ----------
-function partir(text){const out=[];const pages=text.split(/\n?\[Página (\d+)\]\n/);
-  const push=(txt,pag)=>{txt=txt.replace(/\s+/g,' ').trim();for(let i=0;i<txt.length;i+=CHUNK-OVER){const c=txt.slice(i,i+CHUNK);if(c.length>30)out.push({pag,text:c});if(i+CHUNK>=txt.length)break;}};
-  if(pages.length>1){for(let i=1;i<pages.length;i+=2)push(pages[i+1]||'',+pages[i]);}else push(text,null);return out;}
+// (2.8) se guardan los saltos de línea para que la ventana de lectura muestre el texto como viene, y ya no se tira
+// lo que venía antes de la primera marca de página ni las páginas cortitas
+function partir(text){const out=[];const pages=text.split(/\n?\[Página (\d+)\]\n?/);
+  const push=(txt,pag)=>{txt=txt.replace(/[ \t]+/g,' ').replace(/\n{2,}/g,'\n').trim();for(let i=0;i<txt.length;i+=CHUNK-OVER){const c=txt.slice(i,i+CHUNK);if(c.trim().length>=10)out.push({pag,text:c});if(i+CHUNK>=txt.length)break;}};
+  if(pages.length>1){if(pages[0].trim())push(pages[0],null);for(let i=1;i<pages.length;i+=2)push(pages[i+1]||'',+pages[i]);}else push(text,null);return out;}
 const IMG=/^(jpe?g|png|webp|heic|heif)$/,MIME={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',heic:'image/heic',heif:'image/heif',pdf:'application/pdf'};
 // Apuntes a mano, fotos o PDF escaneado: Gemini los pasa a texto una sola vez y desde ahí se buscan sin gastar nada.
 async function transcribir(buf,mime,varias){if(!cfg.key||!cfg.model)throw new Error('para leer fotos o escaneos primero conecta tu API key en ⚙.');
@@ -50,27 +53,32 @@ async function transcribir(buf,mime,varias){if(!cfg.key||!cfg.model)throw new Er
     body:JSON.stringify({contents:[{role:'user',parts:[{inlineData:{mimeType:mime,data:b64(buf)}},{text:'Transcribe fielmente el texto de estos apuntes o páginas (pueden ser a mano). No resumas ni corrijas el contenido; respeta términos médicos, dosis y abreviaturas. Describe en una línea entre corchetes los esquemas o dibujos. '+(varias?'Antes de cada página escribe [Página N] en su propia línea. ':'')+'Devuelve solo el texto.'}]}],generationConfig:{temperature:0,maxOutputTokens:32768}})});
   const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error?.message||('Error '+r.status));
   return (j.candidates?.[0]?.content?.parts||[]).filter(p=>!p.thought&&p.text).map(p=>p.text).join('').trim();}
-async function guardar(nombre,file,text){const id='m'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-  const ps=partir(text);if(ps.reduce((s,p)=>s+p.text.length,0)<80)throw new Error('no trae texto que pueda leer.');
-  await mTx((L,T)=>{L.put({id,name:nombre,file,active:true,trozos:ps.length,pags:ps.length&&ps[ps.length-1].pag,chars:text.length,added:Date.now()});
+// inf = informe de lectura (páginas totales, vacías, con OCR); viejo = libro que se está volviendo a leer
+async function guardar(nombre,file,text,inf,viejo){const id=viejo?.id||'m'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+  const ps=partir(text);if(ps.reduce((s,p)=>s+p.text.length,0)<80)throw new Error(inf?.total?'sus '+inf.total+' páginas no traen texto que pueda leer'+(inf.err?' ('+inf.err+')':'')+'.':'no trae texto que pueda leer.');
+  inf=inf||informeTexto(text);
+  await mTx((L,T)=>{if(viejo){const r=T.index('libro').openKeyCursor(IDBKeyRange.only(id));r.onsuccess=()=>{const c=r.result;if(c){T.delete(c.primaryKey);c.continue();}};}
+    L.put({...(viejo||{}),id,name:nombre,file,active:viejo?viejo.active:true,trozos:ps.length,pags:inf.total||Math.max(0,...ps.map(p=>p.pag||0)),chars:text.length,lectura:inf,added:viejo?.added||Date.now()});
     ps.forEach((p,i)=>T.put({id:id+'_'+i,libro:id,nombre,pag:p.pag,text:p.text}));});
-  log('reservorio médico: '+nombre+' ('+ps.length+' trozos)','y');}
+  log('reservorio médico: '+nombre+' ('+ps.length+' trozos'+(inf.total?', '+inf.conTexto+'/'+inf.total+' pág. con texto':'')+')','y');
+  if(inf.vacias?.length)line('s med','⚠ «'+nombre+'»: '+inf.vacias.length+' página(s) quedaron sin texto legible (p. '+window.rangosPag?.(inf.vacias)+'). Ábrelo en ⚕ MÉDICO → 👁 para revisarlo.');}
+// un archivo (no foto) → {text, inf}
+async function leerArchivo(f,av){const buf=await f.arrayBuffer(),e=f.name.split('.').pop().toLowerCase();
+  if(e==='pdf')return pdfLeer(buf.slice(0),av);   // página por página; las escaneadas pasan solas por el lector
+  if(window.bibLeer&&e!=='txt'&&e!=='md'){const t=await window.bibLeer(f);return {text:t,inf:informeTexto(t)};}   // Word, Excel, etc. con los lectores de la biblioteca
+  const text=e==='docx'?await docxText(buf):new TextDecoder().decode(buf);return {text,inf:informeTexto(text)};}
 async function addLibros(files){const box=$('medDocs');const ext=f=>f.name.split('.').pop().toLowerCase();
   const fotos=files.filter(f=>IMG.test(ext(f)));files=files.filter(f=>!IMG.test(ext(f)));
   for(const f of files){const row=document.createElement('small');row.textContent='Leyendo '+f.name+'… (los libros grandes tardan un poco)';box.appendChild(row);
-    try{const buf=await f.arrayBuffer(),e=ext(f);let text='';
-      if(e==='pdf'){text=await pdfText(buf.slice(0));
-        if(text.replace(/\[Página \d+\]/g,'').trim().length<200){if(f.size>18e6)throw new Error('es un PDF escaneado de más de 18 MB; pártelo en pedazos más chicos.');
-          row.textContent='Pasando a texto '+f.name+' (escaneado)…';text=await transcribir(buf,MIME.pdf,true);}}
-      else if(e==='docx')text=await docxText(buf);else text=new TextDecoder().decode(buf);
-      await guardar(f.name.replace(/\.[^.]+$/,''),f.name,text);}
+    try{const {text,inf}=await leerArchivo(f,m=>row.textContent=f.name+': '+m);
+      await guardar(f.name.replace(/\.[^.]+$/,''),f.name,text,inf);}
     catch(e){alert('No pude leer '+f.name+': '+e.message);}row.remove();}
   if(fotos.length){ // varias fotos juntas = un cuaderno, cada foto es una página
     fotos.sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));const row=document.createElement('small');box.appendChild(row);let text='';
     try{for(let i=0;i<fotos.length;i++){row.textContent=`Pasando tus apuntes a texto… foto ${i+1} de ${fotos.length}`;
         text+=`\n[Página ${i+1}]\n`+await transcribir(await fotos[i].arrayBuffer(),MIME[ext(fotos[i])],false);}
       const nombre=fotos.length>1?'Apuntes '+new Date().toLocaleDateString('es-MX',{day:'numeric',month:'short'}):fotos[0].name.replace(/\.[^.]+$/,'');
-      await guardar(nombre,fotos.map(f=>f.name).join(', '),text);}
+      await guardar(nombre,fotos.map(f=>f.name).join(', '),text,informeLectura(paginasDe(text)||[],fotos.length,{metodo:'gemini'}));}
     catch(e){alert('No pude leer tus fotos: '+e.message);}row.remove();}
   await mLoad();render();}
 
@@ -142,14 +150,23 @@ const modal=document.createElement('div');modal.className='modal';modal.id='medM
 </div></div>`;document.body.appendChild(modal);
 modal.addEventListener('click',e=>{if(e.target===modal)modal.classList.remove('show');});
 function render(){const box=$('medDocs');
-  box.innerHTML=libros.map(l=>`<div class="doc"><input type="checkbox" data-id="${l.id}" ${l.active?'checked':''}><span class="nm" title="${esc(l.file)}">${esc(l.name)}</span><span class="sz">${l.pags?l.pags+' pág':l.trozos+' trozos'}</span><button data-del="${l.id}" title="Quitar">✕</button></div>`).join('')||'<small>Aún no hay libros en el reservorio.</small>';
-  const act=libros.filter(l=>l.active);$('medTotal').textContent=act.length?`Activos: ${act.length} · ${act.reduce((s,l)=>s+l.trozos,0)} trozos buscables · a Capri solo le llegan ~${TOPK} por pregunta`:'';
+  box.innerHTML=libros.map(l=>`<div class="doc"><input type="checkbox" data-id="${l.id}" ${l.active?'checked':''}><span class="nm" title="${esc(l.file)}">${esc(l.name)}</span><span class="sz">${l.lectura?.total?(l.lectura.vacias?.length?'<b style="color:var(--red)" title="páginas sin texto">⚠ '+l.lectura.conTexto+'/'+l.lectura.total+' pág</b>':l.lectura.total+' pág ✓'):l.pags?l.pags+' pág':l.trozos+' trozos'}</span><button data-ver="${l.id}" title="Ver la lectura del documento">👁</button><button data-del="${l.id}" title="Quitar">✕</button></div>`).join('')||'<small>Aún no hay libros en el reservorio.</small>';
+  const act=libros.filter(l=>l.active);$('medTotal').textContent=act.length?`Activos: ${act.length} · ${act.reduce((s,l)=>s+l.trozos,0)} trozos buscables · a Capri le llegan ~${TOPK} por pregunta (o todo el documento si le pides un resumen general) · 👁 = ver la lectura`:'';
   box.querySelectorAll('input[data-id]').forEach(c=>c.onchange=async()=>{const l=libros.find(x=>x.id===c.dataset.id);l.active=c.checked;await mTx(L=>L.put(l));idx=null;render();});
+  box.querySelectorAll('button[data-ver]').forEach(b=>b.onclick=()=>window.verLectura?.('med',b.dataset.ver));
   box.querySelectorAll('button[data-del]').forEach(b=>b.onclick=async()=>{const l=libros.find(x=>x.id===b.dataset.del);if(confirm('¿Quitar «'+l.name+'» del reservorio?')){await mDel(l.id);render();}});
   $('medOn').checked=med.on;$('medOnline').checked=med.online;$('bMed')?.classList.toggle('act',med.on);}
 window.openMed=async()=>{await mLoad();render();modal.classList.add('show');};
 // la BIBLIOTECA manda aquí lo que ya leyó, para que Capri lo cite en temas de salud
-window.medGuardarTexto=async(nombre,file,text)=>{if(!mdb)await mOpen();await guardar(nombre,file,text);await mLoad();render();};
+window.medGuardarTexto=async(nombre,file,text,inf)=>{if(!mdb)await mOpen();await guardar(nombre,file,text,inf);await mLoad();render();};
+// para la ventana de lectura y las preguntas de «todo el documento» (lectura.js)
+window.medLectura=async id=>{if(!mdb)await mOpen();if(!libros.length)await mLoad();const l=libros.find(x=>x.id===id);if(!l)return null;
+  const ts=trozos.filter(t=>t.libro===id).sort((a,b)=>+a.id.split('_').pop()-+b.id.split('_').pop());
+  return {id,name:l.name,file:l.file,lectura:l.lectura||null,chars:l.chars,trozos:ts.length,paginas:paginasDeTrozos(ts,CHUNK,OVER),donde:'Reservorio médico'};};
+window.medReleer=async(id,f,av)=>{const l=libros.find(x=>x.id===id);if(!l)throw new Error('ya no está en el reservorio');
+  if(IMG.test(f.name.split('.').pop().toLowerCase()))throw new Error('para fotos de apuntes vuelve a subirlas desde el reservorio');
+  const {text,inf}=await leerArchivo(f,av);await guardar(l.name,f.name,text,inf,l);await mLoad();render();return inf;};
+window.medActivos=()=>med.on?libros.filter(l=>l.active).map(l=>({id:l.id,name:l.name,chars:l.chars,lectura:l.lectura,added:l.added})):[];
 $('medDrop').onclick=()=>$('medFile').click();$('medFile').onchange=e=>{addLibros([...e.target.files]);e.target.value='';};
 $('medDrop').ondragover=e=>{e.preventDefault();$('medDrop').classList.add('over');};$('medDrop').ondragleave=()=>$('medDrop').classList.remove('over');
 $('medDrop').ondrop=e=>{e.preventDefault();$('medDrop').classList.remove('over');addLibros([...e.dataTransfer.files]);};

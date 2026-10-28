@@ -57,6 +57,7 @@ const SALUD=/s[ií]ntoma|dolor|enfermedad|diagn[oó]s|tratamiento|medicamento|f[
 function rutaLocal(parts){if(!listo()||cer.modo==='gemini')return false;
   if(parts.some(p=>p.inlineData))return false;                 // oír, ver la pantalla o leer PDFs: solo Gemini
   if(cer.modo==='local'||!cfg.key||!cfg.model)return true;
+  if(window.lecturaPesada?.()>8000)return false;                // «resúmeme todo el documento»: no cabe en el contexto de la GPU
   if(modoAct==='idle')return true;                               // lo que dice sola: gratis en tu GPU
   if(cfg.study&&studyText())return false;
   const t=parts.map(p=>p.text||'').join(' ');
@@ -93,6 +94,7 @@ let claudeFuera=0;
 const claudeOk=()=>cer.claude!=='off'&&!!cfg.claudeKey&&claudeSpent<cer.tope&&Date.now()>claudeFuera;
 function rutaClaude(parts){if(!claudeOk()||window.cerebroSinGasto||modoAct==='watch'||modoAct==='idle')return false;
   if(parts.some(p=>p.inlineData&&/^audio/.test(p.inlineData.mimeType)))return false;   // Claude no oye audio: la voz sigue en Gemini
+  if(cer.claude!=='siempre'&&window.lecturaPesada?.()>40000)return false;   // documentos enteros: Gemini los lee sin gastar tu saldo de Claude
   if(cer.claude==='siempre')return true;
   const t=parts.map(p=>p.text||'').join(' ');
   return parts.some(p=>p.inlineData)||(cfg.study&&!!studyText())||t.length>=260||PESADO.test(t)||SALUD.test(t);}

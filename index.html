@@ -750,19 +750,71 @@ function dbPut(d){return new Promise(res=>{if(!db)return res();const t=db.transa
 function dbDel(id){return new Promise(res=>{if(!db)return res();const t=db.transaction('docs','readwrite');t.objectStore('docs').delete(id);t.oncomplete=res;t.onerror=res;});}
 function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('No pude cargar el lector (¿sin internet?)'));document.head.appendChild(s);});}
 async function lector(f,cdn){try{await loadScript('vendor/lectores/'+f);if(f==='pdf.min.js')window.__pdfLocal=true;}catch(e){await loadScript('https://cdnjs.cloudflare.com/ajax/libs/'+cdn);}}
-async function pdfText(buf){
+async function pdfLib(){
   // los lectores viajan con Capri (vendor/lectores): abren al instante y sin internet; si faltan, se bajan de cdnjs
   if(!window.pdfjsLib){await lector('pdf.min.js','pdf.js/3.11.174/pdf.min.js');
-    pdfjsLib.GlobalWorkerOptions.workerSrc=window.__pdfLocal?'vendor/lectores/pdf.worker.min.js':'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}
+    pdfjsLib.GlobalWorkerOptions.workerSrc=window.__pdfLocal?'vendor/lectores/pdf.worker.min.js':'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}}
+async function pdfText(buf){await pdfLib();
   const pdf=await pdfjsLib.getDocument({data:buf}).promise;let out='';
   for(let i=1;i<=pdf.numPages;i++){const pg=await pdf.getPage(i);const tc=await pg.getTextContent();out+=`\n[Página ${i}]\n`+tc.items.map(t=>t.str+(t.hasEOL?'\n':' ')).join('');}
   return out.replace(/[ \t]+/g,' ').trim();}
+// ---------- lectura completa, página por página (2.8) ----------
+// Antes, si un PDF traía texto en algunas páginas y otras eran escaneo o imagen, esas se perdían sin aviso y el documento
+// quedaba a medias. Ahora cada página sin texto pasa sola por el lector de escaneos (Tesseract en tu PC, o Gemini si lo
+// eliges en R.I.P) y se guarda un informe: cuántas páginas tiene, cuáles se leyeron con OCR y cuáles quedaron vacías.
+const PAG_VACIA=25;   // menos de esto (sin espacios) = página sin texto (solo un número de página, una imagen…)
+const limpioPag=t=>String(t||'').replace(/\r/g,'').replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim();
+function paginasDe(text){const ps=String(text||'').split(/\n?\[Página (\d+)\]\n?/);if(ps.length<2)return null;const out=[];
+  if(ps[0].trim())out.push({n:0,text:limpioPag(ps[0])});for(let i=1;i<ps.length;i+=2)out.push({n:+ps[i],text:limpioPag(ps[i+1])});return out;}
+function informeLectura(pags,total,extra={}){const tot=total||Math.min(20000,Math.max(0,...pags.map(p=>p.n||0)))||null;
+  const have=new Map(pags.filter(p=>p.n).map(p=>[p.n,p.text.replace(/\s/g,'').length])),vac=[];for(let n=1;n<=(tot||0);n++)if((have.get(n)||0)<PAG_VACIA)vac.push(n);
+  const ocr=pags.filter(p=>p.m&&p.m!=='texto'&&p.text.replace(/\s/g,'').length>=PAG_VACIA).map(p=>p.n),conf=pags.filter(p=>p.conf!=null);
+  return {v:1,total:tot,conTexto:tot?tot-vac.length:null,vacias:vac,ocr,conf:conf.length?Math.round(conf.reduce((s,p)=>s+p.conf,0)/conf.length):null,fecha:Date.now(),...extra};}
+// informe para un texto que ya viene armado (Word, Excel, PowerPoint, OCR de una foto…)
+function informeTexto(text,extra={}){const ps=paginasDe(text);if(!ps)return {v:1,total:null,conTexto:null,vacias:[],ocr:[],fecha:Date.now(),...extra};
+  return informeLectura(ps,null,extra);}
+function pagsATexto(pags){return pags.filter(p=>p.text.trim()).map(p=>(p.n?`[Página ${p.n}]\n`:'')+p.text).join('\n');}
+// trozos guardados (ordenados) → páginas otra vez, quitando el traslape entre trozos seguidos de la misma página
+function paginasDeTrozos(ts,CH,OV){const out=[];let prev=null;
+  for(const t of ts){const n=t.pag||0;let u=out[out.length-1];if(!u||u.n!==n){u={n,text:''};out.push(u);prev=null;}
+    u.text+=prev&&prev.text.length>=CH?t.text.slice(OV):(u.text?'\n':'')+t.text;prev=t;}
+  return out;}
+async function pdfPagCanvas(pdf,n,scale){const pg=await pdf.getPage(n),vp=pg.getViewport({scale});const c=document.createElement('canvas');
+  c.width=Math.round(vp.width);c.height=Math.round(vp.height);await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;return c;}
+const canvasB64=c=>new Promise(res=>c.toBlob(async b=>res(b64(await b.arrayBuffer())),'image/jpeg',.85));
+// una llamada a Gemini sin streaming (para leer y resumir); si se acaba el cupo por minuto espera y vuelve a intentar
+async function gemUna(parts,gc={},intentos=3){if(!cfg.key||!cfg.model)throw new Error('NOKEY');const th=thinkCfg(cfg.model);
+  for(let k=0;;k++){const r=await fetch(API+'models/'+encodeURIComponent(cfg.model)+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':cfg.key},
+      body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{temperature:0,...(th?{thinkingConfig:th}:{}),...gc}})});
+    const j=await r.json().catch(()=>({}));
+    if((r.status===429||r.status===503)&&k<intentos-1){const d=(j.error?.details||[]).find(x=>x.retryDelay)?.retryDelay;await new Promise(f=>setTimeout(f,Math.min(60,(parseFloat(d)||15)+1)*1000));continue;}
+    if(!r.ok){const e=new Error(j.error?.message||('Error '+r.status));e.status=r.status;throw e;}
+    const c=j.candidates?.[0];return {text:(c?.content?.parts||[]).filter(p=>!p.thought&&p.text).map(p=>p.text).join('').trim(),fin:c?.finishReason};}}
+async function gemPaginas(imgs,nums){const r=await gemUna([...imgs.map(d=>({inlineData:{mimeType:'image/jpeg',data:d}})),
+    {text:`Son ${nums.length} página(s) escaneadas de un documento, en orden: páginas ${nums.join(', ')}. Transcribe fielmente TODO el texto de cada una (puede ser a mano). No resumas ni corrijas; respeta términos médicos, cifras, dosis y abreviaturas. Las tablas en filas. Los dibujos o esquemas, en una línea entre corchetes. Antes de cada página escribe [Página N] en su propia línea, con su número. Devuelve solo el texto.`}],{maxOutputTokens:16384});
+  const ps=paginasDe(r.text),out={};if(ps&&ps.some(p=>p.n))for(const p of ps){if(p.n)out[p.n]=p.text;}else if(nums.length===1)out[nums[0]]=limpioPag(r.text);return out;}
+// PDF → {text, inf}: texto de cada página; las que no traen texto, por OCR una por una
+async function pdfLeer(buf,av=()=>{},op={}){await pdfLib();const pdf=await pdfjsLib.getDocument({data:buf}).promise,N=pdf.numPages,pags=[];
+  for(let i=1;i<=N;i++){if(i===1||i%15===0)av('Leyendo página '+i+' de '+N+'…');const tc=await (await pdf.getPage(i)).getTextContent();
+    pags.push({n:i,text:limpioPag(tc.items.map(t=>t.str+(t.hasEOL?'\n':' ')).join('')),m:'texto'});}
+  const vac=pags.filter(p=>p.text.replace(/\s/g,'').length<PAG_VACIA);let err='';
+  if(vac.length&&op.ocr!==false){const gem=cfg.key&&cfg.model&&(store.get('ripOcr','local')==='gemini'||!window.ocrImagen);
+    try{if(gem){for(let k=0;k<vac.length;k+=4){const lote=vac.slice(k,k+4);av(`Página${lote.length>1?'s':''} ${lote[0].n}${lote.length>1?'–'+lote.at(-1).n:''} sin texto: Gemini las está leyendo (${k+lote.length} de ${vac.length})…`);
+          const imgs=[];for(const p of lote){const c=await pdfPagCanvas(pdf,p.n,1.6);imgs.push(await canvasB64(c));c.width=c.height=0;}
+          const t=await gemPaginas(imgs,lote.map(p=>p.n));for(const p of lote)if(t[p.n]){p.text=t[p.n];p.m='gemini';}}}
+      else if(window.ocrImagen){for(let k=0;k<vac.length;k++){const p=vac[k],pre=`Página ${p.n} sin texto, leyéndola como escaneo (${k+1} de ${vac.length})`;av(pre+'…');
+          const c=await pdfPagCanvas(pdf,p.n,2);const r=await window.ocrImagen(c,m=>av(pre+' · '+m));c.width=c.height=0;
+          if(r.text.trim()){p.text=limpioPag(r.text);p.m='ocr';p.conf=Math.round(r.conf);}}}
+      else err='no hay lector de escaneos ni key de Gemini';}
+    catch(e){err=e.message==='NOKEY'?'falta la key de Gemini':e.message;log('lectura: el OCR se detuvo ('+String(err).slice(0,60)+')','w');}}
+  const inf=informeLectura(pags,N,{metodo:vac.length?(pags.some(p=>p.m==='gemini')?'gemini':pags.some(p=>p.m==='ocr')?'ocr':'texto'):'texto',...(err?{err}:{})});
+  return {text:pagsATexto(pags),inf};}
 async function docxText(buf){if(!window.mammoth)await lector('mammoth.browser.min.js','mammoth/1.6.0/mammoth.browser.min.js');return (await mammoth.extractRawText({arrayBuffer:buf})).value.trim();}
 const b64=buf=>{let s='';const a=new Uint8Array(buf);for(let i=0;i<a.length;i+=0x8000)s+=String.fromCharCode.apply(null,a.subarray(i,i+0x8000));return btoa(s);};
 async function addFiles(files){for(const f of files){const id=Date.now()+'_'+Math.random().toString(36).slice(2,7);const ext=f.name.split('.').pop().toLowerCase();
   const row=document.createElement('small');row.textContent='Leyendo '+f.name+'…';$('docs').appendChild(row);
   try{const buf=await f.arrayBuffer();let text='',pdf=null;
-    if(ext==='pdf'){text=await pdfText(buf.slice(0));if(text.replace(/\[Página \d+\]/g,'').trim().length<200){if(f.size<8e6){pdf=b64(buf);text='';}else throw new Error('El PDF parece escaneado (solo imágenes) y pesa más de 8 MB.');}}
+    if(ext==='pdf'){text=(await pdfLeer(buf.slice(0),m=>row.textContent=f.name+': '+m)).text;if(text.replace(/\[Página \d+\]/g,'').trim().length<200){if(f.size<8e6){pdf=b64(buf);text='';}else throw new Error('El PDF parece escaneado (solo imágenes) y pesa más de 8 MB.');}}
     else if(ext==='docx')text=await docxText(buf);else text=new TextDecoder().decode(buf);
     const d={id,name:f.name,text,pdf,active:true,chars:text.length,size:f.size,added:Date.now()};await dbPut(d);log('documento cargado: '+f.name,'y');}
   catch(e){alert('No pude leer '+f.name+': '+e.message);}row.remove();}
@@ -1209,4 +1261,4 @@ else bootP.then(()=>setTimeout(()=>{setState(cfg.key&&cfg.model?'presumida':'son
 if(DESK){if(cfg.key&&cfg.model)minimize();else expand();}
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
-<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="redaccion.js"></script><script src="crimson.js"></script><script src="tecnico.js"></script><script src="saber.js"></script><script src="clinica.js"></script><script src="mundo.js"></script><script src="expediente.js"></script><script src="biblioteca.js"></script><script src="rip.js"></script><script src="voz.js"></script><script src="cerebro.js"></script><script src="hud.js"></script><script type="module" src="holo3d.js"></script><script src="desk.js"></script></body></html>
+<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="redaccion.js"></script><script src="crimson.js"></script><script src="tecnico.js"></script><script src="saber.js"></script><script src="clinica.js"></script><script src="mundo.js"></script><script src="expediente.js"></script><script src="biblioteca.js"></script><script src="rip.js"></script><script src="lectura.js"></script><script src="voz.js"></script><script src="cerebro.js"></script><script src="hud.js"></script><script type="module" src="holo3d.js"></script><script src="desk.js"></script></body></html>
