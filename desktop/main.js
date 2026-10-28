@@ -34,7 +34,9 @@ function serveWeb() {
       if (file !== WEB && !file.startsWith(WEB + path.sep)) { res.writeHead(403); return res.end(); }
       fs.readFile(file, (err, data) => {
         if (err) { res.writeHead(404); return res.end(); }
-        res.writeHead(200, { 'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+        // aislamiento de origen: deja a la voz local usar varios núcleos (SharedArrayBuffer); «credentialless» deja pasar fuentes, mapas y cámaras
+        res.writeHead(200, { 'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-cache',
+          'Cross-Origin-Opener-Policy': 'same-origin', 'Cross-Origin-Embedder-Policy': 'credentialless' });
         res.end(data);
       });
     });
@@ -623,6 +625,18 @@ ipcMain.handle('respaldo:guardar', async (_e, nombre, texto) => {
 ipcMain.handle('respaldo:abrir', () => { const dir = carpetaDatos('Respaldos'); fs.mkdirSync(dir, { recursive: true }); shell.openPath(dir); return true; });
 ipcMain.on('claude:open', openClaude);
 ipcMain.handle('capri:portatil', () => ({ portatil: PORTATIL, dir: PORTATIL ? DATA_USB : DATA_PC }));
+// voces locales (Piper): el modelo .onnx se baja una vez y se queda en la carpeta Voces junto a tus datos (en modo USB, en la USB).
+// No son datos tuyos, así que no van en la bóveda: así Capri habla desde que arranca, sin descifrar nada.
+const VOCES = () => path.join(app.getPath('userData'), 'Voces');
+const vozOk = (n) => typeof n === 'string' && /^[A-Za-z0-9_.-]{3,80}\.onnx(\.json)?$/.test(n);
+ipcMain.handle('voz:lista', () => { try { return fs.readdirSync(VOCES()).filter(vozOk); } catch { return []; } });
+ipcMain.handle('voz:leer', (e, n) => { if (!vozOk(n)) throw new Error('nombre'); return fs.promises.readFile(path.join(VOCES(), n)); });
+ipcMain.handle('voz:guardar', async (e, n, bytes) => {
+  if (!vozOk(n) || !(bytes instanceof Uint8Array) || bytes.byteLength > 200 * 1024 * 1024) throw new Error('nombre');
+  await fs.promises.mkdir(VOCES(), { recursive: true });
+  await escribeAtomico(path.join(VOCES(), n), Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)); return true;
+});
+ipcMain.handle('voz:borrar', (e, n) => { if (!vozOk(n)) throw new Error('nombre'); fs.rmSync(path.join(VOCES(), n), { force: true }); return true; });
 ipcMain.on('retry', () => { if (win) { offline = false; ready = false; win.loadURL(deskURL()); } });
 
 app.whenReady().then(async () => {

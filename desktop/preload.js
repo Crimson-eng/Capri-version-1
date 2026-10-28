@@ -7,6 +7,9 @@ contextBridge.exposeInMainWorld('capriDesk', {
   retry: () => ipcRenderer.send('retry'),
   openClaude: () => ipcRenderer.send('claude:open'),  // tu cuenta de claude.ai en una ventana de Capri
   portatil: () => ipcRenderer.invoke('capri:portatil'),  // ¿los datos están en la USB (CapriData junto al .exe)?
+  // voces locales (Piper) guardadas en la carpeta Voces
+  voz: { lista: () => ipcRenderer.invoke('voz:lista'), leer: (n) => ipcRenderer.invoke('voz:leer', n),
+    guardar: (n, b) => ipcRenderer.invoke('voz:guardar', n, b), borrar: (n) => ipcRenderer.invoke('voz:borrar', n) },
   // bóveda: la página cifra; aquí solo se leen y escriben sus archivos ya cifrados (carpeta Boveda)
   boveda: {
     activa: ipcRenderer.sendSync('boveda:activa'),
