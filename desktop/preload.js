@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld('capriDesk', {
   cursor: () => ipcRenderer.invoke('cursor'),
   act: (a) => ipcRenderer.invoke('act', a),              // manos de Capri: abrir, escribir, mover el puntero
   tec: (a) => ipcRenderer.invoke('tec', a),              // taller técnico: revisar y reparar memorias USB
+  gpuInfo: () => ipcRenderer.invoke('gpu:info'),          // qué tarjeta de video usa para dibujar
+  turboOllama: () => ipcRenderer.invoke('ollama:turbo'),  // flash attention + caché a 8 bits (con tu permiso)
   windowsNow: () => ipcRenderer.invoke('windows:get'),
   onWindows: on('desk:windows'),                      // tus ventanas (solo Windows): dónde sentarse
   onCfg: on('desk:cfg'),

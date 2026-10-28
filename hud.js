@@ -1,4 +1,5 @@
-// HUD por secciones, al estilo del menú de Cyberpunk 2077: CAPRI · CIBERWARE · MÉDICO · DIARIO.
+// HUD por secciones, al estilo del menú de Cyberpunk 2077: CAPRI · CIBERWARE · MÉDICO · EXPEDIENTE · BIBLIOTECA · MUNDO · DIARIO.
+// EXPEDIENTE (expediente.js), BIBLIOTECA (biblioteca.js) y MUNDO (mundo.js) llenan su propia sección cuando se abre.
 // CIBERWARE: las habilidades de Capri como implantes en un cuerpo holográfico (se activan desde ahí).
 // MÉDICO: cuerpo por sistemas para consultar o estudiar, y el interruptor del reservorio médico.
 // DIARIO: lo que Capri recuerda de ti, como lista de misiones, y las tarjetas de perfil.
@@ -16,7 +17,9 @@ const css=document.createElement('style');css.textContent=`
 .htabs button.t{background:none;border:0;border-bottom:2px solid transparent;color:var(--hr);font:600 13px/1 var(--sans);letter-spacing:.08em;padding:14px 12px 12px;cursor:pointer;white-space:nowrap;position:relative}
 .htabs button.t:hover{color:#ffc2c8}.htabs button.t.on{color:var(--hc);border-bottom-color:var(--hc);text-shadow:0 0 12px var(--hc2)}
 .htabs button.t::after{content:'';position:absolute;left:0;right:0;bottom:-2px;height:2px;background:var(--hr2)}.htabs button.t.on::after{background:var(--hc)}
-body:not([data-view=capri]) .app .desk>:not(.hview){visibility:hidden}body:not([data-view=capri]) .dock{display:none}
+body:not([data-view=capri]) .app .desk>:not(.hview){visibility:hidden}
+/* lo que no se ve no se anima: libera CPU y GPU */
+body:not([data-view=capri]) .app .desk>:not(.hview),body:not([data-view=capri]) .app .desk>:not(.hview) *,body.oculta *{animation-play-state:paused!important}body:not([data-view=capri]) .dock{display:none}
 .hview{position:absolute;inset:0;display:none;padding:22px 30px;overflow:auto;color:#ffd9dc;font:13px/1.5 var(--mono);
  background:radial-gradient(ellipse at 50% 55%,rgba(255,77,94,.13),transparent 60%),repeating-linear-gradient(0deg,rgba(255,77,94,.035) 0 1px,transparent 1px 4px),#070406}
 .hview.on{display:block;animation:hvIn .35s ease-out}
@@ -149,7 +152,8 @@ const AB=[
 const icon=k=>k==='mundo'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M12 3 A9 9 0 1 0 12.01 3 Z M3 12 H21 M12 3 C8.5 6.5 8.5 17.5 12 21 M12 3 C15.5 6.5 15.5 17.5 12 21"/><path class="a2 k" d="M17 4 L20 1 M19 7 L22 6"/></svg>':k==='clinica'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M6 4 H15 L19 8 V20 H6 Z M15 4 V8 H19"/><path class="a2 k" d="M12.5 10 V17 M9 13.5 H16"/></svg>':k==='saber'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M12 3 L20 7.5 V16.5 L12 21 L4 16.5 V7.5 Z"/><path class="a2 k" d="M8.5 12 L11 14.5 L15.5 9.5"/></svg>':k==='tecnico'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M9 3 H15 V9 H9 Z M8 9 H16 V17 C16 19 14 21 12 21 C10 21 8 19 8 17 Z"/><path class="a2 k" d="M11 5 V7 M13 5 V7 M12 12 V18 M10 14 L12 12 L14 14"/></svg>':k==='crimson'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M12 20 C6 16 3 12.5 3 9 C3 6 5.2 4 7.6 4 C9.6 4 11 5.2 12 6.6 C13 5.2 14.4 4 16.4 4 C18.8 4 21 6 21 9 C21 12.5 18 16 12 20 Z"/><path class="a2 k" d="M6 11 H9 L10.5 8 L12.5 14 L14 11 H18"/></svg>':k==='claudecpu'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M7 7 H17 V17 H7 Z M10 3 V7 M14 3 V7 M10 17 V21 M14 17 V21 M3 10 H7 M3 14 H7 M17 10 H21 M17 14 H21"/><path class="a2 k" d="M12 9 L15 12 L12 15 L9 12 Z"/></svg>':k==='cerebro'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M12 4 C8 3 5 5 5 8 C3 9 3 13 5 14 C5 17 8 19 12 18 C16 19 19 17 19 14 C21 13 21 9 19 8 C19 5 16 3 12 4 Z M12 4 V18"/><path class="a2 k" d="M8 21 H16 M10 18 V21 M14 18 V21"/></svg>':k==='redac'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M4 20 L5 15 L16 4 L20 8 L9 19 Z M14 6 L18 10"/><path class="a2 k" d="M13 20 H21"/></svg>':k==='brazos'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M7 21 V11 L5 8 V4 M7 11 L9 4 M7 11 L12 3 M7 11 L15 5 M7 11 L17 9"/><path class="a2 k" d="M15 16 H21 M18 13 V19"/></svg>':k==='ingles'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M4 19 L9 5 L14 19 M6 14 H12"/><path class="a2 k" d="M15 12 H21 M18 9 V19"/></svg>':(typeof ico==='function'?ico(k):'');
 
 // ---------- estructura ----------
-const VIEWS=[['capri','CAPRI'],['ciberware','CIBERWARE'],['medico','MÉDICO'],['diario','DIARIO']];
+const VIEWS=[['capri','CAPRI'],['ciberware','CIBERWARE'],['medico','MÉDICO'],['expediente','EXPEDIENTE'],['biblioteca','BIBLIOTECA'],['mundo','MUNDO'],['diario','DIARIO']];
+const SEC={ciberware:'vCiber',medico:'vMed',expediente:'vExp',biblioteca:'vBib',mundo:'vMundo',diario:'vDiario'};
 const nav=document.createElement('div');nav.className='hnav';
 nav.innerHTML=`<div class="st"><span><b id="hvEn">--</b> <small>Energía</small></span><span><b id="hvMo">--</b> <small>Ánimo</small></span></div>
 <div class="htabs"><button class="k" id="hPrev" title="Anterior (Q)">Q</button>${VIEWS.map(([k,n])=>`<button class="t" data-v="${k}">${n}</button>`).join('')}<button class="k" id="hNext" title="Siguiente (E)">E</button></div>
@@ -268,6 +272,8 @@ function renderD(){if(!vD.classList.contains('on'))return;M();const name=cfg.nam
    <div class="row" style="display:flex;gap:10px"><button class="hbtn c" id="dyAsk">Platicar de esto</button><button class="hbtn" id="dyDel">Olvidar</button></div>`:`<div class="tl">Diario</div><p>Aquí aparece lo que Capri sabe de ti.</p>`;
   if(h){vD.querySelector('#dyAsk').onclick=()=>{go('capri',true);setTimeout(()=>send('¿Te acuerdas de esto? '+h.t),380);};
     vD.querySelector('#dyDel').onclick=()=>{if(!confirm('¿Que Capri olvide esto?\n'+h.t))return;mem.hechos=mem.hechos.filter(x=>x!==h);store.set('mem',mem);dsel=null;renderD();stats();};}}
+// secciones que llenan otros módulos: cada uno escucha «hud:view» y se arma la primera vez que lo abres
+for(const k of ['expediente','biblioteca','mundo'])mk(SEC[k],'');
 vD.addEventListener('click',e=>{const c=e.target.closest('[data-c]');if(c){cat=c.dataset.c;renderD();return;}const q=e.target.closest('.qi[data-t]');if(q){dsel=mem.hechos[+q.dataset.t];renderD();}});
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
@@ -300,15 +306,17 @@ async function go(v,quick){if(v===cur)return;const name=VIEWS.find(x=>x[0]===v)[
   if(!seen.has(v)&&!quick){seen.add(v);await connect('CONNECT // '+name);}
   streaks(quick?300:420);cur=v;document.body.dataset.view=v;
   nav.querySelectorAll('.t').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
-  document.querySelectorAll('.hview').forEach(s=>s.classList.toggle('on',s.id==={ciberware:'vCiber',medico:'vMed',diario:'vDiario'}[v]));
+  document.querySelectorAll('.hview').forEach(s=>s.classList.toggle('on',s.id===SEC[v]));
+  dispatchEvent(new CustomEvent('hud:view',{detail:{v,el:document.getElementById(SEC[v])}}));
   renderC();renderM();renderD();stats();mount3D();if(v==='capri')setTimeout(()=>document.getElementById('q')?.focus(),50);}
-window.hudGo=go;
+document.addEventListener('visibilitychange',()=>document.body.classList.toggle('oculta',document.hidden));
+window.hudGo=go;window.hudView=()=>cur;
 nav.querySelectorAll('.t').forEach(b=>b.onclick=()=>go(b.dataset.v));
 const step=d=>{const i=VIEWS.findIndex(x=>x[0]===cur);go(VIEWS[(i+d+VIEWS.length)%VIEWS.length][0]);};
 nav.querySelector('#hPrev').onclick=()=>step(-1);nav.querySelector('#hNext').onclick=()=>step(1);
-addEventListener('keydown',e=>{const t=e.target;if(t.matches?.('input,textarea,select,[contenteditable]')||e.ctrlKey||e.altKey||e.metaKey)return;if(document.querySelector('.modal.show'))return;
+addEventListener('keydown',e=>{const t=e.target;if(t.matches?.('input,textarea,select,[contenteditable]')||e.ctrlKey||e.altKey||e.metaKey)return;if(document.querySelector('.modal.show:not(.acoplado)'))return;
   if(e.key==='q'||e.key==='Q')step(-1);else if(e.key==='e'||e.key==='E')step(1);else if(e.key==='Escape'&&cur!=='capri')go('capri');
-  else if(/^[1-4]$/.test(e.key))go(VIEWS[+e.key-1][0]);});
+  else if(/^[1-7]$/.test(e.key))go(VIEWS[+e.key-1][0]);});
 document.body.dataset.view='capri';nav.querySelector('.t').classList.add('on');
 new MutationObserver(()=>{renderC();}).observe(document.querySelector('.dock'),{attributes:true,subtree:true,attributeFilter:['class']});
 })();

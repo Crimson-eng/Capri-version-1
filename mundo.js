@@ -141,7 +141,9 @@ async function consulta(k,lugar){let L=aqui();
   return null;}
 
 // ---------- panel ----------
-const css=document.createElement('style');css.textContent=`#mdModal .panel{max-width:780px}#mdModal h2{color:#5ef6ff;text-shadow:0 0 12px rgba(94,246,255,.4)}
+const css=document.createElement('style');css.textContent=`#mdModal .panel{max-width:780px}
+#mdModal.acoplado{position:static;inset:auto;background:none;backdrop-filter:none;padding:0;z-index:auto;display:none}#mdModal.acoplado.show{display:block}
+#mdModal.acoplado .panel{max-width:1180px;max-height:none;margin:0 auto;overflow:visible}#mdModal.acoplado #mdView{height:52vh;min-height:320px}#mdModal.acoplado #mdClose{display:none}#mdModal h2{color:#5ef6ff;text-shadow:0 0 12px rgba(94,246,255,.4)}
 #mdModal .mini{font:12px var(--mono);color:var(--ink);background:#000;border:1px solid #2a2733;padding:6px 9px;cursor:pointer}
 #mdModal .mini:hover,#mdModal .mini.on{border-color:#5ef6ff;color:#5ef6ff}#mdModal .mini:disabled{opacity:.35;cursor:default}
 #mdModal .card{border:1px solid #2a2733;padding:10px;font:12px/1.5 var(--mono);color:var(--ink)}#mdModal .card b{color:#5ef6ff}#mdModal .card .r{color:#ff4d5e}#mdModal .card .g{color:var(--grn)}
@@ -179,8 +181,15 @@ const modal=document.createElement('div');modal.className='modal';modal.id='mdMo
   Cámaras: solo las que sus dueños publican para todos en <a href="https://www.windy.com/webcams" target="_blank" rel="noopener">Windy.com</a>. Capri no busca ni abre cámaras privadas, con contraseña o expuestas por error.</div>
   <div class="row"><button class="btn" id="mdClose">Listo</button></div>
 </div></div>`;document.body.appendChild(modal);
-modal.addEventListener('click',e=>{if(e.target===modal)modal.classList.remove('show');});
-$('mdClose').onclick=()=>modal.classList.remove('show');
+modal.addEventListener('click',e=>{if(e.target===modal&&!acoplado())modal.classList.remove('show');});
+// en Capri completa el Mundo vive en su pestaña de arriba (MUNDO); en la mini Capri o sin HUD sigue siendo ventana
+const acoplado=()=>modal.classList.contains('acoplado');
+const cerrar=()=>{if(acoplado())window.hudGo?.('capri',true);else modal.classList.remove('show');};
+addEventListener('hud:view',e=>{const {v,el}=e.detail||{};
+  if(v==='mundo'&&el){if(modal.parentNode!==el){el.appendChild(modal);modal.classList.add('acoplado');}
+    modal.classList.add('show');render();verVista(vista);if(!verL)refresca();setTimeout(()=>map?.invalidateSize(),80);}
+  else if(acoplado())modal.classList.remove('show');});
+$('mdClose').onclick=cerrar;
 $('mdOn').onchange=e=>{mu.on=e.target.checked;save();pinta();if(mu.on)refresca();log('mundo '+(mu.on?'activo':'apagado'),'y');};
 $('mdAv').onchange=e=>{mu.avisos=e.target.checked;save();};
 $('mdTt').onchange=e=>{mu.tt=e.target.value.trim();save();cache.flujo=cache.inc=null;pintaMapa();if(mu.tt)cargaTrafico();};
@@ -190,7 +199,7 @@ $('mdGps').onclick=async()=>{$('mdLug').textContent='Pidiendo permiso de ubicaci
   catch(e){$('mdLug').textContent='No pude usar tu ubicación ('+(e.code===1?'no diste permiso':e.message||'sin GPS')+'). Escribe tu colonia o ciudad y dale Buscar.';}};
 const buscar=async()=>{const q=$('mdQ').value.trim();if(!q)return;$('mdLug').textContent='Buscando…';const L=await geocode(q);if(!L){$('mdLug').textContent='No encontré ese lugar; prueba con colonia y ciudad.';return;}$('mdQ').value='';ponLugar(L);};
 $('mdBus').onclick=buscar;$('mdQ').onkeydown=e=>{if(e.key==='Enter')buscar();};
-$('mdAsk').onclick=()=>{if(busy)return;modal.classList.remove('show');const L=aqui();
+$('mdAsk').onclick=()=>{if(busy)return;cerrar();const L=aqui();
   respond(L?`¿Cómo está el clima y el tráfico ahorita por ${L.nombre}? ¿Va a llover?`:'Ayúdame a configurar el módulo Mundo.',null,'user');};
 modal.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.closest('[data-v]');if(b)verVista(b.dataset.v);});
 
@@ -231,7 +240,7 @@ $('mdCams').addEventListener('click',async e=>{const C=cache.cams?.C||[];const v
   if(v){const c=C[+(v.dataset.ver??v.dataset.i)];if(c)verCam(c);return;}
   if(k){const c=C[+k.dataset.capri];if(!c||busy)return;k.textContent='…';
     try{const b=await fetch(c.img,{referrerPolicy:'no-referrer'}).then(r=>{if(!r.ok)throw new Error(r.status);return r.blob();});
-      const data=b64(await b.arrayBuffer());modal.classList.remove('show');
+      const data=b64(await b.arrayBuffer());cerrar();
       respond(`(Te paso la imagen de una cámara pública de Windy: «${c.t}»${c.city?' en '+c.city:''}. Dile a ${cfg.name||'Kiga'} qué ves: cómo está el cielo, si llueve, si se ve tráfico o gente. Corto.)`,{inlineData:{mimeType:b.type||'image/jpeg',data}},'user');}
     catch(err){line('s','(🌎 No pude pasarle esa imagen a Capri: el servidor de la cámara no lo permite. Ábrela con ▶ Ver.)');}
     k.textContent='👁 Capri';}});
@@ -255,7 +264,10 @@ function pintaDatos(){if(!modal.classList.contains('show'))return;const c=cache.
   $('mdTrB')?.addEventListener('click',cargaTrafico);}
 function render(){$('mdOn').checked=mu.on;$('mdAv').checked=mu.avisos;$('mdTt').value=mu.tt;$('mdWy').value=mu.wy;
   $('mdLug').innerHTML=(verL?`👁 viendo <b style="color:#5ef6ff">${esc(verL.nombre)}</b> · `:'')+(mu.lugar?`📍 <b style="color:#5ef6ff">${esc(mu.lugar.nombre)}</b> <span style="color:var(--mut)">(${mu.lugar.lat}, ${mu.lugar.lon})</span>`:'Todavía no hay lugar.');pintaDatos();}
-function abrir(L,v){if(document.body.classList.contains('desk'))expand();modal.classList.add('show');render();
+function abrir(L,v){if(document.body.classList.contains('desk'))expand();
+  if(document.getElementById('vMundo')&&window.hudGo){verL=L&&L!==aqui()?L:null;vista=v||vista;
+    if(window.hudView?.()==='mundo'){render();verVista(vista);if(!verL)refresca();}else window.hudGo('mundo');return;}
+  modal.classList.add('show');render();
   verL=L&&L!==aqui()?L:null;verVista(v||vista);
   if(!L||L===aqui())refresca();}
 window.openMundo=()=>abrir(null,vista);

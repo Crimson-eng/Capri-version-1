@@ -191,7 +191,7 @@ const css=document.createElement('style');css.textContent=`.holo3d{position:rela
 document.head.appendChild(css);
 
 function attach(el,m='medico'){
-  if(!renderer){try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'low-power'});}catch(e){return false;}
+  if(!renderer){try{renderer=new THREE.WebGLRenderer({antialias:true,alpha:true,powerPreference:'high-performance'});}catch(e){return false;}
     renderer.setPixelRatio(Math.min(2,devicePixelRatio||1));renderer.setClearColor(0x000000,0);build();bindInput(renderer.domElement);
     labelBox=document.createElement('div');labelBox.className='h3lab';new ResizeObserver(size).observe(document.body);addEventListener('resize',size);loop();}
   mode=m;host=el;el.classList.add('holo3d');el.innerHTML='';el.appendChild(renderer.domElement);el.appendChild(labelBox);
