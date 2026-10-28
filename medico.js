@@ -166,6 +166,7 @@ window.medLectura=async id=>{if(!mdb)await mOpen();if(!libros.length)await mLoad
 window.medReleer=async(id,f,av)=>{const l=libros.find(x=>x.id===id);if(!l)throw new Error('ya no está en el reservorio');
   if(IMG.test(f.name.split('.').pop().toLowerCase()))throw new Error('para fotos de apuntes vuelve a subirlas desde el reservorio');
   const {text,inf}=await leerArchivo(f,av);await guardar(l.name,f.name,text,inf,l);await mLoad();render();return inf;};
+window.medBuscarLocal=(q,k=6)=>search(q,k).map(o=>({src:'med',id:o.t.libro,nombre:o.t.nombre,pag:o.t.pag,text:o.t.text}));   // sin internet (para el expediente)
 window.medActivos=()=>med.on?libros.filter(l=>l.active).map(l=>({id:l.id,name:l.name,chars:l.chars,lectura:l.lectura,added:l.added})):[];
 $('medDrop').onclick=()=>$('medFile').click();$('medFile').onchange=e=>{addLibros([...e.target.files]);e.target.value='';};
 $('medDrop').ondragover=e=>{e.preventDefault();$('medDrop').classList.add('over');};$('medDrop').ondragleave=()=>$('medDrop').classList.remove('over');

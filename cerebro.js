@@ -155,9 +155,10 @@ async function guardaPlatica(){if(!cer.aprende)return;const a=history.at(-1),u=h
   if(!a||!u||a.role!=='model'||u.role!=='user'||/^\(/.test(u.text))return;
   const txt=(cfg.name||'Kiga')+': '+u.text.slice(0,500)+'\nCapri: '+clean(a.text).replace(/^\[[a-z_]+\]\s*/i,'').slice(0,600);
   if(txt===ultimaGuardada)return;ultimaGuardada=txt;
-  const e={t:txt,ts:Date.now()};try{const v=await embed([txt]);if(v?.[0])e.v=v[0];}catch(_){}
+  const imp=window.capriImportancia?window.capriImportancia(txt):1;if(!imp)return;   // «hola», «jaja»…: no vale la pena recordarlo
+  const e={t:txt,ts:Date.now(),imp};try{const v=await embed([txt]);if(v?.[0])e.v=v[0];}catch(_){}
   try{e.id=await tx('readwrite',s=>s.add(e));}catch(_){}mems.push(e);
-  if(mems.length>3000){const viejo=mems.shift();tx('readwrite',s=>s.delete(viejo.id)).catch(()=>{});}
+  if(mems.length>3000){const viejo=mems.slice(0,600).sort((a,b)=>((a.imp??1)-(b.imp??1))||(a.ts-b.ts))[0];mems=mems.filter(m=>m!==viejo);tx('readwrite',s=>s.delete(viejo.id)).catch(()=>{});}   // se va primero lo viejo y poco importante
   pinta();if(++nuevas>=6)setTimeout(destila,4000);}
 async function recordar(parts){if(!cer.aprende||!mems.length)return '';
   const q=parts.filter(p=>p.text).map(p=>p.text).join(' ').slice(-500)||(history.at(-1)?.role==='user'?history.at(-1).text:'');
@@ -166,7 +167,7 @@ async function recordar(parts){if(!cer.aprende||!mems.length)return '';
   let top=[];const qv=viejas.some(m=>m.v)?await embed([q]).catch(()=>null):null;
   if(qv?.[0])top=viejas.filter(m=>m.v&&m.v.length===qv[0].length).map(m=>[cos(qv[0],m.v),m]).filter(x=>x[0]>.5);
   else{const W=palabras(q);if(W.size)top=viejas.map(m=>{const P=palabras(m.t);let n=0;for(const w of W)if(P.has(w))n++;return [n/Math.sqrt(W.size*Math.max(1,P.size)),m];}).filter(x=>x[0]>.18);}
-  top=top.sort((a,b)=>b[0]-a[0]).slice(0,3);if(!top.length)return '';
+  top=top.map(([s,m])=>[s*(.85+.08*(m.imp??1)),m]).sort((a,b)=>b[0]-a[0]).slice(0,3);if(!top.length)return '';   // a igual parecido, gana lo importante
   return `(Recuerdos de pláticas pasadas con ${cfg.name||'Kiga'} que pueden venir al caso. Úsalos solo si ayudan, sin decir que los buscaste:\n`+
     top.map(([,m])=>'- '+new Date(m.ts).toLocaleDateString('es-MX',{day:'numeric',month:'short'})+': '+m.t.replace(/\n/g,' / ')).join('\n')+')';}
 // cada 6 pláticas, la GPU relee lo último y saca datos nuevos y duraderos de ti para su memoria de siempre

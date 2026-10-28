@@ -200,6 +200,80 @@ function identificadores(p){return [nombreDe(p),[p.nombre,p.ap1].filter(Boolean)
 function tapar(txt,p){let t=String(txt||'');for(const w of identificadores(p))t=t.split(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi')).join('[PACIENTE]');
   return window.clinicaAnonimizar?window.clinicaAnonimizar(t):t;}
 
+// ---------- apoyo diagnóstico (2.9): relaciona el caso con tus apuntes ----------
+// Capri arma un resumen clínico SIN identificadores (edad, sexo, lo que dicen las notas; nombre, CURP, domicilio, teléfonos,
+// expediente y responsable se tapan; las fechas van como «hace N días»), separa los datos clave de los secundarios,
+// busca en tus apuntes, biblioteca y fuentes oficiales SOLO en este dispositivo y propone diagnósticos diferenciales con
+// lo que está a favor, en contra, lo que falta y la fuente. Es un borrador para razonar el caso: lo valida el médico.
+const CLIN=['motivo','pa','s','resumen','ias','habitus','cabeza','cuello','torax','abdomen','miembros','genitales','otra','estudios','dx','idx','dxpost','dxf','dxpre','crit','tx','hallazgos','pend','app','ahf','tox','ago','apnp'];
+const hace=f=>{const d=Math.round((Date.now()-new Date((f||'')+'T12:00'))/864e5);return isNaN(d)?'':d<=0?'hoy':d===1?'ayer':'hace '+d+' días';};
+const docsRec=p=>(p.docs||[]).slice().sort((a,b)=>(b.fecha+b.hora).localeCompare(a.fecha+a.hora));
+function resumenClinico(p){const L=[`Paciente: ${edad(p)||'edad sin registrar'}, ${p.sexo||'sexo sin registrar'}.`+(p.alergias?' Alergias: '+p.alergias+'.':'')+(p.sangre?' Grupo y Rh: '+p.sangre+'.':'')];
+  for(const d of docsRec(p).slice(0,6)){const v=d.c||{},cs=camposDe(d.tipo).concat(extrasDe(d.tipo));
+    const sv=SV.filter(([k])=>v['sv_'+k]).map(([k,l])=>l.replace(/ \(.*/,'')+' '+v['sv_'+k]).join(', ');
+    const ps=cs.filter(f=>f[3]!=='sv'&&(CLIN.includes(f[0])||f[0].startsWith('x_'))&&String(v[f[0]]||'').trim()).map(f=>f[1].split(' (')[0]+': '+String(v[f[0]]).trim().slice(0,900));
+    if(sv||ps.length)L.push(`— ${DOCS[d.tipo][0]} (${hace(d.fecha)}):`+(sv?'\nSignos vitales: '+sv:'')+(ps.length?'\n'+ps.join('\n'):''));}
+  return tapar(L.join('\n'),p).slice(0,9000);}
+// lo que no puede esperar: signos vitales de alarma y banderas rojas en lo escrito (sin IA, siempre igual)
+function alarmasSV(v){const a=[],n=k=>parseFloat(String(v['sv_'+k]||'').replace(',','.')),ta=String(v.sv_ta||'').match(/(\d{2,3})\s*\/\s*(\d{2,3})/);
+  if(n('temp')>=38)a.push('fiebre ('+v.sv_temp+' °C)');if(n('temp')<35.5)a.push('hipotermia ('+v.sv_temp+' °C)');
+  if(n('fc')>100)a.push('taquicardia ('+v.sv_fc+' lpm)');if(n('fc')<50)a.push('bradicardia ('+v.sv_fc+' lpm)');
+  if(n('fr')>22)a.push('taquipnea ('+v.sv_fr+' rpm)');if(n('spo2')<92)a.push('saturación baja ('+v.sv_spo2+'%)');
+  if(ta){if(+ta[1]<90)a.push('hipotensión ('+v.sv_ta+')');else if(+ta[1]>=180||+ta[2]>=110)a.push('tensión arterial muy alta ('+v.sv_ta+')');}return a;}
+const BANDERAS=/dolor tor[aá]cico|disnea|s[ií]ncope|desmayo|sangrado (abundante|activo|importante)|hematemesis|melena|hematoquecia|alteraci[oó]n del estado de (alerta|conciencia)|desorientad|confusi[oó]n|convulsi|rigidez de nuca|ictericia|anuria|oliguria|d[eé]ficit neurol[oó]gico|hemiparesia|abdomen agudo|rebote positivo|irritaci[oó]n peritoneal|ideaci[oó]n suicida|choque|cianosis/gi;
+function alarmas(p){const ds=docsRec(p).slice(0,3),out=[];const conSV=ds.find(d=>SVmin.some(k=>d.c?.['sv_'+k]));if(conSV)out.push(...alarmasSV(conSV.c));
+  const txt=ds.map(d=>Object.entries(d.c||{}).filter(([k])=>!k.startsWith('sv_')).map(([,x])=>x).join(' ')).join(' ');
+  for(const m of new Set((txt.match(BANDERAS)||[]).map(x=>x.toLowerCase())))if(!new RegExp('(niega|sin|no presenta|no refiere)\\s+(\\w+\\s+){0,2}'+m,'i').test(txt))out.push(m);
+  return [...new Set(out)];}
+const textoPac=p=>[dxDe(p),...docsRec(p).slice(0,4).flatMap(d=>['motivo','pa','s','resumen','idx','dxf','crit'].map(k=>d.c?.[k]||''))].join(' ');
+async function apoyo(p){const res=resumenClinico(p),q=tapar(textoPac(p),p).replace(/\s+/g,' ').slice(0,700);
+  if(res.length<60||q.trim().length<8)throw new Error('todavía hay muy poco escrito de este paciente: llena al menos el padecimiento actual o una nota.');
+  const motor=ex.cfg.motor||'auto',local=(motor==='auto'||motor==='local')&&window.cerebroInfo?.().ok;
+  const fu=[];const add=(src,id,n,pag,text)=>{const k=n+'|'+pag;if(!fu.some(f=>f.k===k))fu.push({k,src,id,n,pag,text});};
+  for(const o of (window.bibBuscar?await window.bibBuscar(q,10).catch(()=>[]):[]))add('bib',o.t.doc,o.t.nombre,o.t.pag,o.t.text);
+  for(const o of (window.medBuscarLocal?.(q,6)||[]))add('med',o.id,o.nombre,o.pag,o.text);
+  const F=fu.slice(0,8),corte=local?420:1100;
+  const sys=`Eres el apoyo de razonamiento clínico de un estudiante de medicina en México, que trabaja bajo supervisión de un médico. Recibes el resumen de un caso real SIN datos que identifiquen a la persona y fragmentos de los apuntes y fuentes del estudiante. Haz esto:
+1. Separa los datos del caso en "clave" (los que cambian el diagnóstico o la conducta: signos de alarma, hallazgos positivos, valores anormales, factores de riesgo) y "secundario" (lo que casi no aporta).
+2. Propón de 2 a 5 diagnósticos diferenciales, del más al menos probable. En cada uno: "a_favor" = datos que SÍ vienen en el caso (cópialos casi literal), "en_contra" = datos del caso que no cuadran, "falta" = qué interrogar, explorar o estudiar para confirmarlo o descartarlo, "fuentes" = ids [F1]… de los fragmentos que lo respaldan (solo si de verdad lo dicen; si ninguno, lista vacía).
+3. "alarmas": lo que obliga a actuar ya o a avisar al médico responsable.
+No inventes datos del caso ni de las fuentes. No des dosis. Es un borrador para que el médico lo valide.
+Responde SOLO JSON: {"clave":["..."],"secundario":["..."],"diferenciales":[{"dx":"...","prob":"alta|media|baja","a_favor":["..."],"en_contra":["..."],"falta":["..."],"fuentes":["F1"]}],"alarmas":["..."]}`;
+  const user=`CASO:\n${res}\n\nFRAGMENTOS DE SUS APUNTES Y FUENTES:\n${F.map((f,i)=>`[F${i+1}] ${f.n}${f.pag?', p. '+f.pag:''}\n${tapar(f.text,p).slice(0,corte)}`).join('\n\n')||'(no encontré nada en sus apuntes sobre este caso)'}`;
+  let j=null,quien='tu GPU';
+  if(local)j=await window.cerebroJSON(sys,user).catch(e=>{log('apoyo dx GPU: '+String(e.message).slice(0,50),'w');return null;});
+  if(!j){if(motor==='local')throw new Error('el cerebro de tu GPU no respondió y elegiste que nada salga de esta PC.');if(motor==='manual')throw new Error('en ⚙ elegiste que Capri no use IA en el expediente.');
+    if(!ex.cfg.nubeOk&&!confirm('El cerebro de tu GPU no está disponible.\n\n¿Mandar el resumen del caso a Google Gemini? Va sin nombre, CURP, domicilio, teléfonos, expediente ni responsable, y las fechas como «hace N días».'))throw new Error('Cancelado: no se mandó nada.');
+    ex.cfg.nubeOk=true;j=await gemini(sys,user);quien='Gemini (sin identificadores)';}
+  // revisión: lo que Capri dice que está «a favor» tiene que venir en el expediente, y las fuentes tienen que existir
+  const base=res+' '+alarmas(p).join(' '),R=new Set([...pals(base),...pals(expandir(base))]),enCaso=t=>{const w=pals(t);return !w.length||w.filter(x=>R.has(x)).length/w.length>=.5;};
+  const L=a=>(Array.isArray(a)?a:[]).map(x=>String(x||'').trim()).filter(Boolean).slice(0,10);
+  const dif=(Array.isArray(j?.diferenciales)?j.diferenciales:[]).slice(0,5).map(x=>({dx:String(x.dx||'').trim(),prob:/alta|media|baja/.test(x.prob)?x.prob:'',
+    a_favor:L(x.a_favor).map(t=>({t,ok:enCaso(t)})),en_contra:L(x.en_contra),falta:L(x.falta),
+    fuentes:[...new Set(L(x.fuentes).map(f=>+String(f).replace(/\D/g,'')).filter(n=>n>=1&&n<=F.length))].map(n=>({src:F[n-1].src,id:F[n-1].id,n:F[n-1].n,pag:F[n-1].pag}))})).filter(x=>x.dx);
+  const r={ts:Date.now(),quien,clave:L(j?.clave),secundario:L(j?.secundario),alarmas:[...new Set([...alarmas(p),...L(j?.alarmas)])],dif,nf:F.length};
+  p.apoyo=r;bit('Capri relacionó el caso con tus apuntes ('+quien+')',p);await persistir();return r;}
+function vApoyo(p){const r=p.apoyo,al=alarmas(p);
+  const fu=f=>`<a href="#" data-lec="${esc(f.src)}|${esc(f.id)}|${f.pag||''}" style="color:var(--hc)">${esc(f.n)}${f.pag?', p. '+f.pag:''}</a>`;
+  return `<h4>🧠 Apoyo diagnóstico <i style="font-style:normal;color:#a0565e;letter-spacing:.04em;text-transform:none">· con tus apuntes, sin datos que identifiquen al paciente</i></h4>
+   ${al.length?`<div class="alergia">⚠ ATENCIÓN: ${esc(al.join(' · '))}</div>`:''}
+   <div class="row"><button class="hbtn c" data-a="apoyo">${r?'↻ Volver a relacionar':'Relacionar con mis apuntes'}</button>${r?.dif?.length?'<button class="mini" data-a="apoyoNota">Llevar a nota de evolución (borrador)</button>':''}<small class="warn" id="exApMsg"></small></div>
+   ${r?`<div class="dict"><small style="color:#a0565e">${new Date(r.ts).toLocaleString('es-MX',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · ${esc(r.quien)} · ${r.nf} fragmento(s) de tus apuntes · sugerencias para razonar el caso, no un diagnóstico: lo valida el médico responsable</small>
+    ${r.alarmas.length?`<div class="warn" style="margin-top:6px"><b>Alarmas:</b> ${esc(r.alarmas.join(' · '))}</div>`:''}
+    ${r.clave.length?`<div style="margin-top:6px"><b style="color:var(--hc)">Datos clave:</b> ${esc(r.clave.join(' · '))}</div>`:''}
+    ${r.secundario.length?`<div style="color:#a0565e;font-size:12px">Secundarios: ${esc(r.secundario.join(' · '))}</div>`:''}
+    ${r.dif.map((d,i)=>`<fieldset style="margin-top:8px"><legend>${i+1}. ${esc(d.dx)} ${d.prob?'<i>· probabilidad '+esc(d.prob)+'</i>':''}</legend>
+      ${d.a_favor.length?`<div><b>A favor:</b> ${d.a_favor.map(x=>x.ok?esc(x.t):`<span class="warn" title="esto no viene en el expediente">¿${esc(x.t)}?</span>`).join(' · ')}</div>`:''}
+      ${d.en_contra.length?`<div><b>En contra:</b> ${esc(d.en_contra.join(' · '))}</div>`:''}
+      ${d.falta.length?`<div><b>Falta para confirmar o descartar:</b> ${esc(d.falta.join(' · '))}</div>`:''}
+      <div><b>Fuente:</b> ${d.fuentes.length?d.fuentes.map(fu).join(' · '):'<span class="warn">ninguno de tus apuntes lo respalda: es conocimiento general de la IA, verifícalo</span>'}</div></fieldset>`).join('')||'<div class="warn">No propuso diferenciales; agrega más datos del caso.</div>'}
+   </div>`:''}`;}
+// para relacionar lo que estudias con tus pacientes (solo con el expediente abierto; nada de esto va a la IA)
+window.expRelacionados=texto=>{if(!ex||!llave)return null;const W=new Set(pals(expandir(texto)));if(W.size<2)return [];
+  return ex.pacs.map(p=>{const P=new Set(pals(expandir(textoPac(p)))),D=new Set(pals(expandir(dxDe(p))));let n=0,dx=0;for(const w of W)if(P.has(w)){n++;if(D.has(w))dx++;}return {p,n,dx};})
+    .filter(x=>x.dx>=1&&x.n>=2).sort((a,b)=>b.n-a.n).slice(0,3).map(x=>({id:x.p.id,nexp:x.p.nexp,dx:String(dxDe(x.p)).slice(0,50)}));};
+window.expAbrirPac=id=>{window.hudGo?.('expediente');setTimeout(()=>{if(!ex)return;const p=ex.pacs.find(x=>x.id===id);if(!p)return;pac=p;bit('abrió expediente (desde una plática)',p);vista={v:'pac'};render();},450);};
+
 // ---------- Capri acomoda lo que le dictas ----------
 const SVRE={ta:/(?:\bT\.?\s?A\.?|tensi[oó]n arterial|presi[oó]n arterial)\s*[:=]?\s*(\d{2,3}\s*\/\s*\d{2,3})/i,fc:/(?:\bF\.?\s?C\.?|frecuencia card[ií]aca|pulso)\s*[:=]?\s*(\d{2,3})/i,
  fr:/(?:\bF\.?\s?R\.?|frecuencia respiratoria)\s*[:=]?\s*(\d{1,2})/i,temp:/(?:\bT(?:emp)?\.?\s?°?|temperatura)\s*[:=]?\s*(\d{2}(?:[.,]\d)?)\s*°?\s*C?\b/i,
@@ -293,8 +367,8 @@ function render(){if(!sec)return;
 function lado(){const ps=ex.pacs.slice().sort((a,b)=>(b.upd||b.ts)-(a.upd||a.ts));
   return `<div class="side"><div class="row"><h3>Expediente</h3><span class="sp"></span><button class="mini" data-a="lock" title="Bloquear ahora">🔒</button><button class="mini" data-a="cfg" title="Ajustes y privacidad">⚙</button></div>
    <div class="sub">${NOM} · cifrado local</div>
-   <input id="exBus" placeholder="Buscar nombre, expediente o diagnóstico" value="${esc(vista.q||'')}">
-   <div class="list" id="exLs">${ps.filter(p=>!vista.q||(nombreDe(p)+' '+p.nexp+' '+(dxDe(p)||'')).toLowerCase().includes(vista.q.toLowerCase())).map(p=>`<div class="it${pac===p?' on':''}" data-p="${p.id}"><b>${esc(nombreDe(p))}</b><small>${esc(p.nexp)} · ${esc(edad(p))} · ${esc(p.sexo||'')} · ${(p.docs||[]).length} doc.</small></div>`).join('')||'<small style="color:#a0565e">Aún no hay pacientes.</small>'}</div>
+   <input id="exBus" placeholder="Buscar nombre, expediente, diagnóstico o síntoma" value="${esc(vista.q||'')}">
+   <div class="list" id="exLs">${ps.filter(p=>!vista.q||(nombreDe(p)+' '+p.nexp+' '+textoPac(p)).toLowerCase().includes(vista.q.toLowerCase())).map(p=>{const al=alarmas(p);return `<div class="it${pac===p?' on':''}" data-p="${p.id}"${al.length?' title="'+esc(al.join(' · '))+'"':''}><b>${al.length?'<span style="color:var(--hr)">⚠ </span>':''}${esc(nombreDe(p))}</b><small>${esc(p.nexp)} · ${esc(edad(p))} · ${esc(p.sexo||'')} · ${(p.docs||[]).length} doc.${dxDe(p)?' · '+esc(String(dxDe(p)).slice(0,40)):''}</small></div>`;}).join('')||'<small style="color:#a0565e">Aún no hay pacientes.</small>'}</div>
    <button class="hbtn c" data-a="nuevo">+ Nuevo paciente</button></div>`;}
 function vLock(){
   if(!existe){H(`<div class="lock" style="grid-column:1/-1"><h3>Expediente clínico</h3><div class="sub">${NOM} · personas reales</div>
@@ -325,6 +399,7 @@ function vPac(){const p=pac;if(!p)return vLista();const docs=(p.docs||[]).slice(
    <div class="sub">${esc(p.nexp)} · ${esc(edad(p))} · ${esc(p.sexo)} · nacimiento ${esc(fechaL(p.fnac))}</div>
    ${p.alergias?`<div class="alergia">⚠ ALERGIAS: ${esc(p.alergias)}</div>`:''}
    ${vista.ficha?fFicha(p):''}
+   ${vApoyo(p)}
    <h4>Nuevo documento</h4><div class="row">${ORDEN.map(t=>`<button class="mini" data-new="${t}" title="${esc(NOM+' '+DOCS[t][1])}">${esc(DOCS[t][0])}</button>`).join('')}</div>
    <h4>Documentos (${docs.length})</h4><div>${docs.map(d=>{const v=d.c,f=faltan(camposDe(d.tipo),v);
      return `<div class="doc" data-d="${d.id}"><em>${esc(d.fecha)} ${esc(d.hora)}</em><span>${esc(DOCS[d.tipo][0])}${d.c?.dx||d.c?.a?' · <em>'+esc(String(d.c.dx||d.c.a).slice(0,70))+'</em>':''}</span><span class="st ${d.firma?'f':'b'}">${d.firma?'✓ firmada':f.length?'borrador · faltan '+f.length:'borrador completo'}</span></div>`;}).join('')||'<small style="color:#a0565e">Sin documentos. Empieza por la historia clínica.</small>'}</div>
@@ -424,6 +499,12 @@ async function accion(a,el){toque();const p=pac;
   if(a==='expandir'){sec.querySelectorAll('textarea[data-k],input[data-k]:not([data-k^="sv_"])').forEach(e=>{e.value=expandir(e.value);});leeDoc();pintaRev();return;}
   if(a==='borrarDoc'){if(!confirm('¿Descartar este borrador?'))return;
     p.docs=p.docs.filter(x=>x.id!==vista.d);bit('descartó borrador',p);await persistir();vista={v:'pac'};return render();}
+  if(a==='apoyo'){const m=$e('exApMsg');el.disabled=true;m.textContent='Buscando en tus apuntes y pensando…';
+    try{await apoyo(p);render();}catch(e){m.textContent='✖ '+e.message;el.disabled=false;}return;}
+  if(a==='apoyoNota'){const r=p.apoyo;if(!r?.dif?.length)return;
+    const t='Diagnósticos diferenciales a considerar (sugerencia de Capri con base en los apuntes; pendiente de validar por el médico responsable):\n'+r.dif.map((d,i)=>`${i+1}. ${d.dx}${d.a_favor.length?'. A favor: '+d.a_favor.filter(x=>x.ok).map(x=>x.t).join('; '):''}${d.falta.length?'. Pendiente: '+d.falta.join('; '):''}`).join('\n');
+    const d={id:uid(),tipo:'evolucion',fecha:hoyISO(),hora:horaAhora(),c:{dx:t},ts:Date.now(),ia:{dx:1},iaVal:{dx:t},nuevas:{dx:{c:[],p:['sugerencia de Capri']}}};
+    p.docs.push(d);bit('llevó los diferenciales de Capri a una nota en borrador',p);await persistir();vista={v:'doc',d:d.id};return render();}
   if(a==='organizar')return organizarUI();
   if(a==='dictar')return dictar(el);
   if(a==='firmar'){const d=leeDoc(),v=d.c,f=faltan(camposDe(d.tipo),v);if(!d.elab)return pintaRev('<div class="warn">Escribe el nombre completo de quien elabora (5.10).</div>');
@@ -496,6 +577,7 @@ function montar(el){if(sec)return;sec=el;
       if(t==='referencia')d.c.envia=[ex.cfg.est?.nombre,ex.cfg.est?.dom].filter(Boolean).join(', ');if(t==='consentimiento'){d.c.titulo='Carta de consentimiento bajo información';d.c.medico=ex.cfg.med?.nombre||'';}
       pac.docs.push(d);bit('creó '+DOCS[t][0],pac);persistir();vista={v:'doc',d:d.id};return render();}
     const dd=e.target.closest('[data-d]');if(dd){vista={v:'doc',d:dd.dataset.d};const d=pac.docs.find(x=>x.id===dd.dataset.d);bit('consultó documento',pac);return render();}
+    const lk=e.target.closest('[data-lec]');if(lk){e.preventDefault();const [s1,id,pg]=lk.dataset.lec.split('|');return window.verLectura?.(s1,id,+pg||0);}
     const df=e.target.closest('[data-delfmt]');if(df){ex.formatos=ex.formatos.filter(f=>f.id!==df.dataset.delfmt);persistir();return render();}});
   sec.addEventListener('input',e=>{toque();if(e.target.id==='exBus'){vista.q=e.target.value;const q=e.target.value;render();const i=$e('exBus');i.focus();i.setSelectionRange(q.length,q.length);return;}
     if(e.target.dataset.k?.startsWith('sv_')||e.target.dataset.k)clearTimeout(montar.t),montar.t=setTimeout(()=>{if(vista.v==='doc'){leeDoc();pintaRev();imc();}},350);});
@@ -520,5 +602,5 @@ const _send=send;
 send=async v=>{const k=(v||'').trim().toLowerCase();if(/^(expediente|expedientes)$/.test(k)&&!busy){line('u',v.trim());window.openExpediente();return;}
   await _send(v);if(k==='help')line('t','  expediente — Expediente clínico (NOM-004), cifrado, para personas reales');};
 // pruebas: funciones puras sin interfaz
-window.__expTest={abreviaturas,expandir,revisaSV,revisaTx,faltan,camposDe,signosDe,cifrasNuevas,tapar,apartadosDe,edad,DOCS,HC};
+window.__expTest={resumenClinico,alarmas,alarmasSV,abreviaturas,expandir,revisaSV,revisaTx,faltan,camposDe,signosDe,cifrasNuevas,tapar,apartadosDe,edad,DOCS,HC};
 })();

@@ -88,7 +88,7 @@ fi.onchange=async()=>{const f=fi.files[0];fi.value='';if(!f||!cur)return;const {
   catch(e){msg='✖ No pude: '+e.message;pinta();}};
 modal.addEventListener('input',e=>{if(e.target.id!=='lecQ')return;q=e.target.value;clearTimeout(pinta.t);pinta.t=setTimeout(()=>{const y=$('lecB')?.scrollTop;pinta();const i=$('lecQ');i.focus();i.setSelectionRange(q.length,q.length);if(y!=null)$('lecB').scrollTop=y;},220);});
 modal.addEventListener('keydown',e=>{if(e.target.id==='lecG'&&e.key==='Enter')ir(+e.target.value);});
-window.verLectura=async(src,id)=>{const d=await (src==='med'?window.medLectura:window.bibLectura)?.(id);if(!d)return;cur={src,id,d};q='';msg='';pinta();modal.classList.add('show');$('lecB').scrollTop=0;};
+window.verLectura=async(src,id,pag)=>{const d=await (src==='med'?window.medLectura:window.bibLectura)?.(id);if(!d)return;cur={src,id,d};q='';msg='';pinta();modal.classList.add('show');$('lecB').scrollTop=0;if(pag)ir(pag);};
 
 // ---------- notas por secciones guardadas (para no volver a resumir) ----------
 let ldb=null;
