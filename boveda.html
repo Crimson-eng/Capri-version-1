@@ -25,6 +25,7 @@ button:disabled{opacity:.5;cursor:wait}
  <input id="k" type="password" autofocus placeholder="Llave" autocomplete="current-password">
  <div id="nv" hidden><small>Entraste con el código de recuperación. Pon una llave nueva:</small>
   <input id="n1" type="password" placeholder="Llave nueva (8+ caracteres)"><input id="n2" type="password" placeholder="Repite la llave nueva"></div>
+ <label id="rr" style="display:none;gap:8px;align-items:center;margin:0 0 10px;cursor:pointer"><input type="checkbox" id="rcd" style="width:auto;margin:0"><small>Recordarme en esta PC (abre sin pedir la llave)</small></label>
  <button id="go">ABRIR</button>
  <div id="msg"></div>
  <div class="bar"><button type="button" class="l" id="rec">Olvidé mi llave: usar código de recuperación</button><button type="button" class="l" id="out">Salir</button></div>
@@ -39,12 +40,18 @@ window.capriDesk.mode?.('full');   // que la ventana se muestre y reciba el tecl
 const inf=await D.info();if(!inf.creada){ir();return;}
 let codigo=false,raw=null;
 const msg=(t,e)=>{$('msg').textContent=t;$('msg').className=e?'e':'';};
+// esta PC te recuerda: se abre sola, sin llave
+const rec=await D.recordando?.().catch(()=>null);if(rec?.puede)$('rr').style.display='flex';
+if(rec?.si){const r=await D.recordada().catch(()=>null);
+  if(r){const x=B.deb64(r);if(await B.probar(await B.maestra(x))){raw=x;$('tt').textContent='Hola de nuevo, choom';$('k').hidden=true;$('rr').style.display='none';$('rec').hidden=true;return entrar();}}
+  await D.olvidar();msg('Esta PC ya no reconoce tu bóveda: escribe tu llave.',true);}
 $('out').onclick=()=>D.salir();
 $('rec').onclick=()=>{codigo=!codigo;$('k').value='';$('k').type=codigo?'text':'password';$('k').placeholder=codigo?'Código de recuperación (XXXX-XXXX-…)':'Llave';
   $('rec').textContent=codigo?'Mejor uso mi llave':'Olvidé mi llave: usar código de recuperación';$('tt').textContent=codigo?'Código de recuperación':'Tu llave, choom';msg('');$('k').focus();};
 async function entrar(){$('go').disabled=true;
   try{const malos=await B.cargarTodo(await B.maestra(raw),t=>msg(t));
     sessionStorage.setItem('capri_boveda_k',B.b64(raw));
+    if($('rcd').checked)await D.recordar(B.b64(raw)).catch(()=>{});
     if(malos.length&&!confirm('No pude descifrar esto (archivo dañado o incompleto):\n\n'+malos.join('\n')+'\n\n¿Entrar de todos modos? Lo demás está bien. Si guardas cambios en esas partes, se reemplazan.')){D.salir();return;}
     msg('Listo. Despertando a Capri…');ir();}
   catch(e){msg('No pude abrir tus datos: '+(e.message||e),true);$('go').disabled=false;}}

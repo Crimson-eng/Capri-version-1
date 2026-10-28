@@ -1,6 +1,7 @@
 // Capri de escritorio: una ventana transparente, encima de todo, del tamaño de la pantalla.
 // Mini Capri ronda por ella; donde no está Capri, los clics pasan a tus otras ventanas.
-const { app, BrowserWindow, Tray, Menu, ipcMain, screen, session, desktopCapturer, shell, nativeImage, globalShortcut } = require('electron');
+const { app, BrowserWindow, Tray, Menu, ipcMain, screen, session, desktopCapturer, shell, nativeImage, globalShortcut, safeStorage } = require('electron');
+const crypto = require('crypto');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
@@ -153,6 +154,45 @@ function vaciarBoveda() {
     send('boveda:flush');
   });
 }
+// tu sesión de claude.ai: con bóveda vive en la RAM, así que la página la guarda cifrada aparte (claude.enc) y la vuelve a meter al abrir
+let claudeCambio = false;
+const esCapri = (e) => win && e.sender === win.webContents;
+ipcMain.handle('boveda:claudeSacar', async (e, todo) => {
+  if (!BOVEDA_ON || !esCapri(e) || (!claudeCambio && !todo)) return null;
+  claudeCambio = false;
+  const cs = await session.fromPartition('claude-ram').cookies.get({});
+  return cs.map((c) => ({ url: 'https://' + String(c.domain || '').replace(/^\./, '') + (c.path || '/'), name: c.name, value: c.value,
+    domain: c.hostOnly ? undefined : c.domain, path: c.path, secure: c.secure, httpOnly: c.httpOnly, expirationDate: c.expirationDate, sameSite: c.sameSite }));
+});
+ipcMain.handle('boveda:claudeMeter', async (e, cs) => {
+  if (!BOVEDA_ON || !esCapri(e) || !Array.isArray(cs)) return 0;
+  const ses = session.fromPartition('claude-ram'), ahora = Date.now() / 1000; let n = 0;
+  for (const c of cs.slice(0, 400)) {
+    if (!c || typeof c.url !== 'string' || !/^https:\/\/([\w-]+\.)*[\w-]+\//.test(c.url) || (c.expirationDate && c.expirationDate < ahora)) continue;
+    try { await ses.cookies.set(c); n++; } catch {}
+  }
+  setTimeout(() => { claudeCambio = false; }, 500);
+  return n;
+});
+// «Recordarme en esta PC»: la llave maestra se guarda protegida por Windows (DPAPI, solo tu usuario de esta PC la abre)
+// en la carpeta de Capri de ESTA PC, nunca en la USB. En otra PC, o con otro usuario, te vuelve a pedir la llave.
+const RECUERDA = path.join(DATA_PC, 'Recordar');
+// (CAPRI_PRUEBA_RECORDAR=1 solo para las pruebas en Linux sin llavero: ahí la protección sería texto plano)
+const PRUEBA_REC = process.env.CAPRI_PRUEBA_RECORDAR === '1' && process.platform === 'linux';
+const protegeOk = () => PRUEBA_REC || (safeStorage.isEncryptionAvailable() && (process.platform !== 'linux' || safeStorage.getSelectedStorageBackend() !== 'basic_text'));
+function archivoRecuerda() {
+  try { const m = JSON.parse(fs.readFileSync(META, 'utf8')); return path.join(RECUERDA, crypto.createHash('sha256').update(m.salt + ':' + m.creado).digest('hex').slice(0, 20) + '.llave'); } catch { return null; }
+}
+ipcMain.handle('boveda:recordar', async (e, raw) => {
+  const f = archivoRecuerda(); if (!BOVEDA_ON || !esCapri(e) || !f || typeof raw !== 'string' || !protegeOk()) return false;
+  await fs.promises.mkdir(RECUERDA, { recursive: true }); await escribeAtomico(f, safeStorage.encryptString(raw)); return true;
+});
+ipcMain.handle('boveda:recordada', async (e) => {
+  const f = archivoRecuerda(); if (!BOVEDA_ON || !esCapri(e) || !f || !protegeOk()) return null;
+  try { return safeStorage.decryptString(await fs.promises.readFile(f)); } catch { return null; }
+});
+ipcMain.handle('boveda:recordando', () => { const f = archivoRecuerda(); return { puede: protegeOk(), si: !!f && fs.existsSync(f) }; });
+ipcMain.handle('boveda:olvidar', () => { const f = archivoRecuerda(); if (f) fs.rmSync(f, { force: true }); return true; });
 ipcMain.on('boveda:reiniciar', () => { app.relaunch({ execPath: EXE }); app.quit(); });
 ipcMain.on('boveda:salir', () => app.quit());
 app.on('before-quit', (e) => {
@@ -231,7 +271,7 @@ function openClaude() {
   claudeWin = new BrowserWindow({
     width: Math.min(1100, wa.width - 80), height: Math.min(860, wa.height - 60), minWidth: 420, minHeight: 500,
     title: 'Capri // Claude', icon: path.join(__dirname, 'icon.png'), backgroundColor: '#0c0b12', autoHideMenuBar: true,
-    // con bóveda la sesión de claude.ai tampoco se guarda en disco (inicias sesión cada vez que abres Capri)
+    // con bóveda la sesión de claude.ai vive en la RAM y se guarda cifrada en la bóveda (claude.enc)
     webPreferences: { partition: BOVEDA_ON ? 'claude-ram' : 'persist:claude', contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
   const wc = claudeWin.webContents;
@@ -589,6 +629,7 @@ app.whenReady().then(async () => {
   // que al prender la PC se abra esta versión y no una vieja
   if (process.platform === 'win32' && EXE !== process.execPath && app.getLoginItemSettings().openAtLogin) {
     app.setLoginItemSettings({ openAtLogin: false }); app.setLoginItemSettings({ openAtLogin: true, path: EXE }); }
+  if (PRUEBA_REC) safeStorage.setUsePlainTextEncryption?.(true);
   const ses = sesionCapri();
   // micrófono, notificaciones, pantalla completa y ubicación (módulo Mundo) sí; lo demás no
   const ok = ['media', 'notifications', 'fullscreen', 'clipboard-sanitized-write', 'display-capture', 'geolocation'];
@@ -603,6 +644,7 @@ app.whenReady().then(async () => {
   const cok = ['notifications', 'clipboard-sanitized-write', 'clipboard-read', 'fullscreen'];
   cses.setPermissionRequestHandler((wc, perm, cb) => cb(cok.includes(perm)));
   cses.setPermissionCheckHandler((wc, perm) => cok.includes(perm));
+  if (BOVEDA_ON) cses.cookies.on('changed', () => { claudeCambio = true; });
   await serveWeb();
   createWindow();
   createTray();

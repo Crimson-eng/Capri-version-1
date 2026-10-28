@@ -39,20 +39,20 @@ async function gz(bytes,des){const s=new Blob([bytes]).stream().pipeThrough(des?
 const cifraJSON=async(key,obj)=>sellar(key,await gz(te.encode(JSON.stringify(obj))));
 const descifraJSON=async(key,buf)=>JSON.parse(td.decode(await gz(await abrir(key,buf),true)));
 // ---------- leer y escribir IndexedDB completas ----------
-let cargando=false;
+let cargando=0;   // cuántas cargas de la bóveda van en curso (lo que escriben no cuenta como cambio)
 const abrirDB=(n,v,up)=>new Promise((res,rej)=>{const r=v?indexedDB.open(n,v):indexedDB.open(n);if(up)r.onupgradeneeded=()=>up(r.result);r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});
 async function volcarStore(db,s){const recs=[],st0=db.transaction(s,'readonly').objectStore(s);
   const meta={name:s,keyPath:st0.keyPath,autoIncrement:st0.autoIncrement,indexes:[...st0.indexNames].map(i=>{const x=st0.index(i);return {name:i,keyPath:x.keyPath,unique:x.unique,multiEntry:x.multiEntry};})};
   await new Promise((res,rej)=>{const c=st0.openCursor();c.onsuccess=()=>{const k=c.result;if(!k)return res();recs.push([k.primaryKey,k.value]);k.continue();};c.onerror=()=>rej(c.error);});
   for(const r of recs){r[0]=await empaca(r[0]);r[1]=await empaca(r[1]);}   // fuera de la transacción: leer un Blob es asíncrono
   return {meta,recs};}
-async function cargarDB(name,version,stores){cargando=true;
+async function cargarDB(name,version,stores){cargando++;
   try{const db=await abrirDB(name,version,d=>{for(const {meta:m} of stores){if(d.objectStoreNames.contains(m.name))continue;
         const st=d.createObjectStore(m.name,{keyPath:m.keyPath??undefined,autoIncrement:!!m.autoIncrement});for(const i of m.indexes)st.createIndex(i.name,i.keyPath,{unique:i.unique,multiEntry:i.multiEntry});}});
     for(const {meta:m,recs} of stores){if(!recs.length||!db.objectStoreNames.contains(m.name))continue;await new Promise((res,rej)=>{const t=db.transaction(m.name,'readwrite'),st=t.objectStore(m.name);
         for(const [k,v] of recs){const val=desempaca(v);if(m.keyPath==null)st.put(val,desempaca(k));else st.put(val);}t.oncomplete=res;t.onerror=()=>rej(t.error);});}
     db.close();}
-  finally{cargando=false;}}
+  finally{cargando--;}}
 // ---------- qué cambió desde el último guardado ----------
 // se marca cuando la escritura YA terminó (complete): así un guardado a medio camino no se come un cambio
 const sucio=new Set(),borradas=new Set();let lsSucio=false;
@@ -85,26 +85,35 @@ async function guardar(todo){if(!key)return 0;if(guardando)return guardando.then
           for(const s of cuales){await escribeStore(name,db,s);n++;}}
         catch(e){for(const s of ss)sucio.add(name+'\u0000'+s);throw e;}   // se reintenta en el siguiente guardado
         finally{db.close();}}
+      const cs=D.claudeSacar?await D.claudeSacar(todo).catch(()=>null):null;if(cs){await D.escribir('claude.enc',await cifraJSON(key,cs));n++;}
       if(lsSucio||todo){lsSucio=false;const o={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);o[k]=localStorage.getItem(k);}await D.escribir('ls.enc',await cifraJSON(key,o));n++;}
       ultimo=Date.now();}
     catch(e){console.error('bóveda: no pude guardar',e);window.log?.('🔐 bóveda: no pude guardar ('+String(e.message||e).slice(0,60)+')','w');}
     finally{guardando=null;}return n;})();}
 // ---------- abrir la bóveda (lo usa boveda.html) ----------
 // devuelve la lista de lo que no se pudo descifrar (archivo dañado o a medias); lo demás se carga igual
-async function cargarTodo(k,av=()=>{}){const fs=(await D.lista()).filter(f=>f.endsWith('.enc'));let i=0;const malos=[];
-  for(const f of fs.filter(f=>/^idb~[^~#]+\.enc$/.test(f))){let m;try{m=await descifraJSON(k,await D.leer(f));}catch(e){malos.push(f);continue;}const stores=[];
-    for(const s of m.stores){av(`Descifrando ${m.name} · ${s} (${++i})…`);if(!fs.includes(archivo(m.name,s)))continue;
-      try{const p1=await descifraJSON(k,await D.leer(archivo(m.name,s)));
-        for(let p=2;p<=(p1.partes||1);p++)p1.recs.push(...(await descifraJSON(k,await D.leer(archivo(m.name,s,p)))).recs);
-        stores.push(p1);}
-      catch(e){malos.push(m.name+' · '+s);}}
-    await cargarDB(m.name,m.version,stores);}
+// todo se lee y descifra en paralelo (arranque rápido); devuelve lo que no se pudo descifrar (archivo dañado o a medias)
+async function cargarTodo(k,av=()=>{}){const fs=(await D.lista()).filter(f=>f.endsWith('.enc'));const malos=[];let hechos=0,total=0;
+  const paso=t=>av(`Descifrando ${t} (${++hechos}/${total})…`);
+  const leeStore=async(m,s)=>{const p1=await descifraJSON(k,await D.leer(archivo(m.name,s)));
+    const resto=await Promise.all(Array.from({length:(p1.partes||1)-1},(_,i)=>D.leer(archivo(m.name,s,i+2)).then(b=>descifraJSON(k,b))));
+    for(const r of resto)p1.recs.push(...r.recs);paso(m.name+' · '+s);return p1;};
+  const metas=fs.filter(f=>/^idb~[^~#]+\.enc$/.test(f));total=metas.length;
+  await Promise.all(metas.map(async f=>{let m;try{m=await descifraJSON(k,await D.leer(f));}catch(e){malos.push(f);return;}
+    const ss=m.stores.filter(s=>fs.includes(archivo(m.name,s)));total+=ss.length;paso(m.name);
+    const stores=(await Promise.all(ss.map(s=>leeStore(m,s).catch(()=>{malos.push(m.name+' · '+s);return null;})))).filter(Boolean);
+    await cargarDB(m.name,m.version,stores);}));
   if(fs.includes('ls.enc')){av('Descifrando tus ajustes…');
-    try{const o=await descifraJSON(k,await D.leer('ls.enc'));cargando=true;try{for(const [a,b] of Object.entries(o))localStorage.setItem(a,b);}finally{cargando=false;}}
+    try{const o=await descifraJSON(k,await D.leer('ls.enc'));cargando++;try{for(const [a,b] of Object.entries(o))localStorage.setItem(a,b);}finally{cargando--;}}
     catch(e){malos.push('ajustes');}}
+  // tu sesión de claude.ai, aparte de las memorias
+  if(fs.includes('claude.enc')&&D.claudeMeter){try{await D.claudeMeter(await descifraJSON(k,await D.leer('claude.enc')));}catch(e){}}
   return malos;}
+// ¿esta llave maestra abre la bóveda? (para la llave recordada en esta PC)
+async function probar(k){const fs=(await D.lista()).filter(f=>/^idb~[^~#]+\.enc$|^ls\.enc$/.test(f));if(!fs.length)return true;
+  try{await descifraJSON(k,await D.leer(fs.includes('ls.enc')?'ls.enc':fs[0]));return true;}catch(e){return false;}}
 const envolver=async(meta,raw,llave)=>{const s1=crypto.getRandomValues(new Uint8Array(16));meta.salt=b64(s1);meta.wrapL=b64(await sellar(await derivar(llave,s1),raw));await D.crearMeta(meta);};
-window.Boveda={nuevoCodigo,crearMeta,desbloquear,maestra,cargarTodo,b64,
+window.Boveda={nuevoCodigo,crearMeta,desbloquear,maestra,cargarTodo,probar,b64,deb64,
   guardar:()=>guardar(false),guardarTodo:()=>guardar(true),
   info:()=>D.info(),activa:()=>!!key,ultimo:()=>ultimo,
   // primera vez: llave maestra nueva, se guarda TODO lo que hay ahora y Capri se reinicia ya cifrada
@@ -135,17 +144,20 @@ const hace=ts=>{if(!ts)return 'aún no';const m=Math.round((Date.now()-ts)/60e3)
 function ajustes(){const ref=document.getElementById('cClose')?.parentElement;if(!ref||enBoveda)return;
   const box=document.createElement('div');box.id='bvBox';ref.before(box);const $b=id=>document.getElementById(id);
   const inp=(id,ph)=>`<input id="${id}" type="password" autocomplete="new-password" placeholder="${ph}" style="width:100%;margin:4px 0">`;
-  async function pinta(){const inf=await D.info().catch(()=>({}));
+  async function pinta(){const inf=await D.info().catch(()=>({})),rec=inf.activa?await D.recordando?.().catch(()=>null):null;
     if(!inf.activa){box.innerHTML=`<h3>🔐 Bóveda: cifrar mis datos</h3>
       <small>Cifra con tu llave TODO lo de Capri: pláticas e hilos, apuntes, biblioteca, reservorio médico, expediente, lecciones y tus keys. Al abrir Capri te pide la llave; mientras la usas todo vive en la memoria y se guarda cifrado (AES-256) cada minuto y al cerrarla, así que en el disco o la USB no queda nada legible.</small>
       ${inp('bvL1','Tu llave (mínimo 8 caracteres; mejor una frase)')}${inp('bvL2','Repite la llave')}
       ${inf.portatil?'<div style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="bvPC" checked style="width:auto;margin:0;flex:none"><small style="text-align:left;margin:0">Borrar también la copia sin cifrar que quedó en esta PC de antes de pasarte a la USB</small></div>':''}
       <div class="row" style="justify-content:flex-start"><button class="btn" id="bvOn" style="width:auto;flex:1;padding:8px 10px">🔐 Cifrar mis datos</button></div><small id="bvMsg"></small>`;
       $b('bvOn').onclick=empezar;return;}
-    box.innerHTML=`<h3>🔐 Bóveda activa</h3><small>Tus datos están cifrados en <b>${esc(inf.dir)}</b>. Último guardado: ${hace(ultimo)}. Se guarda sola cada minuto y al cerrar.</small>
+    box.innerHTML=`<h3>🔐 Bóveda activa</h3><small>Tus datos están cifrados en <b>${esc(inf.dir)}</b>. Último guardado: ${hace(ultimo)}. Se guarda sola cada minuto y al cerrar. Tu sesión de claude.ai también se guarda aquí, aparte.</small>
+      ${rec?.puede?`<div style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="bvRec" ${rec.si?'checked':''} style="width:auto;margin:0;flex:none"><small style="text-align:left;margin:0">Abrir sin pedirme la llave en esta PC (Windows la guarda protegida con tu usuario; en otra PC sí te la pide)</small></div>`:''}
       <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" id="bvSave" style="width:auto;flex:1;padding:8px 10px">💾 Guardar ahora</button><button class="btn" id="bvLock" style="width:auto;flex:1;padding:8px 10px">🔒 Bloquear</button></div>
       <details style="margin-top:6px"><summary><small>Cambiar llave o código de recuperación</small></summary>${inp('bvA','Llave actual')}${inp('bvN1','Llave nueva')}${inp('bvN2','Repite la llave nueva')}
       <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" id="bvCh" style="width:auto;flex:1;padding:8px 10px">Cambiar llave</button><button class="btn" id="bvCod" style="width:auto;flex:1;padding:8px 10px">Nuevo código de recuperación</button></div></details><small id="bvMsg"></small>`;
+    if($b('bvRec'))$b('bvRec').onchange=async e=>{const raw=sessionStorage.getItem('capri_boveda_k');
+      const ok=e.target.checked?(raw&&await D.recordar(raw)):await D.olvidar();$b('bvMsg').textContent=e.target.checked?(ok?'✓ Esta PC ya no te pedirá la llave.':'✗ No pude guardarla en esta PC.'):'✓ Listo: esta PC vuelve a pedirte la llave.';if(!ok)e.target.checked=false;};
     $b('bvSave').onclick=async()=>{$b('bvMsg').textContent='guardando…';const n=await guardar(false);$b('bvMsg').textContent=`✓ guardado (${n} parte(s) cambiaron)`;};
     $b('bvLock').onclick=()=>window.Boveda.bloquear();
     $b('bvCh').onclick=async()=>{const a=$b('bvA').value,n1=$b('bvN1').value;if(n1.length<8||n1!==$b('bvN2').value)return $b('bvMsg').textContent='La llave nueva debe tener 8+ caracteres y coincidir.';

@@ -20,6 +20,12 @@ contextBridge.exposeInMainWorld('capriDesk', {
     salir: () => ipcRenderer.send('boveda:salir'),
     alCerrar: (fn) => { ipcRenderer.removeAllListeners('boveda:flush'); ipcRenderer.on('boveda:flush', () => fn()); ipcRenderer.send('boveda:escucha'); },
     listo: () => ipcRenderer.send('boveda:listo'),
+    claudeSacar: (todo) => ipcRenderer.invoke('boveda:claudeSacar', !!todo),   // tu sesión de claude.ai (para guardarla cifrada)
+    claudeMeter: (cs) => ipcRenderer.invoke('boveda:claudeMeter', cs),
+    recordar: (raw) => ipcRenderer.invoke('boveda:recordar', raw),           // «Recordarme en esta PC»
+    recordada: () => ipcRenderer.invoke('boveda:recordada'),
+    recordando: () => ipcRenderer.invoke('boveda:recordando'),
+    olvidar: () => ipcRenderer.invoke('boveda:olvidar'),
   },
   // Capri rondando por el escritorio
   menu: () => ipcRenderer.send('menu'),               // clic derecho sobre ella
