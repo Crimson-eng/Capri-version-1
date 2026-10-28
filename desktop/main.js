@@ -430,8 +430,8 @@ app.whenReady().then(async () => {
   if (process.platform === 'win32' && EXE !== process.execPath && app.getLoginItemSettings().openAtLogin) {
     app.setLoginItemSettings({ openAtLogin: false }); app.setLoginItemSettings({ openAtLogin: true, path: EXE }); }
   const ses = session.defaultSession;
-  // micrófono, notificaciones y pantalla completa sí; lo demás no
-  const ok = ['media', 'notifications', 'fullscreen', 'clipboard-sanitized-write', 'display-capture'];
+  // micrófono, notificaciones, pantalla completa y ubicación (módulo Mundo) sí; lo demás no
+  const ok = ['media', 'notifications', 'fullscreen', 'clipboard-sanitized-write', 'display-capture', 'geolocation'];
   ses.setPermissionRequestHandler((wc, perm, cb) => cb(ok.includes(perm)));
   ses.setPermissionCheckHandler((wc, perm) => ok.includes(perm));
   // botón MIRAR: comparte la pantalla principal
