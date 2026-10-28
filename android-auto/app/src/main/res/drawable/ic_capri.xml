@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Estrella de Capri en un solo color (icono pequeño de notificación) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="128" android:viewportHeight="128">
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M64,12 L73,55 L116,64 L73,73 L64,116 L55,73 L12,64 L55,55 Z" />
+</vector>

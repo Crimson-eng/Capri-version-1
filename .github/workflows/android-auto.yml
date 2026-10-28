@@ -1,0 +1,39 @@
+name: Capri Auto (Android)
+
+on:
+  workflow_dispatch:
+  push:
+    paths: ['android-auto/**', '.github/workflows/android-auto.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.11.1
+      - run: gradle -p android-auto assembleDebug --no-daemon
+      - run: cp android-auto/app/build/outputs/apk/debug/app-debug.apk Capri-Auto.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Capri-Auto
+          path: Capri-Auto.apk
+      - name: Publicar descarga
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-auto-preview
+          name: Capri Auto (prueba)
+          prerelease: true
+          files: Capri-Auto.apk
+          body: |
+            Abre este enlace en tu celular Android y descarga **Capri-Auto.apk**.
+            Android te preguntará si permites instalar apps de esta fuente: di que sí.
+            Luego abre Capri Auto, pega tu clave de Gemini y sigue los pasos que vienen en la app para activarla en Android Auto.
