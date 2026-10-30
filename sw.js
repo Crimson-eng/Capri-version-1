@@ -1,6 +1,6 @@
 // Guarda la app en el dispositivo para que abra rápido y funcione sin internet (menos el cerebro).
 // Sube VERSION cada vez que cambies archivos para que los celulares descarguen lo nuevo.
-const VERSION='capri-v31';
+const VERSION='capri-v32';
 const SHELL=[
   './',
   './index.html',
@@ -34,6 +34,8 @@ const SHELL=[
   './boveda.js',
   './boveda.html',
   './hud.js',
+  './relic.js',
+  './relic3d.js',
   './holo3d.js',
   './vendor/three.module.min.js',
   './manifest.webmanifest',

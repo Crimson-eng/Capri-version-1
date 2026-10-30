@@ -613,7 +613,7 @@ const ago=ms=>{const m=Math.round(ms/60000);return m<60?(m<2?'un momento':m+' mi
 function animoNow(){const a=M().animo;if(!a)return null;const hrs=(Date.now()-a.ts)/36e5,hl=ANIMOS[a.n]||3;const i=a.i*Math.pow(.5,hrs/hl);return i<2?null:{...a,i};}
 function remember(cat,txt){txt=txt.trim().slice(0,220);if(!txt)return;cat=MEMCATS[cat]?cat:'otro';const k=txt.toLowerCase();
   M();if(mem.hechos.some(h=>h.t.toLowerCase()===k))return;if(cat==='nombre')mem.hechos=mem.hechos.filter(h=>h.c!=='nombre'||!/llama|nombre/i.test(h.t)||!/llama|nombre/i.test(txt));
-  mem.hechos.push({c:cat,t:txt,ts:Date.now()});
+  mem.hechos.push({c:cat,t:txt,ts:Date.now()});dispatchEvent(new CustomEvent('capri:recuerdo',{detail:txt}));
   // el día se olvida a la semana, lo demás se queda; tope de 120 recuerdos
   mem.hechos=mem.hechos.filter(h=>h.c!=='dia'||Date.now()-h.ts<7*864e5).slice(-120);log('recuerdo guardado: '+txt.slice(0,40),'y');}
 function forget(txt){M();const k=txt.trim().toLowerCase();if(!k)return;const n=mem.hechos.length;mem.hechos=mem.hechos.filter(h=>!h.t.toLowerCase().includes(k)&&!k.includes(h.t.toLowerCase()));if(mem.hechos.length<n)log('recuerdo borrado','w');}
@@ -658,11 +658,15 @@ let history=store.get('history',[]).map(h=>h.role==='model'?{...h,text:h.text.re
 let frags=store.get('frags',[]),fragNow=null,fragForce=null;
 function fragTitle(txt,file){const m=txt.match(/\*\*\s*(?:name|nombre)\s*:\s*\*\*\s*([^\n*]+)/i)||txt.match(/^#[^\n]*:\s*([^\n]+)$/m);
   const n=(m?m[1]:file.replace(/\.[^.]+$/,'')).trim().slice(0,30);return n.charAt(0).toUpperCase()+n.slice(1).toLowerCase();}
+// 2.12: desde RELIC cada constructo se puede dormir (f.off: no se asoma ni Capri lo menciona) y se elige qué tan seguido salen
+const fragVivos=()=>frags.filter(f=>!f.off);
+const FRAGFREQ={rara:.4,normal:1,seguido:2.5};
 function fragPick(mode){if(!frags.length||mode==='watch')return null;
   if(fragForce){const f=fragForce;fragForce=null;return f;}
-  const last=store.get('fragLast',0),p=mode==='idle'?.15:.07;
-  if(Date.now()-last<20*60000||Math.random()>p)return null;return pick(frags);}
-function fragPrompt(name){if(!frags.length)return '';const names=frags.map(f=>f.name).join(', ');
+  const vivos=fragVivos(),k=FRAGFREQ[store.get('fragFreq','normal')]||1;if(!vivos.length)return null;
+  const last=store.get('fragLast',0),p=(mode==='idle'?.15:.07)*k;
+  if(Date.now()-last<20*60000/k||Math.random()>p)return null;return pick(vivos);}
+function fragPrompt(name){if(!fragVivos().length&&!fragNow)return '';const names=(fragVivos().length?fragVivos():[fragNow]).map(f=>f.name).join(', ');
   const base=`FRAGMENTOS DE TU MOSAICO
 Entre las psiques que te formaron hay fragmentos con nombre que a veces se te escapan: ${names}. No los sacas por gusto: cuando uno se asoma, lo suprimes. Si ${name} pregunta por ellos, te pones a la defensiva, celosa o misteriosa, y no sueltas mucho.
 
@@ -685,10 +689,11 @@ function fragPerfil(f){const T=fragTope(),txt=f.text;if(txt.length<=T)return txt
   const sc=resto.map((p,i)=>{const P=pal(p);let n=0;for(const w of W)if(P.has(w))n++;return [n/Math.sqrt(1+P.size),i];}).sort((a,b)=>b[0]-a[0]);
   const elegidos=[];let n=head.length;for(const [,i] of sc){const p=resto[i].slice(0,T-cab);if(n+p.length>T)continue;elegidos.push(i);n+=p.length+2;}
   return head+'\n…\n'+elegidos.sort((a,b)=>a-b).map(i=>resto[i].slice(0,T-cab)).join('\n\n');}
-function renderFrags(){$('fragList').innerHTML=frags.length?frags.map((f,i)=>`<div class="row" style="justify-content:space-between"><span>◆ ${f.name.replace(/[<>&]/g,'')} <small>${Math.round(f.text.length/1000)}k${f.cut?' · recortado de '+Math.round(f.cut/1000)+'k':''}</small></span><button class="btn" data-fx="${i}">Quitar</button></div>`).join(''):'<small>Ninguno todavía.</small>';
-  $('fragList').querySelectorAll('[data-fx]').forEach(b=>b.onclick=()=>{frags.splice(+b.dataset.fx,1);store.set('frags',frags);renderFrags();});}
+function renderFrags(){$('fragList').innerHTML=frags.length?frags.map((f,i)=>`<div class="row" style="justify-content:space-between"><span>◆ ${f.name.replace(/[<>&]/g,'')} <small>${f.off?'dormido · ':''}${Math.round(f.text.length/1000)}k${f.cut?' · recortado de '+Math.round(f.cut/1000)+'k':''}</small></span><button class="btn" data-fx="${i}">Quitar</button></div>`).join(''):'<small>Ninguno todavía.</small>';
+  $('fragList').querySelectorAll('[data-fx]').forEach(b=>b.onclick=()=>{frags.splice(+b.dataset.fx,1);store.set('frags',frags);renderFrags();});
+  dispatchEvent(new Event('capri:constructos'));}
 async function addFrag(file){const all=(await file.text()).replace(/\r/g,'').trim();if(!all)return;const txt=all.slice(0,FRAG_MAX),name=fragTitle(txt,file.name);
-  const f={name,text:txt};if(all.length>FRAG_MAX)f.cut=all.length;
+  const f={name,text:txt,ts:Date.now()};if(all.length>FRAG_MAX)f.cut=all.length;
   frags=frags.filter(f=>f.name!==name);frags.push(f);store.set('frags',frags);
   if(store.get('frags',[]).length!==frags.length){frags.pop();alert('No cupo «'+name+'» en la memoria del navegador. Quita otro fragmento o usa un archivo más corto.');}
   else{log('fragmento integrado: '+name+(f.cut?' (solo los primeros '+FRAG_MAX/1000+'k caracteres)':''),'w');if(f.cut)alert('«'+name+'» es muy largo ('+Math.round(all.length/1000)+'k caracteres). Integré los primeros '+FRAG_MAX/1000+'k; cuando se asome, Capri usa solo las partes que vienen al caso. Si quieres que lo lea entero, súbelo también a la BIBLIOTECA.');}
@@ -981,10 +986,10 @@ addEventListener('keydown',e=>{if(e.key==='Escape'&&pensar&&!document.querySelec
 const TAGRE=new RegExp('\\[('+TAGS.join('|')+')\\]\\s*','gi');
 function clean(s){return s.replace(/<<[^>]*(>>|$)/g,'').replace(/<$/,'').replace(TAGRE,'').replace(/\*\*?/g,'').replace(/^#+\s*/gm,'');}
 async function respond(userText,extra,mode){ // mode: user | watch | idle | voice
-  busy=true;setState('pensando');core('THINKING');const t0=performance.now();bump();const P=pensarIni();
+  busy=true;setState('pensando');core('THINKING');const t0=performance.now();let t1=0;bump();const P=pensarIni();
   const parts=[];if(extra)parts.push(extra);parts.push({text:userText});
   let raw='',shown='',stateSet=false,heard=null,el=null,cur=null,speakBuf='',off=0,supp=false;
-  fragNow=fragPick(mode);const who=fragNow?'??? // '+fragNow.name.toUpperCase():(window.crimsonWho?.()||'CAPRI');let label=who;if(fragNow){store.set('fragLast',Date.now());log('ALERTA: fragmento '+fragNow.name+' fuera de control','w');}
+  fragNow=fragPick(mode);if(fragNow)dispatchEvent(new CustomEvent('capri:fragmento',{detail:fragNow.name}));const who=fragNow?'??? // '+fragNow.name.toUpperCase():(window.crimsonWho?.()||'CAPRI');let label=who;if(fragNow){store.set('fragLast',Date.now());log('ALERTA: fragmento '+fragNow.name+' fuera de control','w');}
   const ensureLine=()=>{if(!el){line('c',label);el=line('t','');cur=document.createElement('span');cur.className='cur';cur.innerHTML='&nbsp;';el.after(cur);}};
   const onText=t=>{if(P.ac.signal.aborted)return;P.ult=Date.now();P.hablo=true;raw+=t;
     if(fragNow&&stateSet&&!supp){const mi=raw.search(/<<\s*suprime\s*>>/i);if(mi>=0){supp=true;off=clean(raw.slice(0,mi)).replace(/^\s+/,'').length;
@@ -996,7 +1001,7 @@ async function respond(userText,extra,mode){ // mode: user | watch | idle | voic
         if(heard){line('u mic',heard);}}
       if(!clean(rest).trim())return;
       stateSet=true;const st=m?m[1].toLowerCase():'sonrisa_traviesa';setState(TAGS.includes(st)?st:'sonrisa_traviesa');core('TALKING');if(fragNow)$('tag').textContent=who;
-      log('respuesta en '+Math.round(performance.now()-t0)+' ms','g');raw=rest;}
+      t1=performance.now()-t0;log('respuesta en '+Math.round(t1)+' ms','g');raw=rest;}
     let body=clean(raw).replace(/^\s+/,'');if(mode==='voice'){if(body.startsWith('{')&&!body.includes('}'))return;if(heard&&heard.toLowerCase().startsWith(body.toLowerCase()))return;body=noEcho(body,heard);if(!body)return;}const add=body.slice(shown.length);if(!add)return;ensureLine();shown=body;el.textContent=shown.slice(off).replace(/^\s+/,'');term.scrollTop=1e9;showBubble(shown);
     speakBuf+=add;const mm=[...speakBuf.matchAll(/[.!?…](\s)/g)];if(mm.length){const cut=mm[mm.length-1].index+1;speakChunk(speakBuf.slice(0,cut));speakBuf=speakBuf.slice(cut);}};
   try{// antes esto iba fuera del try: si fallaba, Capri se quedaba «pensando» para siempre
@@ -1009,8 +1014,12 @@ async function respond(userText,extra,mode){ // mode: user | watch | idle | voic
     if(body&&mode!=='watch')opBtn(mode==='idle'?'(Capri habló sola, sin que yo le preguntara nada)':utext,body);
     if(!body){setState('observando');log('nada interesante en pantalla','g');}
     if(body&&mode==='user')window.medAfter?.();
-  }catch(e){if(cur)cur.remove();if(speakBuf.trim()&&!esCorte(e))speakChunk(speakBuf);showError(e);}
+    medida({pri:Math.round(t1),total:Math.round(performance.now()-t0),chars:body.length,mode});
+  }catch(e){if(cur)cur.remove();if(speakBuf.trim()&&!esCorte(e))speakChunk(speakBuf);showError(e);medida({total:Math.round(performance.now()-t0),mode,falla:esCorte(e)?'corte':'error'});}
   pensarFin(P);fragNow=null;busy=false;bump();setTimeout(hideBubble,5000);afterTalk();}
+// 2.12: cada respuesta deja su medida (1ª palabra, total, quién contestó) para RELIC → Aprendizaje y velocidad
+function medida(m){const ci=window.cerebroInfo?.();m.ts=Date.now();m.cer=ci?.ultimo||'nube';if(m.cer==='nube')m.cer=cfg.model||'Gemini';
+  const L=store.get('relicMet',[]);L.push(m);store.set('relicMet',L.slice(-200));dispatchEvent(new CustomEvent('capri:medida',{detail:m}));}
 function afterTalk(){const w=setInterval(()=>{if(isSpeaking())return;clearInterval(w);core('DORMANT');if(cfg.hands&&!recording&&!busy)setTimeout(()=>{if(cfg.hands&&!recording&&!busy)startRec(true)},400);},300);}
 function showError(e){
   if(e?.name==='AbortError'&&e.message==='CANCEL'){setState('observando');line('s','(Cancelado. Ya puedes escribirme otra cosa.)');log('respuesta cancelada','y');return;}
@@ -1311,4 +1320,4 @@ else bootP.then(()=>setTimeout(()=>{setState(cfg.key&&cfg.model?'presumida':'son
 if(DESK){if(cfg.key&&cfg.model)minimize();else expand();}
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
-<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="redaccion.js"></script><script src="crimson.js"></script><script src="tecnico.js"></script><script src="saber.js"></script><script src="clinica.js"></script><script src="mundo.js"></script><script src="expediente.js"></script><script src="biblioteca.js"></script><script src="rip.js"></script><script src="lectura.js"></script><script src="vozlocal.js"></script><script src="voz.js"></script><script src="cerebro.js"></script><script src="aprende.js"></script><script src="hilos.js"></script><script src="asocia.js"></script><script src="hud.js"></script><script type="module" src="holo3d.js"></script><script src="desk.js"></script></body></html>
+<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="redaccion.js"></script><script src="crimson.js"></script><script src="tecnico.js"></script><script src="saber.js"></script><script src="clinica.js"></script><script src="mundo.js"></script><script src="expediente.js"></script><script src="biblioteca.js"></script><script src="rip.js"></script><script src="lectura.js"></script><script src="vozlocal.js"></script><script src="voz.js"></script><script src="cerebro.js"></script><script src="aprende.js"></script><script src="hilos.js"></script><script src="asocia.js"></script><script src="hud.js"></script><script src="relic.js"></script><script type="module" src="holo3d.js"></script><script type="module" src="relic3d.js"></script><script src="desk.js"></script></body></html>
