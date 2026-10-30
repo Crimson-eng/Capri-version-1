@@ -14,13 +14,29 @@ const save=()=>store.set('cerebro',cer);
 let ok=false,modelos=[],ultimo='',modoAct='user';
 const esEmb=n=>/embed|bge|minilm|e5-|gte|arctic/i.test(n);
 const chats=()=>modelos.filter(m=>!esEmb(m.n)),embs=()=>modelos.filter(m=>esEmb(m.n));
-async function ver(){
-  try{const r=await fetch(OLL+'/api/tags',{signal:AbortSignal.timeout(1500)});const j=await r.json();modelos=(j.models||[]).map(m=>({n:m.name,gb:(m.size||0)/1e9}));ok=true;}
+// 2.12.1: conexión con Ollama que se arregla sola. Antes Capri miraba UNA vez al segundo y medio (con 1.5 s de paciencia) y
+// luego cada minuto: si Ollama aún estaba arrancando (al prender la PC tarda), salía «desconectado» hasta un minuto o más.
+// Ahora: reintenta a los 2, 2, 3, 3, 5, 5, 8, 8 s y luego cada 30 s; si sigue sin responder y tienes Capri de escritorio,
+// abre Ollama ella misma (una vez); y en cuanto conecta lo avisa y precalienta el modelo.
+let intentos=0,abriOllama=false,vigiaT=null,verP=null,yaConecto=false;
+const ESPERAS=[2,2,3,3,5,5,8,8];
+const buscando=()=>!ok&&intentos<=ESPERAS.length;
+function vigia(){clearTimeout(vigiaT);vigiaT=setTimeout(()=>ver(),ok?60000:(ESPERAS[intentos-1]||30)*1000);}
+function ver(){return verP||(verP=_ver().finally(()=>{verP=null;vigia();}));}
+async function _ver(){const antes=ok;
+  try{const r=await fetch(OLL+'/api/tags',{signal:AbortSignal.timeout(4000)});if(!r.ok)throw new Error('Error '+r.status);const j=await r.json();modelos=(j.models||[]).map(m=>({n:m.name,gb:(m.size||0)/1e9}));ok=true;}
   catch(e){ok=false;modelos=[];}
+  if(ok){intentos=0;if(!antes){log('🧠 conectada a Ollama'+(yaConecto?' otra vez':''),'g');yaConecto=true;dispatchEvent(new Event('capri:gpu'));}}
+  else{intentos++;if(antes)log('🧠 se perdió Ollama; reintento sola','w');
+    if(intentos===3&&!abriOllama&&cer.modo!=='gemini'&&window.capriDesk?.abrirOllama){abriOllama=true;
+      const r=await window.capriDesk.abrirOllama().catch(()=>null);
+      log(r?.ok?'🧠 Ollama estaba cerrado: lo abrí yo~':'🧠 no pude abrir Ollama ('+(r?.why||'error')+')',r?.ok?'y':'w');}}
   if(ok){if(!chats().some(m=>m.n===cer.modelo))cer.modelo=(chats().find(m=>/gemma/i.test(m.n))||chats()[0])?.n||'';
     if(!embs().some(m=>m.n===cer.emb))cer.emb=(embs().find(m=>/embeddinggemma/i.test(m.n))||embs()[0])?.n||'';save();}
   pinta();if(ok&&cer.modelo&&cer.turbo&&cer.modo!=='gemini')calentar();return ok;}
-setInterval(ver,60000);setTimeout(ver,1500);
+setTimeout(ver,300);
+addEventListener('online',()=>{if(!ok){intentos=0;ver();}});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!ok)ver();});
 
 // ---------- turbo GPU ----------
 // 1) El modelo se carga a la tarjeta en cuanto abres Capri (y se queda 2 h), así la primera respuesta no espera la carga.
@@ -49,7 +65,7 @@ window.cerebroJSON=async(system,user)=>{if(!listo())return null;
   const r=await fetch(OLL+'/api/chat',{method:'POST',body:JSON.stringify(body),signal:window.capriSenal?.(180000)||AbortSignal.timeout(180000)});if(!r.ok)throw new Error('GPU: Error '+r.status);
   const j=await r.json();const t=(j.message?.content||'').replace(/<think>[\s\S]*?<\/think>/g,'').trim();try{return JSON.parse(t);}catch(e){throw new Error('la GPU no devolvió JSON válido');}};
 const listo=()=>ok&&!!cer.modelo;
-window.cerebroInfo=()=>({ok,modelo:cer.modelo,modo:cer.modo,emb:cer.emb,mems:mems.length,ultimo,claude:cer.claude,claudeKey:!!cfg.claudeKey,gasto:claudeSpent,tope:cer.tope});
+window.cerebroInfo=()=>({ok,con:ok?'on':buscando()?'buscando':'off',modelo:cer.modelo,modo:cer.modo,emb:cer.emb,mems:mems.length,ultimo,claude:cer.claude,claudeKey:!!cfg.claudeKey,gasto:claudeSpent,tope:cer.tope});
 
 // ---------- ¿quién contesta? ----------
 const PESADO=/\b(explica|expl[ií]came|analiza|resume|resumen|c[oó]digo|programa|script|traduce|examen|investiga|compara|calcula|ecuaci[oó]n|ensayo|tarea|redacta|escr[ií]beme)\b|por qu[eé]|c[oó]mo funciona/i;
@@ -126,7 +142,7 @@ let preRec=null;
 ask=async(parts,onText)=>{
   const rec=await (preRec||recordar(parts)).catch(()=>'');preRec=null;const p2=rec?[{text:rec},...parts]:parts;
   if(rutaClaude(parts)){let dijo=false;try{return await claudeBrain(p2,x=>{dijo=true;onText(x);});}catch(e){if(dijo||esCorte(e))throw e;claudeFallo(e);}}
-  if(rutaLocal(parts)){let dijo=false;try{return await local(p2,x=>{dijo=true;onText(x);});}catch(e){if(esCorte(e))throw e;log(String(e.message).slice(0,60),'w');if(dijo||!cfg.key||!cfg.model)throw e;}}
+  if(rutaLocal(parts)){let dijo=false;try{return await local(p2,x=>{dijo=true;onText(x);});}catch(e){if(esCorte(e))throw e;log(String(e.message).slice(0,60),'w');if(e instanceof TypeError){ok=false;intentos=0;pinta();ver();}if(dijo||!cfg.key||!cfg.model)throw e;}}
   let algo=false;
   try{const t=await _ask(p2,x=>{algo=true;onText(x);});marca('nube');return t;}
   catch(e){if(esCorte(e))throw e;const caido=e.status===429||e.status>=500||e.message==='NOKEY'||e instanceof TypeError;
@@ -286,7 +302,8 @@ const box=document.createElement('div');box.innerHTML=`<h3>Cerebro de tu GPU <sm
 $('cClose')?.parentElement?.before(box);
 function pinta(){btn.classList.toggle('act',cer.modo!=='gemini'&&listo());const st=$('ceSt');if(!st)return;
   st.textContent=ok?(chats().length?'● Conectado a Ollama · '+chats().length+' modelo(s) · memoria buscable: '+mems.length+' plática(s)'+(cer.emb?' (por significado)':' (por palabras: baja embeddinggemma para que busque mejor)')+(ultimo?' · último que contestó: '+(ultimo==='nube'?'Gemini':ultimo):''):'● Ollama está abierto pero no tiene modelos: baja uno (abajo dice cómo).')
-    :'✖ No encontré Ollama en tu PC (o está cerrado). Sin él, todo va a Gemini.';
+    :buscando()?'◌ Conectando con Ollama… (intento '+Math.max(1,intentos)+'; si estaba cerrado lo abro yo)'
+    :'✖ No encontré Ollama en tu PC (o está cerrado). Sin él, todo va a Gemini. Sigo buscándolo cada 30 s.';
   st.style.color=ok&&chats().length?'var(--grn)':'#ffb000';
   const s=$('ceMod');s.innerHTML=chats().map(m=>`<option value="${m.n}">${m.n} · ${m.gb.toFixed(1)} GB${m.gb>3.6?' (grande para 4 GB)':''}</option>`).join('')||'<option value="">(ninguno)</option>';s.value=cer.modelo;
   $('ceModo').value=cer.modo;$('ceApr').value=cer.aprende?'1':'0';$('ceTurbo').value=cer.turbo?'1':'0';
@@ -296,7 +313,7 @@ function pinta(){btn.classList.toggle('act',cer.modo!=='gemini'&&listo());const 
 $('ceModo').onchange=()=>{cer.modo=$('ceModo').value;save();pinta();};
 $('ceMod').onchange=()=>{cer.modelo=$('ceMod').value;save();pinta();if(cer.turbo)calentar(true);};
 $('ceApr').onchange=()=>{cer.aprende=$('ceApr').value==='1';save();};
-$('ceRe').onclick=()=>ver();
+$('ceRe').onclick=()=>{intentos=0;abriOllama=false;ver();};
 $('ceCl').onchange=()=>{cer.claude=$('ceCl').value;claudeFuera=0;save();pinta();};
 $('ceTope').onchange=()=>{cer.tope=Math.max(0,+$('ceTope').value||0);save();pinta();};
 $('ceDel').onclick=async()=>{if(!confirm('¿Borrar la memoria buscable de pláticas? (Sus recuerdos de siempre no se borran.)'))return;mems=[];await tx('readwrite',s=>s.clear()).catch(()=>{});pinta();};

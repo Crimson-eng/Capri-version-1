@@ -5,7 +5,7 @@
 //   04 tronco y chip → MEJORAS DEL CHIP: módulos instalados, ajustes de rendimiento y puertos de expansión (plan tipo Flipper Zero)
 // Todo es local (localStorage), igual que el resto de Capri.
 (()=>{
-const VER='2.12';
+const VER='2.12.1';
 const css=document.createElement('style');css.textContent=`
 #vRelic{padding:0;overflow:hidden}
 .rl{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,440px);height:100%}
@@ -97,7 +97,7 @@ function aprendido(){const ci=window.cerebroInfo?.()||{},ap=window.aprendeInfo?.
     ['Tarjetas de repaso',sa.tarjetas||0],['Habilidades y notas del taller',(ta.propias||0)+(ta.lecciones||0)],['Crimson Nightmare (de ti)',(cr.perfil||0)+(cr.caps||0)],['Constructos integrados',frags.length]];
   const total=it.reduce((s,x)=>s+x[1],0),nivel=Math.floor(Math.sqrt(total/4))+1,base=(nivel-1)**2*4,sig=nivel**2*4;return {it,total,nivel,pct:(total-base)/(sig-base)};}
 function modulos(){const ci=window.cerebroInfo?.()||{},sa=window.saberInfo?.(),cr=window.crimsonInfo?.(),turbo=document.getElementById('ceTurbo')?.value==='1';
-  return [['Cerebro adaptativo','Piensa también con tu GPU (Ollama).',ci.ok?'a':'i',ci.ok?'ACTIVO':'SIN OLLAMA'],
+  return [['Cerebro adaptativo','Piensa también con tu GPU (Ollama).',ci.ok?'a':'i',ci.ok?'ACTIVO':ci.con==='buscando'?'CONECTANDO…':'SIN OLLAMA'],
    ['Turbo GPU','Precalienta el modelo y ajusta el contexto.',turbo&&ci.ok?'a':'i',turbo?'ENCENDIDO':'APAGADO'],
    ['Coprocesador Claude','Tercer cerebro para lo difícil.',ci.claude&&ci.claude!=='off'&&ci.claudeKey?'a':'i',ci.claude&&ci.claude!=='off'?(ci.claudeKey?'ACTIVO':'SIN KEY'):'APAGADO'],
    ['Voz local','Habla con Piper en tu PC, sin Gemini.',window.vozLocal?.lista?.()?'a':'i',window.vozLocal?.lista?.()?'LISTA':'SIN VOZ'],
