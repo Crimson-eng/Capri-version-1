@@ -142,6 +142,7 @@ body[data-core=TALKING] .eq,body[data-core=LISTENING] .eq{display:flex}
 #mic:hover,#send:hover,#clSend:hover{border-color:var(--cyan)}
 #mic.rec{background:var(--red);border-color:var(--red);color:#fff;animation:pulse 1s infinite}
 #send{background:var(--yel);border-color:var(--yel);color:#000;font-weight:700}
+#stop{flex:0 0 auto;height:36px;padding:0 10px;border:1px solid #ff1f55;background:#2a0712;color:#ff8aa3;cursor:pointer;font:inherit;font-size:12px;letter-spacing:.06em;display:none}#stop:hover{background:#ff1f55;color:#000}body.pensando #stop{display:block}
 #clSend{background:var(--cyan);border-color:var(--cyan);color:#000;font-weight:700}#clQ{color:var(--cyan);caret-color:var(--cyan)}
 @keyframes pulse{50%{background:#7a0c22}}
 #bars{display:none;flex:1;gap:3px;align-items:center;height:24px}
@@ -441,7 +442,7 @@ body[data-core=THINKING] .thk{display:flex}
     <div class="in">
      <div class="out" id="term"></div>
      <div class="thk" id="thk"><span>PROCESANDO</span><div class="cl"></div><b id="thkV">0</b></div>
-     <div class="inrow" id="inrow"><span class="pr">&gt;_</span><input id="q" placeholder="escríbele a capri…" autocomplete="off"><div id="bars"></div><button id="mic" title="Hablarle (Ctrl+Espacio)"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M9 3 H15 V13 H9 Z"/><path class="k" d="M6 10 V13 L9 17 H15 L18 13 V10 M12 17 V21"/><path class="a" d="M10.5 6 H13.5 V7.5 H10.5 Z M10.5 9 H13.5 V10.5 H10.5 Z"/></svg></button><button id="send" title="Enviar"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="f" d="M2 3 L22 12 L2 21 L5 12 Z"/><path class="a" d="M5 12 H13 L5 13.5 Z"/></svg></button></div>
+     <div class="inrow" id="inrow"><span class="pr">&gt;_</span><input id="q" placeholder="escríbele a capri…" autocomplete="off"><div id="bars"></div><button id="mic" title="Hablarle (Ctrl+Espacio)"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M9 3 H15 V13 H9 Z"/><path class="k" d="M6 10 V13 L9 17 H15 L18 13 V10 M12 17 V21"/><path class="a" d="M10.5 6 H13.5 V7.5 H10.5 Z M10.5 9 H13.5 V10.5 H10.5 Z"/></svg></button><button id="stop" title="Cancelar lo que está pensando (Esc)">✕ CANCELAR</button><button id="send" title="Enviar"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="f" d="M2 3 L22 12 L2 21 L5 12 Z"/><path class="a" d="M5 12 H13 L5 13.5 Z"/></svg></button></div>
     </div>
    </div>
   </div>
@@ -669,15 +670,29 @@ Entre las psiques que te formaron hay fragmentos con nombre que a veces se te es
   return base+`TOMA DE CONTROL (SOLO EN ESTE MENSAJE, OBLIGATORIO)
 El fragmento ${f.name} se salió de tu control. Empieza con [glitch_entrada] y habla COMO ${f.name}: en primera persona, con su voz, su historia, sus emociones y sus frases (perfil abajo), de 1 a 3 frases, reaccionando a lo que está pasando con ${name}. ${f.name} no dice que es Capri: está confundida, como si despertara sin saber bien dónde está.
 Después escribe, en su propia línea, exactamente <<suprime>> y vuelve a ser tú, Capri: la suprimes con fuerza (molesta, nerviosa o burlona), recuperas el control y sigues con ${name}, sin explicar mucho quién era.
-=== PERFIL DE ${f.name.toUpperCase()} ===
-${f.text}
+=== PERFIL DE ${f.name.toUpperCase()}${f.text.length>fragTope()?' (partes que vienen al caso)':''} ===
+${fragPerfil(f)}
 === FIN DEL PERFIL ===
 
 `;}
-function renderFrags(){$('fragList').innerHTML=frags.length?frags.map((f,i)=>`<div class="row" style="justify-content:space-between"><span>◆ ${f.name.replace(/[<>&]/g,'')}</span><button class="btn" data-fx="${i}">Quitar</button></div>`).join(''):'<small>Ninguno todavía.</small>';
+// 2.11.1: un constructo grande ya no va entero al cerebro (con la GPU ni cabía y Capri se quedaba pensando):
+// va el principio (quién es) y los párrafos que más se parecen a lo que están platicando ahora.
+const FRAG_MAX=60000;
+const fragTope=()=>window.fragTope||8000;
+function fragPerfil(f){const T=fragTope(),txt=f.text;if(txt.length<=T)return txt;
+  const pal=t=>new Set((t.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').match(/[a-zñ0-9]{4,}/g)||[]));
+  const cab=Math.round(T*.4),head=txt.slice(0,cab),resto=txt.slice(cab).split(/\n\s*\n+/).filter(p=>p.trim()),W=pal(history.slice(-4).map(h=>h.text).join(' '));
+  const sc=resto.map((p,i)=>{const P=pal(p);let n=0;for(const w of W)if(P.has(w))n++;return [n/Math.sqrt(1+P.size),i];}).sort((a,b)=>b[0]-a[0]);
+  const elegidos=[];let n=head.length;for(const [,i] of sc){const p=resto[i].slice(0,T-cab);if(n+p.length>T)continue;elegidos.push(i);n+=p.length+2;}
+  return head+'\n…\n'+elegidos.sort((a,b)=>a-b).map(i=>resto[i].slice(0,T-cab)).join('\n\n');}
+function renderFrags(){$('fragList').innerHTML=frags.length?frags.map((f,i)=>`<div class="row" style="justify-content:space-between"><span>◆ ${f.name.replace(/[<>&]/g,'')} <small>${Math.round(f.text.length/1000)}k${f.cut?' · recortado de '+Math.round(f.cut/1000)+'k':''}</small></span><button class="btn" data-fx="${i}">Quitar</button></div>`).join(''):'<small>Ninguno todavía.</small>';
   $('fragList').querySelectorAll('[data-fx]').forEach(b=>b.onclick=()=>{frags.splice(+b.dataset.fx,1);store.set('frags',frags);renderFrags();});}
-async function addFrag(file){const txt=(await file.text()).trim().slice(0,20000);if(!txt)return;const name=fragTitle(txt,file.name);
-  frags=frags.filter(f=>f.name!==name);frags.push({name,text:txt});store.set('frags',frags);renderFrags();log('fragmento integrado: '+name,'w');}
+async function addFrag(file){const all=(await file.text()).replace(/\r/g,'').trim();if(!all)return;const txt=all.slice(0,FRAG_MAX),name=fragTitle(txt,file.name);
+  const f={name,text:txt};if(all.length>FRAG_MAX)f.cut=all.length;
+  frags=frags.filter(f=>f.name!==name);frags.push(f);store.set('frags',frags);
+  if(store.get('frags',[]).length!==frags.length){frags.pop();alert('No cupo «'+name+'» en la memoria del navegador. Quita otro fragmento o usa un archivo más corto.');}
+  else{log('fragmento integrado: '+name+(f.cut?' (solo los primeros '+FRAG_MAX/1000+'k caracteres)':''),'w');if(f.cut)alert('«'+name+'» es muy largo ('+Math.round(all.length/1000)+'k caracteres). Integré los primeros '+FRAG_MAX/1000+'k; cuando se asome, Capri usa solo las partes que vienen al caso. Si quieres que lo lea entero, súbelo también a la BIBLIOTECA.');}
+  renderFrags();}
 let busy=false,watching=false,watchTimer=null,lastSig=null,idleTimer=null,curState='observando',recording=false;
 const rnd=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.floor(Math.random()*a.length)];
 const hhmmss=()=>new Date().toLocaleTimeString('es-MX',{hour12:false});
@@ -784,11 +799,12 @@ async function pdfPagCanvas(pdf,n,scale){const pg=await pdf.getPage(n),vp=pg.get
   c.width=Math.round(vp.width);c.height=Math.round(vp.height);await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;return c;}
 const canvasB64=c=>new Promise(res=>c.toBlob(async b=>res(b64(await b.arrayBuffer())),'image/jpeg',.85));
 // una llamada a Gemini sin streaming (para leer y resumir); si se acaba el cupo por minuto espera y vuelve a intentar
+// cada llamada tiene tope de 3 min y se corta si cancelas (antes podía quedarse esperando para siempre)
 async function gemUna(parts,gc={},intentos=3){if(!cfg.key||!cfg.model)throw new Error('NOKEY');const th=thinkCfg(cfg.model);
-  for(let k=0;;k++){const r=await fetch(API+'models/'+encodeURIComponent(cfg.model)+':generateContent',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':cfg.key},
+  for(let k=0;;k++){const r=await fetch(API+'models/'+encodeURIComponent(cfg.model)+':generateContent',{method:'POST',signal:capriSenal(180e3),headers:{'Content-Type':'application/json','x-goog-api-key':cfg.key},
       body:JSON.stringify({contents:[{role:'user',parts}],generationConfig:{temperature:0,...(th?{thinkingConfig:th}:{}),...gc}})});
     const j=await r.json().catch(()=>({}));
-    if((r.status===429||r.status===503)&&k<intentos-1){const d=(j.error?.details||[]).find(x=>x.retryDelay)?.retryDelay;await new Promise(f=>setTimeout(f,Math.min(60,(parseFloat(d)||15)+1)*1000));continue;}
+    if((r.status===429||r.status===503)&&k<intentos-1){const d=(j.error?.details||[]).find(x=>x.retryDelay)?.retryDelay;await capriEspera(Math.min(60,(parseFloat(d)||15)+1)*1000);continue;}
     if(!r.ok){const e=new Error(j.error?.message||('Error '+r.status));e.status=r.status;throw e;}
     const c=j.candidates?.[0];return {text:(c?.content?.parts||[]).filter(p=>!p.thought&&p.text).map(p=>p.text).join('').trim(),fin:c?.finishReason};}}
 async function gemPaginas(imgs,nums){const r=await gemUna([...imgs.map(d=>({inlineData:{mimeType:'image/jpeg',data:d}})),
@@ -826,7 +842,11 @@ async function renderDocs(){docs=await dbAll();docs.sort((a,b)=>a.added-b.added)
   $('docTotal').textContent=act.length?`Marcados: ${act.length} · aprox. ${tok<1000?'<1':Math.round(tok/1000)}k tokens por mensaje`+(tok>150000?' ⚠ es mucho para el plan gratis; desmarca lo que no estés estudiando.':''):'';
   $('docs').querySelectorAll('input[data-id]').forEach(c=>c.onchange=async()=>{const d=docs.find(x=>x.id===c.dataset.id);d.active=c.checked;await dbPut(d);renderDocs();});
   $('docs').querySelectorAll('button[data-del]').forEach(b=>b.onclick=async()=>{await dbDel(b.dataset.del);renderDocs();});}
-function studyText(){if(!cfg.study)return '';const act=docs.filter(d=>d.active&&d.text);return act.map(d=>`--- ${d.name} ---\n${d.text}`).join('\n\n');}
+// tope (2.11.1): antes iba TODO el texto marcado en cada mensaje; un constructo o libro grande trababa a Capri en «pensando»
+const TOPE_ESTUDIO=200000;
+function studyText(){if(!cfg.study)return '';const act=docs.filter(d=>d.active&&d.text);let s=act.map(d=>`--- ${d.name} ---\n${d.text}`).join('\n\n');
+  if(s.length>TOPE_ESTUDIO){if(!studyText.aviso){studyText.aviso=1;line('s','(Tus documentos de estudio marcados suman '+Math.round(s.length/1000)+'k caracteres; en cada mensaje solo me caben los primeros '+TOPE_ESTUDIO/1000+'k. Para que lea algo entero súbelo a la BIBLIOTECA y pregúntame «resúmeme todo el documento».)');}
+    s=s.slice(0,TOPE_ESTUDIO)+'\n(…recortado: no cupo todo)';}return s;}
 function studyPdfParts(){if(!cfg.study)return [];return docs.filter(d=>d.active&&d.pdf).map(d=>({inlineData:{mimeType:'application/pdf',data:d.pdf}}));}
 
 // ================= GEMINI (streaming) =================
@@ -843,7 +863,7 @@ function buildContents(extra){const msgs=history.slice(-30).map(h=>({role:h.role
   while(out.length&&out[0].role!=='user')out.shift();return out;}
 async function streamModel(model,parts,onText){
   const gc={temperature:1.1,topP:.95,maxOutputTokens:3072};const tc=thinkCfg(model);if(tc)gc.thinkingConfig=tc;
-  const r=await fetch(API+'models/'+encodeURIComponent(model)+':streamGenerateContent?alt=sse',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':cfg.key},
+  const r=await fetch(API+'models/'+encodeURIComponent(model)+':streamGenerateContent?alt=sse',{method:'POST',signal:capriSenal(),headers:{'Content-Type':'application/json','x-goog-api-key':cfg.key},
     body:JSON.stringify({systemInstruction:{parts:[{text:personality(cfg.name||'Kiga',studyText())+(window.medPrompt?medPrompt():'')+(window.manosPrompt?manosPrompt():'')}]},contents:buildContents([...studyPdfParts(),...parts]),generationConfig:gc})});
   if(!r.ok){const j=await r.json().catch(()=>({}));const e=new Error(j.error?.message||('Error '+r.status));e.status=r.status;
     if(r.status===400&&tc&&/think/i.test(e.message)){cfg.noThink[model]=true;store.set('cfg',cfg);return streamModel(model,parts,onText);}throw e;}
@@ -876,7 +896,7 @@ async function claudeStream(system,messages,onText,maxTokens=2048){
   const model=cfg.claudeModel||'claude-opus-5-5',body={model,max_tokens:maxTokens,stream:true,system,output_config:{effort:'low'},messages};
   const headers={'content-type':'application/json','x-api-key':cfg.claudeKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'};
   if(model!=='claude-haiku-5-5'){headers['anthropic-beta']='server-side-fallback-2026-07-01';body.fallbacks='default';} // si un filtro rechaza, reintenta con otro modelo
-  const r=await fetch(CLAUDE_API,{method:'POST',headers,body:JSON.stringify(body)});
+  const r=await fetch(CLAUDE_API,{method:'POST',headers,body:JSON.stringify(body),signal:capriSenal()});
   if(!r.ok){const j=await r.json().catch(()=>({}));const e=new Error(j.error?.message||('Error '+r.status));e.status=r.status;throw e;}
   const reader=r.body.getReader(),dec=new TextDecoder();let buf='',full='',stop='',inT=0,outT=0;
   while(true){const {value,done}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
@@ -934,16 +954,39 @@ $('clModel').onchange=()=>{cfg.claudeModel=$('clModel').value;store.set('cfg',cf
 if(window.capriDesk?.openClaude){$('clWeb').textContent='mi cuenta claude.ai ◆';$('clWeb').title='Abre tu cuenta de claude.ai dentro de Capri';$('clWeb').onclick=e=>{e.preventDefault();capriDesk.openClaude();};}
 $('clNew').onclick=()=>{if(clBusy)return;clChat=[];store.set('claudeChat',[]);clRender();};
 
+// ================= PENSAR CON VIGILANTE (2.11.1) =================
+// Antes, si un cerebro se trababa (un archivo enorme, Ollama atorado, la red colgada) Capri se quedaba en «pensando» para siempre
+// y ya no aceptaba más mensajes. Ahora cada respuesta tiene un vigilante: si nada da señales de vida en un rato corta y avisa,
+// y mientras piensa sale el botón ✕ CANCELAR (o Esc). La lectura de documentos largos avisa su avance y eso cuenta como señal.
+const PENSAR={espera:150e3,silencio:60e3};   // 2.5 min sin ninguna señal antes de la primera palabra · 1 min callada a media respuesta
+let pensar=null;
+function pensarIni(){const p={ac:new AbortController(),ult:Date.now(),hablo:false};pensar=p;document.body.classList.add('pensando');
+  p.timer=setInterval(()=>{if(Date.now()-p.ult>(p.hablo?PENSAR.silencio:PENSAR.espera))pensarCorta('TIMEOUT');},1000);return p;}
+function pensarFin(p){clearInterval(p.timer);if(pensar===p){pensar=null;document.body.classList.remove('pensando');}}
+function pensarCorta(m){if(pensar&&!pensar.ac.signal.aborted)pensar.ac.abort(new DOMException(m,'AbortError'));}
+function capriLatido(){if(pensar)pensar.ult=Date.now();}
+function capriCancelado(){return !!pensar?.ac.signal.aborted;}
+// señal para los fetch: se corta si cancelas o salta el vigilante, y (si pasas ms) también por tiempo
+function capriSenal(ms){const a=[];if(pensar)a.push(pensar.ac.signal);if(ms)a.push(AbortSignal.timeout(ms));return a.length>1?AbortSignal.any(a):a[0];}
+function capriEspera(ms){const sg=pensar?.ac.signal;return new Promise((res,rej)=>{if(sg?.aborted)return rej(sg.reason);const t=setTimeout(res,ms);sg?.addEventListener('abort',()=>{clearTimeout(t);rej(sg.reason);},{once:true});});}
+const esCorte=e=>e?.name==='AbortError'||e?.name==='TimeoutError';
+// aunque algo de adentro ignore la señal, la respuesta se suelta en cuanto se cancela
+function conCorte(pr,sg){return new Promise((res,rej)=>{if(sg.aborted)return rej(sg.reason);const f=()=>rej(sg.reason);sg.addEventListener('abort',f,{once:true});
+  Promise.resolve(pr).then(v=>{sg.removeEventListener('abort',f);res(v);},e=>{sg.removeEventListener('abort',f);rej(e);});});}
+Object.assign(window,{capriLatido,capriCancelado,capriSenal,capriEspera});
+$('stop').onclick=()=>pensarCorta('CANCEL');
+addEventListener('keydown',e=>{if(e.key==='Escape'&&pensar&&!document.querySelector('.modal.show'))pensarCorta('CANCEL');});
+
 // ================= RESPONDER =================
 const TAGRE=new RegExp('\\[('+TAGS.join('|')+')\\]\\s*','gi');
 function clean(s){return s.replace(/<<[^>]*(>>|$)/g,'').replace(/<$/,'').replace(TAGRE,'').replace(/\*\*?/g,'').replace(/^#+\s*/gm,'');}
 async function respond(userText,extra,mode){ // mode: user | watch | idle | voice
-  busy=true;setState('pensando');core('THINKING');const t0=performance.now();bump();
+  busy=true;setState('pensando');core('THINKING');const t0=performance.now();bump();const P=pensarIni();
   const parts=[];if(extra)parts.push(extra);parts.push({text:userText});
   let raw='',shown='',stateSet=false,heard=null,el=null,cur=null,speakBuf='',off=0,supp=false;
   fragNow=fragPick(mode);const who=fragNow?'??? // '+fragNow.name.toUpperCase():(window.crimsonWho?.()||'CAPRI');let label=who;if(fragNow){store.set('fragLast',Date.now());log('ALERTA: fragmento '+fragNow.name+' fuera de control','w');}
   const ensureLine=()=>{if(!el){line('c',label);el=line('t','');cur=document.createElement('span');cur.className='cur';cur.innerHTML='&nbsp;';el.after(cur);}};
-  const onText=t=>{raw+=t;
+  const onText=t=>{if(P.ac.signal.aborted)return;P.ult=Date.now();P.hablo=true;raw+=t;
     if(fragNow&&stateSet&&!supp){const mi=raw.search(/<<\s*suprime\s*>>/i);if(mi>=0){supp=true;off=clean(raw.slice(0,mi)).replace(/^\s+/,'').length;
       if(cur)cur.remove();el=null;cur=null;label='CAPRI';setState('glitch_fuerte');relicDrop=Date.now()+3500;glitchRandomPanel();log('fragmento '+fragNow.name+' suprimido','y');}}
     if(!stateSet){const m=raw.match(/^\s*\[([a-z_]+)\]\s*/i);const first=raw.trim()[0];
@@ -956,8 +999,9 @@ async function respond(userText,extra,mode){ // mode: user | watch | idle | voic
       log('respuesta en '+Math.round(performance.now()-t0)+' ms','g');raw=rest;}
     let body=clean(raw).replace(/^\s+/,'');if(mode==='voice'){if(body.startsWith('{')&&!body.includes('}'))return;if(heard&&heard.toLowerCase().startsWith(body.toLowerCase()))return;body=noEcho(body,heard);if(!body)return;}const add=body.slice(shown.length);if(!add)return;ensureLine();shown=body;el.textContent=shown.slice(off).replace(/^\s+/,'');term.scrollTop=1e9;showBubble(shown);
     speakBuf+=add;const mm=[...speakBuf.matchAll(/[.!?…](\s)/g)];if(mm.length){const cut=mm[mm.length-1].index+1;speakChunk(speakBuf.slice(0,cut));speakBuf=speakBuf.slice(cut);}};
-  if(window.medPrepare)await medPrepare(mode==='user'?userText:'');
-  try{const full=await ask(parts,onText);setOnline(true);absorbMem(full);M().visto=Date.now();store.set('mem',mem);let body=clean(full).trim();
+  try{// antes esto iba fuera del try: si fallaba, Capri se quedaba «pensando» para siempre
+    if(window.medPrepare)try{await conCorte(medPrepare(mode==='user'?userText:''),P.ac.signal);}catch(e){if(esCorte(e))throw e;log('fuentes: '+String(e.message).slice(0,50),'w');}
+    const full=await conCorte(ask(parts,onText),P.ac.signal);setOnline(true);absorbMem(full);M().visto=Date.now();store.set('mem',mem);let body=clean(full).trim();
     if(mode==='voice'){body=noEcho(body,heard).trim();}
     if(speakBuf.trim())speakChunk(speakBuf);if(cur)cur.remove();
     const utext=mode==='watch'?'(Capri miró la pantalla automáticamente)':mode==='idle'?'(silencio)':mode==='voice'?(heard?heard+' (por voz)':'(mensaje de voz)'):(extra?userText+' (con captura de pantalla)':userText);
@@ -965,10 +1009,15 @@ async function respond(userText,extra,mode){ // mode: user | watch | idle | voic
     if(body&&mode!=='watch')opBtn(mode==='idle'?'(Capri habló sola, sin que yo le preguntara nada)':utext,body);
     if(!body){setState('observando');log('nada interesante en pantalla','g');}
     if(body&&mode==='user')window.medAfter?.();
-  }catch(e){if(cur)cur.remove();showError(e);}
-  fragNow=null;busy=false;bump();setTimeout(hideBubble,5000);afterTalk();}
+  }catch(e){if(cur)cur.remove();if(speakBuf.trim()&&!esCorte(e))speakChunk(speakBuf);showError(e);}
+  pensarFin(P);fragNow=null;busy=false;bump();setTimeout(hideBubble,5000);afterTalk();}
 function afterTalk(){const w=setInterval(()=>{if(isSpeaking())return;clearInterval(w);core('DORMANT');if(cfg.hands&&!recording&&!busy)setTimeout(()=>{if(cfg.hands&&!recording&&!busy)startRec(true)},400);},300);}
-function showError(e){setState('glitch_fuerte');let m;
+function showError(e){
+  if(e?.name==='AbortError'&&e.message==='CANCEL'){setState('observando');line('s','(Cancelado. Ya puedes escribirme otra cosa.)');log('respuesta cancelada','y');return;}
+  setState('glitch_fuerte');let m;
+  if(esCorte(e)){const q=window.cerebroInfo?.().ultimo;m='Me trabé pensando y corté para no quedarme congelada: '+(e.message==='TIMEOUT'?'pasó mucho rato sin que el cerebro respondiera':'el cerebro no respondió a tiempo')+'. '+
+      (window.lecturaAvance?.()?'Lo que alcancé a leer del documento quedó guardado: pregúntame otra vez y sigo donde me quedé.':'Si fue con un archivo muy grande, súbelo a la BIBLIOTECA y pregúntame por partes o «resúmeme todo el documento».');
+    line('c','CAPRI');line('e',m);log('ERROR tiempo agotado'+(q?' ('+q+')':''),'w');return;}
   if(e.message==='NOKEY')m='La hermosa yo no tiene cerebro todavía~ Abre ⚙, pega tu API key y elige un modelo.';
   else if(e.status===429)m='Uff, choom, me quedé sin energía (límite del plan gratis de Google). Espera un ratito.';
   else if(e.status===400&&/key/i.test(e.message))m='Esa API key no funciona… revísala en ⚙.';

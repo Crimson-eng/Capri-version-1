@@ -46,7 +46,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&listo()&&
 window.cerebroJSON=async(system,user)=>{if(!listo())return null;
   const body={model:cer.modelo,stream:false,format:'json',keep_alive:VIVO,options:{temperature:.1,num_ctx:ctxDe()},messages:[{role:'system',content:system},{role:'user',content:user}]};
   if(/qwen3|deepseek-r1/i.test(cer.modelo))body.think=false;
-  const r=await fetch(OLL+'/api/chat',{method:'POST',body:JSON.stringify(body),signal:AbortSignal.timeout(180000)});if(!r.ok)throw new Error('GPU: Error '+r.status);
+  const r=await fetch(OLL+'/api/chat',{method:'POST',body:JSON.stringify(body),signal:window.capriSenal?.(180000)||AbortSignal.timeout(180000)});if(!r.ok)throw new Error('GPU: Error '+r.status);
   const j=await r.json();const t=(j.message?.content||'').replace(/<think>[\s\S]*?<\/think>/g,'').trim();try{return JSON.parse(t);}catch(e){throw new Error('la GPU no devolvió JSON válido');}};
 const listo=()=>ok&&!!cer.modelo;
 window.cerebroInfo=()=>({ok,modelo:cer.modelo,modo:cer.modo,emb:cer.emb,mems:mems.length,ultimo,claude:cer.claude,claudeKey:!!cfg.claudeKey,gasto:claudeSpent,tope:cer.tope});
@@ -71,13 +71,14 @@ function sysPrompt(){const name=cfg.name||'Kiga';
   s=s.replace('Ahora es '+now+'.','');
   return [s,`Ahora es ${now}${now.endsWith('.')?'':'.'}\nEmpieza SIEMPRE con tu estado entre corchetes, ej. [presumida]. Contesta en español, corto y natural.`];}
 async function local(parts,onText){
-  const msgs=[{role:'system',content:sysPrompt().join('\n\n')}];
+  window.fragTope=2500;let sp;try{sp=sysPrompt();}finally{window.fragTope=0;}   // en la GPU el contexto es chico: del constructo que se asoma va lo esencial
+  const msgs=[{role:'system',content:sp.join('\n\n')}];
   for(const h of history.slice(-12))msgs.push({role:h.role==='model'?'assistant':'user',content:h.text});
   msgs.push({role:'user',content:parts.filter(p=>p.text).map(p=>p.text).join('\n')});
   const m2=[];for(const m of msgs){const l=m2[m2.length-1];if(l&&l.role===m.role&&m.role!=='system')l.content+='\n'+m.content;else m2.push({...m});}
   const body={model:cer.modelo,messages:m2,stream:true,keep_alive:VIVO,options:{temperature:1,num_ctx:ctxDe()}};
   if(/qwen3|deepseek-r1/i.test(cer.modelo))body.think=false;
-  const r=await fetch(OLL+'/api/chat',{method:'POST',body:JSON.stringify(body)});
+  const r=await fetch(OLL+'/api/chat',{method:'POST',body:JSON.stringify(body),signal:window.capriSenal?.()});   // se corta si cancelas o se traba
   if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error('GPU: '+(j.error||'Error '+r.status));}
   const reader=r.body.getReader(),dec=new TextDecoder();let buf='',raw='',sent=0;
   while(true){const {value,done}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
@@ -124,11 +125,11 @@ const _ask=ask;
 let preRec=null;
 ask=async(parts,onText)=>{
   const rec=await (preRec||recordar(parts)).catch(()=>'');preRec=null;const p2=rec?[{text:rec},...parts]:parts;
-  if(rutaClaude(parts)){let dijo=false;try{return await claudeBrain(p2,x=>{dijo=true;onText(x);});}catch(e){if(dijo)throw e;claudeFallo(e);}}
-  if(rutaLocal(parts)){let dijo=false;try{return await local(p2,x=>{dijo=true;onText(x);});}catch(e){log(String(e.message).slice(0,60),'w');if(dijo||!cfg.key||!cfg.model)throw e;}}
+  if(rutaClaude(parts)){let dijo=false;try{return await claudeBrain(p2,x=>{dijo=true;onText(x);});}catch(e){if(dijo||esCorte(e))throw e;claudeFallo(e);}}
+  if(rutaLocal(parts)){let dijo=false;try{return await local(p2,x=>{dijo=true;onText(x);});}catch(e){if(esCorte(e))throw e;log(String(e.message).slice(0,60),'w');if(dijo||!cfg.key||!cfg.model)throw e;}}
   let algo=false;
   try{const t=await _ask(p2,x=>{algo=true;onText(x);});marca('nube');return t;}
-  catch(e){const caido=e.status===429||e.status>=500||e.message==='NOKEY'||e instanceof TypeError;
+  catch(e){if(esCorte(e))throw e;const caido=e.status===429||e.status>=500||e.message==='NOKEY'||e instanceof TypeError;
     if(!algo&&caido&&claudeOk()&&!window.cerebroSinGasto&&!parts.some(p=>p.inlineData&&/^audio/.test(p.inlineData.mimeType))){
       line('s','(Gemini no respondió; te contesto con Claude.)');try{return await claudeBrain(p2,onText);}catch(e2){claudeFallo(e2);}}
     if(algo||!caido||!listo()||cer.modo==='gemini'||parts.some(p=>p.inlineData))throw e;

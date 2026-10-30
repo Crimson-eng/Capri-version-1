@@ -124,24 +124,35 @@ function objetivos(q){const qn=N(q),med=(window.medActivos?.()||[]).map(d=>({...
 const MAXDOCS=12;
 const nube=()=>!!(cfg.key&&cfg.model)&&window.cerebroInfo?.().modo!=='local';
 const gpu=()=>!!window.cerebroInfo?.().ok&&!!window.cerebroInfo().modelo;
+// un .txt o .md (un constructo, por ejemplo) no tiene páginas: antes salía UNA sección con todo el archivo y se mandaba
+// entera al cerebro, que se quedaba pensando. Ahora lo que no quepa en una sección se parte en pedazos (por párrafos).
+function partirTexto(t,S){const out=[];let i=0;while(i<t.length){let j=Math.min(t.length,i+S);
+    if(j<t.length){const k=Math.max(t.lastIndexOf('\n\n',j),t.lastIndexOf('\n',j));if(k>i+S*.5)j=k;else{const e=t.lastIndexOf('. ',j);if(e>i+S*.5)j=e+1;}}
+    out.push(t.slice(i,j));i=j;}return out;}
 function secciones(pags,S){const out=[];let c=null;
+  pags=pags.flatMap(p=>p.text.length>S?partirTexto(p.text,S-20).map(text=>({n:p.n,text})):[p]);
   for(const p of pags){if(!p.text.trim())continue;const bloque=(p.n?`[p. ${p.n}]\n`:'')+p.text;
     if(c&&c.text.length+bloque.length>S){out.push(c);c=null;}
-    if(!c)c={a:p.n||1,b:p.n||1,text:''};c.text+=(c.text?'\n':'')+bloque;c.b=p.n||c.b;}
-  if(c)out.push(c);return out;}
-const PROMPT_SEC=(nom,a,b)=>`Eres el lector de Capri. Esta es la sección de las páginas ${a} a ${b} del documento «${nom}». Saca TODO lo importante para estudiar y consultar: conceptos y definiciones, criterios diagnósticos, clasificaciones, tratamientos (fármaco, dosis, vía, duración), cifras y valores de corte, complicaciones y señales de alarma. Viñetas cortas que empiecen con guion y terminen con su página así: (p. N). Si hay varios temas, ponles un título en MAYÚSCULAS. Nada que no diga el texto; no repitas. Máximo unas 25 viñetas.`;
-async function resumeSec(nom,s,local){
-  if(!local){const r=await gemUna([{text:PROMPT_SEC(nom,s.a,s.b)+'\n\n=== TEXTO ===\n'+s.text}],{temperature:.2,maxOutputTokens:2048});if(!r.text)throw new Error('respuesta vacía');return r.text;}
-  const j=await window.cerebroJSON(PROMPT_SEC(nom,s.a,s.b)+' Responde SOLO JSON: {"puntos":[{"t":"punto corto","p":numero_de_pagina}]}',s.text);
+    if(!c)c={a:p.n||1,b:p.n||1,text:'',sinPag:!p.n};c.text+=(c.text?'\n':'')+bloque;c.b=p.n||c.b;}
+  if(c)out.push(c);out.forEach((s,i)=>{s.i=i+1;s.de=out.length;});return out;}
+const PROMPT_SEC=(nom,a,b)=>`Eres el lector de Capri. Esta es ${typeof a==='string'?a:'la sección de las páginas '+a+' a '+b} del documento «${nom}». Si no es material de estudio (un perfil, un relato, el constructo de otra IA), saca lo esencial: quién es, cómo habla, rasgos, historia, gustos, reglas y datos clave. Si es de estudio, saca TODO lo importante para estudiar y consultar: conceptos y definiciones, criterios diagnósticos, clasificaciones, tratamientos (fármaco, dosis, vía, duración), cifras y valores de corte, complicaciones y señales de alarma. Viñetas cortas que empiecen con guion y terminen con su página así: (p. N). Si hay varios temas, ponles un título en MAYÚSCULAS. Nada que no diga el texto; no repitas. Máximo unas 25 viñetas.`;
+async function resumeSec(nom,s,local){const A=s.sinPag?'la parte '+s.i+' de '+s.de:s.a;
+  if(!local){const r=await gemUna([{text:PROMPT_SEC(nom,A,s.b)+'\n\n=== TEXTO ===\n'+s.text}],{temperature:.2,maxOutputTokens:2048});if(!r.text)throw new Error('respuesta vacía');return r.text;}
+  const j=await window.cerebroJSON(PROMPT_SEC(nom,A,s.b)+' Responde SOLO JSON: {"puntos":[{"t":"punto corto","p":numero_de_pagina}]}',s.text);
   const ps=(j?.puntos||[]).filter(x=>x&&x.t);if(!ps.length)throw new Error('la GPU no sacó puntos');return ps.map(x=>'- '+x.t+(x.p?' (p. '+x.p+')':'')).join('\n');}
 async function mapa(d,lec,S,local,av){const key=d.src+':'+d.id+':'+lec.chars+':'+S+(local?':gpu':'');
   const secs=secciones(lec.paginas,S),prev=await lget(key).catch(()=>null);
   if(prev?.secs?.length===secs.length)secs.forEach((s,i)=>s.notas=prev.secs[i].notas);
   const falta=secs.filter(s=>!s.notas);let hechas=secs.length-falta.length,cola=[...falta];
   const guarda=()=>lput(key,{secs:secs.map(s=>({a:s.a,b:s.b,notas:s.notas||null})),fecha:Date.now()}).catch(()=>{});
-  const trabajador=async()=>{while(cola.length){const s=cola.shift();av(`📖 leyendo «${d.name}» completo: sección ${hechas+1} de ${secs.length} (págs. ${s.a}–${s.b})…`);
-      try{s.notas=await resumeSec(d.name,s,local);hechas++;await guarda();}catch(e){s.err=e.status===429?'sin cupo de Google':String(e.message).slice(0,60);hechas++;}}};
+  const sg=window.capriSenal?.();
+  // tope de tiempo por pregunta: lo que no alcance se queda para la siguiente (lo leído ya está guardado)
+  const hasta=Date.now()+(local?240e3:180e3),barra=()=>{const k=Math.round(10*hechas/secs.length);return '▰'.repeat(k)+'▱'.repeat(10-k)+' '+Math.round(100*hechas/secs.length)+'%';};
+  const trabajador=async()=>{while(cola.length){if(sg?.aborted||Date.now()>hasta){for(const s of cola.splice(0))s.err='no alcanzó el tiempo; pregúntame otra vez y la leo';avance.pend=true;break;}
+      const s=cola.shift();av(`📖 leyendo «${d.name}» completo ${barra()} · sección ${hechas+1} de ${secs.length}${s.a?' (págs. '+s.a+'–'+s.b+')':''}… (✕ CANCELAR para parar)`);
+      try{s.notas=await resumeSec(d.name,s,local);hechas++;await guarda();}catch(e){s.err=e.name==='AbortError'?'cancelado':e.name==='TimeoutError'?'tardó demasiado':e.status===429?'sin cupo de Google':String(e.message).slice(0,60);hechas++;}}};
   await Promise.all(Array.from({length:local?1:2},trabajador));return secs;}
+const avance={pend:false};window.lecturaAvance=()=>avance.pend;
 let ctx='',cob=[],prog=null;
 window.lecturaPesada=()=>ctx.length;
 async function prepara(q){const ds=objetivos(q);if(!ds)return false;
@@ -150,13 +161,13 @@ async function prepara(q){const ds=objetivos(q);if(!ds)return false;
   const docs=ds.slice(0,MAXDOCS),lecs=[];for(const d of docs){const l=await (d.src==='med'?window.medLectura:window.bibLectura)?.(d.id);if(l)lecs.push([d,l]);}
   if(!lecs.length)return false;
   const tot=lecs.reduce((s,[,l])=>s+l.paginas.reduce((t,p)=>t+p.text.length,0),0);
-  const av=m=>{if(!prog)prog=line('s med',m);else prog.textContent=m;};
+  const av=m=>{window.capriLatido?.();if(!prog)prog=line('s med',m);else prog.textContent=m;};avance.pend=false;
   const partes=[];cob=[];
   for(const [d,l] of lecs){const e=estadoCorto(l);
     if(tot<=DIRECTO){partes.push(`### «${d.name}» (texto completo${e.total?', '+e.total+' páginas':''})\n`+l.paginas.filter(p=>p.text.trim()).map(p=>(p.n?`[p. ${p.n}] `:'')+p.text).join('\n'));cob.push({...e,name:d.name,modo:'texto completo'});continue;}
     const secs=await mapa(d,l,S,local,av),ok=secs.filter(s=>s.notas);
-    partes.push(`### «${d.name}» (notas de ${ok.length} de ${secs.length} secciones${e.total?', '+e.total+' páginas':''})\n`+secs.map(s=>`[págs. ${s.a}–${s.b}]\n`+(s.notas||'(esta sección no se pudo leer: '+(s.err||'error')+')')).join('\n\n'));
-    cob.push({...e,name:d.name,modo:'resumen por secciones',secs:secs.length,ok:ok.length,faltan:secs.filter(s=>!s.notas).map(s=>s.a+'–'+s.b)});}
+    partes.push(`### «${d.name}» (notas de ${ok.length} de ${secs.length} secciones${e.total?', '+e.total+' páginas':''})\n`+secs.map(s=>(s.sinPag?`[parte ${s.i} de ${s.de}]\n`:`[págs. ${s.a}–${s.b}]\n`)+(s.notas||'(esta sección no se pudo leer: '+(s.err||'error')+')')).join('\n\n'));
+    cob.push({...e,name:d.name,modo:'resumen por secciones',secs:secs.length,ok:ok.length,faltan:secs.filter(s=>!s.notas).map(s=>s.sinPag?'parte '+s.i:s.a+'–'+s.b)});}
   let txt=partes.join('\n\n');
   if(txt.length>TOPE){const cada=Math.floor(TOPE/partes.length);txt=partes.map(p=>p.length>cada?p.slice(0,cada)+'\n(…recortado para que quepa)':p).join('\n\n');cob.forEach(c=>c.recorte=true);}
   ctx=txt;const n=ds.length>MAXDOCS?ds.length-MAXDOCS:0;if(n)cob.push({name:'',extra:n});
@@ -167,11 +178,11 @@ function estadoCorto(l){const pg=l.paginas.filter(p=>p.n),inf=l.lectura;
   if(!pg.length)return {total:null};const max=Math.max(...pg.map(p=>p.n)),have=new Set(pg.map(p=>p.n)),vac=[];for(let k=1;k<=max;k++)if(!have.has(k))vac.push(k);
   return {total:max,con:max-vac.length,vac,viejo:true};}
 const cobTxt=c=>c.extra?`y ${c.extra} documento(s) más que no entraron (máximo ${MAXDOCS} a la vez)`:
-  `«${c.name}»: ${c.total?c.con+' de '+c.total+' páginas con texto'+(c.vac.length?' (sin texto: p. '+rangos(c.vac)+')':''):'documento sin páginas'}${c.viejo?' (leído con una versión vieja: pudo quedar incompleto)':''} · ${c.modo}${c.secs?' ('+c.ok+' de '+c.secs+' secciones'+(c.faltan.length?'; faltaron págs. '+c.faltan.join(', '):'')+')':''}${c.recorte?' · recortado para caber':''}`;
+  `«${c.name}»: ${c.total?c.con+' de '+c.total+' páginas con texto'+(c.vac.length?' (sin texto: p. '+rangos(c.vac)+')':''):'documento sin páginas'}${c.viejo?' (leído con una versión vieja: pudo quedar incompleto)':''} · ${c.modo}${c.secs?' ('+c.ok+' de '+c.secs+' secciones'+(c.faltan.length?'; faltaron: '+c.faltan.join(', '):'')+')':''}${c.recorte?' · recortado para caber':''}`;
 
 const _prep=window.medPrepare;
 window.medPrepare=async q=>{ctx='';cob=[];
-  let g=false;try{g=!!q&&q.length>=8&&await prepara(q);}catch(e){log('lectura completa: '+String(e.message).slice(0,60),'w');if(prog){prog.remove();prog=null;}ctx='';cob=[];}
+  let g=false;try{g=!!q&&q.length>=8&&await prepara(q);}catch(e){if(e?.name==='AbortError'){if(prog){prog.remove();prog=null;}throw e;}log('lectura completa: '+String(e.message).slice(0,60),'w');if(prog){prog.remove();prog=null;}ctx='';cob=[];}
   // con lectura completa no hacen falta los trozos sueltos (y se limpian los de la pregunta anterior)
   return _prep?_prep(g?'':q):undefined;};
 const _prompt=window.medPrompt;
