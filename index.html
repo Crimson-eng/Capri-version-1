@@ -709,6 +709,15 @@ function setState(s){if(!GIFS[s])s='observando';if(s!==curState){$('pAvatar').cl
   log('estado → '+LABEL[s],'y');}
 function line(cls,txt){if(cls[0]==='u'&&window.miniPrevEl)miniPrevEl.textContent='> '+txt;const d=document.createElement('div');d.className=cls;d.textContent=txt;term.appendChild(d);term.scrollTop=1e9;return d;}
 function setOnline(ok){const c=$('con');c.textContent=ok?'● CONNECTED':'● OFFLINE';c.classList.toggle('on',ok);}
+// Al abrir, Capri revisa sola su key (solo lista modelos: no gasta cupo) y se marca CONNECTED sin esperar al saludo.
+// Si la red aún no está (Windows recién encendido) reintenta cada vez más espaciado, y otra vez en cuanto vuelve internet.
+// Si Google retiró el modelo guardado, elige otro que sí exista en vez de quedarse desconectada.
+let conT=0,conN=0;
+async function autoConectar(){clearTimeout(conT);if(!cfg.key)return setOnline(false);
+  try{const ms=await listModels(cfg.key);if(ms.length){cfg.models=ms;if(!ms.includes(cfg.model)){const viejo=cfg.model;cfg.model=rankForFree(ms)[0];$('mdl').textContent=cfg.model;if(viejo)log('modelo '+viejo+' ya no existe; ahora '+cfg.model,'y');}store.set('cfg',cfg);}
+    conN=0;setOnline(true);}
+  catch(e){setOnline(false);if(/key/i.test(e.message)){log('la key de Gemini no sirve: revísala en ⚙','w');return;}conT=setTimeout(autoConectar,Math.min(60e3,3e3*2**conN++));}}
+addEventListener('online',()=>{conN=0;autoConectar();});
 function log(txt,cls){const L=$('log');const d=document.createElement('div');d.textContent=hhmmss()+'  '+txt;if(cls)d.className=cls;L.appendChild(d);while(L.children.length>60)L.firstChild.remove();}
 
 // ================= FONDO DE ASTILLAS =================
@@ -1033,7 +1042,7 @@ function showError(e){
   else if(e.message==='SAFETY')m='…ese tema me lo bloquearon desde arriba. Ni la hermosa yo puede con eso.';
   else if(e instanceof TypeError)m='No pude conectarme a internet o a Google. Revisa tu conexión.';
   else m='Algo tronó: '+e.message;
-  if(e.status!==429&&e.message!=='NOKEY')setOnline(false);line('c','CAPRI');line('e',m);
+  if(e.status!==429&&e.message!=='NOKEY'){setOnline(false);conT=setTimeout(autoConectar,5e3);}line('c','CAPRI');line('e',m);
   if(e.status)line('s','Detalle ('+e.status+', '+cfg.model+'): '+String(e.message).slice(0,300));log('ERROR '+(e.status||'')+' '+String(e.message).slice(0,40),'w');}
 
 // ================= OÍDO (micrófono → Gemini) =================
@@ -1316,8 +1325,9 @@ const RETURN_PROMPT=(n,t)=>`(${n} acaba de abrir la app${t?' después de '+t+' s
 {const away=M().visto?Date.now()-mem.visto:0;if(cfg.key&&cfg.model&&(!mem.visto||away>2*36e5)){bootP.then(()=>setTimeout(()=>{if(!busy)respond(RETURN_PROMPT(cfg.name||'Kiga',mem.visto?ago(away):''),null,'idle');},800));}
 else bootP.then(()=>setTimeout(()=>{setState(cfg.key&&cfg.model?'presumida':'sonrisa_traviesa');line('c','CAPRI');
   line('t',cfg.key&&cfg.model?pick([`…sistema arriba. Ah, eres tú~`,`¡VOLVISTE! digo… hola. Normal. Tranqui.`,`la hermosa yo ha despertado. tiemblen, procesadores.`,`ehh ${cfg.name}, ¿me extrañaste? obvio sí.`]):"¡Sistema en línea~! Pero sin cerebro. Abre ⚙, pega tu API key de Google y dale «Conectar».");
-  if(cfg.key&&cfg.model)setOnline(true);if(cfg.alive)setTimeout(wander,2500);},350));}
+  if(cfg.alive)setTimeout(wander,2500);},350));}
 if(DESK){if(cfg.key&&cfg.model)minimize();else expand();}
+autoConectar();
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
 <script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="redaccion.js"></script><script src="crimson.js"></script><script src="tecnico.js"></script><script src="saber.js"></script><script src="clinica.js"></script><script src="mundo.js"></script><script src="expediente.js"></script><script src="biblioteca.js"></script><script src="rip.js"></script><script src="lectura.js"></script><script src="vozlocal.js"></script><script src="voz.js"></script><script src="cerebro.js"></script><script src="aprende.js"></script><script src="hilos.js"></script><script src="asocia.js"></script><script src="hud.js"></script><script src="relic.js"></script><script type="module" src="holo3d.js"></script><script type="module" src="relic3d.js"></script><script src="desk.js"></script></body></html>
