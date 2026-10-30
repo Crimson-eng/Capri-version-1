@@ -595,6 +595,23 @@ ipcMain.handle('ollama:turbo', async () => {
   } catch (e) { return { ok: false, why: 'no-ollama', msg: e.message }; }
   return { ok };
 });
+// 2.12.1: si Capri no encuentra Ollama al arrancar (cerrado o aún sin abrir), lo abre ella misma, una vez, sin cerrarle nada.
+// Usa la app de Ollama si está instalada donde la pone su instalador; si no, «ollama serve» si está en el PATH.
+ipcMain.handle('ollama:abrir', async () => {
+  const opts = { detached: true, stdio: 'ignore', windowsHide: true };
+  const lanza = (cmd, args) => new Promise((r) => {
+    try {
+      const p = spawn(cmd, args, opts);
+      p.once('error', (e) => r({ ok: false, why: e.code === 'ENOENT' ? 'no-instalado' : e.message }));
+      p.once('spawn', () => { p.unref(); r({ ok: true }); });
+    } catch (e) { r({ ok: false, why: e.message }); }
+  });
+  if (process.platform === 'win32') {
+    const appExe = path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Ollama', 'ollama app.exe');
+    if (fs.existsSync(appExe)) return lanza(appExe, []);
+  } else if (process.platform === 'darwin' && fs.existsSync('/Applications/Ollama.app')) return lanza('open', ['-a', 'Ollama']);
+  return lanza('ollama', ['serve']);
+});
 // R.I.P: bajar una fuente oficial o consultar una etiqueta de medicamento sin el bloqueo CORS del navegador.
 // Solo sitios de gobierno de México (*.gob.mx), openFDA, MedlinePlus y PubMed; nada más.
 const RIP_OK = /(^|\.)gob\.mx$|^api\.fda\.gov$|^medlineplus\.gov$|^(eutils\.)?ncbi\.nlm\.nih\.gov$|^wsearch\.nlm\.nih\.gov$/i;

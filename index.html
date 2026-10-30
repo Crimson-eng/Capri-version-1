@@ -35,7 +35,7 @@ body[data-core=LISTENING] .logo .st{background:var(--cyan);color:#021416}
 body[data-core=THINKING] .logo .st{background:var(--pur);color:#fff}
 .tray{display:flex;align-items:center;gap:12px;color:var(--mut)}
 #mclk{color:var(--ink);font:14px/1 var(--pix)}
-.con{font:11px/1 var(--pix);color:var(--red)}.con.on{color:var(--grn)}
+.con{font:11px/1 var(--pix);color:var(--red)}.con.on{color:var(--grn)}.con.wait{color:#ffb000;animation:conBlink 1s steps(2) infinite}@keyframes conBlink{50%{opacity:.45}}
 /* ---------- escritorio ---------- */
 .desk{flex:1;min-height:0;display:flex;gap:30px;padding:30px 30px 18px;position:relative;justify-content:center;overflow:hidden}
 .deskL{flex:0 1 380px;min-width:260px;display:flex;flex-direction:column;gap:26px}
@@ -708,7 +708,25 @@ function setState(s){if(!GIFS[s])s='observando';if(s!==curState){$('pAvatar').cl
   clearTimeout(idleTimer);if(!['observando','pensando','escuchando'].includes(s))idleTimer=setTimeout(()=>{if(!busy&&!recording)setState('observando')},8000);
   log('estado → '+LABEL[s],'y');}
 function line(cls,txt){if(cls[0]==='u'&&window.miniPrevEl)miniPrevEl.textContent='> '+txt;const d=document.createElement('div');d.className=cls;d.textContent=txt;term.appendChild(d);term.scrollTop=1e9;return d;}
-function setOnline(ok){const c=$('con');c.textContent=ok?'● CONNECTED':'● OFFLINE';c.classList.toggle('on',ok);}
+function setOnline(ok,como){const c=$('con');const wait=!ok&&como==='wait';
+  c.textContent=ok?'● CONNECTED':wait?'● CONECTANDO…':como==='key'?'● KEY ✖':'● OFFLINE';c.classList.toggle('on',ok);c.classList.toggle('wait',wait);
+  c.title=ok?'Conectada a Gemini':wait?'Buscando conexión con Gemini; reintento sola':como==='key'?'Google rechazó tu API key: revísala en ⚙':'Sin conexión con Gemini';
+  if(ok){nube.ok=true;nube.n=0;clearTimeout(nube.t);nube.esperan.splice(0).forEach(f=>f());}else nube.ok=false;}
+// 2.12.1: al abrir Capri (sobre todo al prender la PC) internet o Google pueden tardar unos segundos en estar listos.
+// Antes se marcaba OFFLINE al primer tropiezo y así se quedaba hasta tu siguiente mensaje. Ahora Capri prueba la conexión
+// sola (una consulta mínima que no gasta cupo), reintenta 2, 3, 5, 8… s hasta 30 s y vuelve a probar cuando regresa internet.
+const nube={ok:false,n:0,t:null,esperan:[]};
+async function vigiaNube(){clearTimeout(nube.t);if(!cfg.key||!cfg.model)return setOnline(false);setOnline(false,'wait');
+  try{const r=await fetch(API+'models?pageSize=1',{headers:{'x-goog-api-key':cfg.key},signal:AbortSignal.timeout(8000)});
+    if(r.ok||r.status===429)return setOnline(true);                  // 429 = sin cupo, pero conectada
+    if(r.status===400||r.status===401||r.status===403){log('Google rechazó la API key ('+r.status+')','w');return setOnline(false,'key');}
+    throw new Error('HTTP '+r.status);}
+  catch(e){const s=[2,3,5,8,13,20,30][Math.min(nube.n++,6)];if(nube.n===1||nube.n%5===0)log('Gemini aún no responde; reintento en '+s+' s','y');
+    setOnline(false,'wait');nube.t=setTimeout(vigiaNube,s*1000);}}
+// espera a que haya algún cerebro (Gemini o tu GPU) antes de hablar sola al abrir, con tope
+function esperaConexion(ms){return new Promise(res=>{if(nube.ok||window.cerebroInfo?.().ok)return res();const t=setTimeout(res,ms);
+  nube.esperan.push(()=>{clearTimeout(t);res();});addEventListener('capri:gpu',()=>{clearTimeout(t);res();},{once:true});});}
+addEventListener('online',()=>{if(cfg.key&&cfg.model&&!nube.ok){nube.n=0;vigiaNube();}});
 function log(txt,cls){const L=$('log');const d=document.createElement('div');d.textContent=hhmmss()+'  '+txt;if(cls)d.className=cls;L.appendChild(d);while(L.children.length>60)L.firstChild.remove();}
 
 // ================= FONDO DE ASTILLAS =================
@@ -1006,7 +1024,7 @@ async function respond(userText,extra,mode){ // mode: user | watch | idle | voic
     speakBuf+=add;const mm=[...speakBuf.matchAll(/[.!?…](\s)/g)];if(mm.length){const cut=mm[mm.length-1].index+1;speakChunk(speakBuf.slice(0,cut));speakBuf=speakBuf.slice(cut);}};
   try{// antes esto iba fuera del try: si fallaba, Capri se quedaba «pensando» para siempre
     if(window.medPrepare)try{await conCorte(medPrepare(mode==='user'?userText:''),P.ac.signal);}catch(e){if(esCorte(e))throw e;log('fuentes: '+String(e.message).slice(0,50),'w');}
-    const full=await conCorte(ask(parts,onText),P.ac.signal);setOnline(true);absorbMem(full);M().visto=Date.now();store.set('mem',mem);let body=clean(full).trim();
+    const full=await conCorte(ask(parts,onText),P.ac.signal);if((window.cerebroInfo?.().ultimo||'nube')==='nube')setOnline(true);absorbMem(full);M().visto=Date.now();store.set('mem',mem);let body=clean(full).trim();
     if(mode==='voice'){body=noEcho(body,heard).trim();}
     if(speakBuf.trim())speakChunk(speakBuf);if(cur)cur.remove();
     const utext=mode==='watch'?'(Capri miró la pantalla automáticamente)':mode==='idle'?'(silencio)':mode==='voice'?(heard?heard+' (por voz)':'(mensaje de voz)'):(extra?userText+' (con captura de pantalla)':userText);
@@ -1033,7 +1051,7 @@ function showError(e){
   else if(e.message==='SAFETY')m='…ese tema me lo bloquearon desde arriba. Ni la hermosa yo puede con eso.';
   else if(e instanceof TypeError)m='No pude conectarme a internet o a Google. Revisa tu conexión.';
   else m='Algo tronó: '+e.message;
-  if(e.status!==429&&e.message!=='NOKEY')setOnline(false);line('c','CAPRI');line('e',m);
+  if(e.status!==429&&e.message!=='NOKEY'){if(e instanceof TypeError||e.status>=500){nube.n=0;vigiaNube();}else setOnline(false,e.status===400&&/key/i.test(e.message)?'key':'');}line('c','CAPRI');line('e',m);
   if(e.status)line('s','Detalle ('+e.status+', '+cfg.model+'): '+String(e.message).slice(0,300));log('ERROR '+(e.status||'')+' '+String(e.message).slice(0,40),'w');}
 
 // ================= OÍDO (micrófono → Gemini) =================
@@ -1148,7 +1166,7 @@ $('cLoad').onclick=async()=>{const key=$('cKey').value.trim();if(!key)return;$('
   catch(e){$('cLoad').textContent='✖ '+(/key/i.test(e.message)?'Key inválida':e.message).slice(0,60);setOnline(false);}};
 $('cClose').onclick=()=>{cfg.key=$('cKey').value.trim();cfg.model=$('cModel').value;cfg.name=$('cName').value.trim()||'Kiga';cfg.every=+$('cEvery').value;cfg.idle=+$('cIdle').value;cfg.notif=$('cNotif').value==='1';askNotif();
   cfg.voiceName=$('cVoice').value;cfg.rate=+$('cRate').value;cfg.pitch=+$('cPitch').value;cfg.fx=$('cFx').value;cfg.sens=+$('cSens').value;cfg.claudeKey=$('cClaude').value.trim();cfg.claudeModel=$('cClaudeModel').value;store.set('cfg',cfg);$('modal').classList.remove('show');$('mdl').textContent=cfg.model||'—';
-  if(cfg.key&&cfg.model)setOnline(true);if(watching)schedule();bump();};
+  if(cfg.key&&cfg.model){nube.n=0;vigiaNube();}else setOnline(false);if(watching)schedule();bump();};
 $('cWipe').onclick=()=>{history=[];store.set('history',[]);term.innerHTML='';line('s','(Memoria borrada.)');};
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('show');}));
 function openLib(){renderDocs();$('studyOn').checked=cfg.study;$('lib').classList.add('show');}
@@ -1313,10 +1331,11 @@ let bootDone;const bootP=new Promise(r=>bootDone=r);
 $('mdl').textContent=cfg.model||'—';setState('glitch_entrada');core('DORMANT');ambient();setTimeout(aliveLoop,15000);bump();
 let lastQ='';history.slice(-8).forEach(h=>{if(h.role==='user'){const cm=h.text.match(/^\(Claude le dio .*? sobre tu última respuesta: ([\s\S]*)\)$/);if(cm){term.querySelector('.op:last-of-type')?.remove();line('c cl','CLAUDE // 2ª OPINIÓN');line('t cl',cm[1]);return;}lastQ=h.text;if(!/^\((Capri miró|silencio|mensaje de voz)/.test(h.text))line(/ \(por voz\)$/.test(h.text)?'u mic':'u',h.text.replace(/ \(por voz\)$/,''));}else{const b=clean(h.text).trim();if(b){line('c','CAPRI');line('t',b);if(!/^\((Capri miró|silencio)/.test(lastQ))opBtn(lastQ.replace(/ \(por voz\)$/,''),b);}}});
 const RETURN_PROMPT=(n,t)=>`(${n} acaba de abrir la app${t?' después de '+t+' sin hablarte':''}. Salúdale por tu cuenta como tú lo harías, 1 o 2 frases, según tu ánimo y lo que recuerdas de ${n}. Si te dejó mucho tiempo, que se note.)`;
-{const away=M().visto?Date.now()-mem.visto:0;if(cfg.key&&cfg.model&&(!mem.visto||away>2*36e5)){bootP.then(()=>setTimeout(()=>{if(!busy)respond(RETURN_PROMPT(cfg.name||'Kiga',mem.visto?ago(away):''),null,'idle');},800));}
+{const away=M().visto?Date.now()-mem.visto:0;if(cfg.key&&cfg.model&&(!mem.visto||away>2*36e5)){bootP.then(()=>esperaConexion(45000)).then(()=>setTimeout(()=>{if(!busy)respond(RETURN_PROMPT(cfg.name||'Kiga',mem.visto?ago(away):''),null,'idle');},800));}
 else bootP.then(()=>setTimeout(()=>{setState(cfg.key&&cfg.model?'presumida':'sonrisa_traviesa');line('c','CAPRI');
   line('t',cfg.key&&cfg.model?pick([`…sistema arriba. Ah, eres tú~`,`¡VOLVISTE! digo… hola. Normal. Tranqui.`,`la hermosa yo ha despertado. tiemblen, procesadores.`,`ehh ${cfg.name}, ¿me extrañaste? obvio sí.`]):"¡Sistema en línea~! Pero sin cerebro. Abre ⚙, pega tu API key de Google y dale «Conectar».");
-  if(cfg.key&&cfg.model)setOnline(true);if(cfg.alive)setTimeout(wander,2500);},350));}
+  if(cfg.alive)setTimeout(wander,2500);},350));}
+if(cfg.key&&cfg.model)vigiaNube();
 if(DESK){if(cfg.key&&cfg.model)minimize();else expand();}
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
