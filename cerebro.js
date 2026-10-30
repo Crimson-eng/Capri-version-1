@@ -20,7 +20,8 @@ async function ver(){
   if(ok){if(!chats().some(m=>m.n===cer.modelo))cer.modelo=(chats().find(m=>/gemma/i.test(m.n))||chats()[0])?.n||'';
     if(!embs().some(m=>m.n===cer.emb))cer.emb=(embs().find(m=>/embeddinggemma/i.test(m.n))||embs()[0])?.n||'';save();}
   pinta();if(ok&&cer.modelo&&cer.turbo&&cer.modo!=='gemini')calentar();return ok;}
-setInterval(ver,60000);setTimeout(ver,1500);
+// Ollama puede tardar en despertar cuando Windows arranca: revisa seguido al principio y luego cada minuto
+setInterval(ver,60000);[1500,5e3,12e3,25e3,40e3].forEach(t=>setTimeout(ver,t));
 
 // ---------- turbo GPU ----------
 // 1) El modelo se carga a la tarjeta en cuanto abres Capri (y se queda 2 h), así la primera respuesta no espera la carga.
