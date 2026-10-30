@@ -332,6 +332,7 @@ function pintaMedidas(){const o=$('ceBenchOut');if(!o)return;const M=cer.medidas
     '<div style="color:var(--mut)">Para comparar: mide con Turbo apagado y luego encendido. La 1ª palabra baja sobre todo porque el modelo ya está cargado; las palabras/s suben cuando está 100% en GPU.</div>':'Aún no hay mediciones.';}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 $('ceTurbo').onchange=()=>{cer.turbo=$('ceTurbo').value==='1';save();if(cer.turbo)calentar(true);pinta();};
+window.cerebroMedir=medir;window.cerebroMedidas=()=>(cer.medidas||[]).slice();window.cerebroResumen=resumenMedida;
 $('ceBench').onclick=async()=>{const b=$('ceBench');b.disabled=true;b.textContent='⚡ Midiendo…';try{await medir();}finally{b.disabled=false;b.textContent='⚡ Medir velocidad';}};
 if(window.capriDesk?.turboOllama)$('ceOllT').style.display='';
 $('ceOllT').onclick=async()=>{if(!confirm('Turbo de Ollama: activa «flash attention» y guarda el contexto a 8 bits (OLLAMA_FLASH_ATTENTION=1 y OLLAMA_KV_CACHE_TYPE=q8_0 para tu usuario de Windows). Usa la mitad de memoria de video para el contexto, así el modelo cabe entero en tu tarjeta.\n\nSe va a cerrar y volver a abrir Ollama. ¿Seguimos?'))return;
