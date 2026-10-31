@@ -141,7 +141,7 @@ if('speechSynthesis' in window){const c=speechSynthesis.cancel.bind(speechSynthe
 
 // ---------- laboratorio en Ajustes ----------
 const row=$('cPreset')?.parentElement;if(!row)return;
-const box=document.createElement('div');box.innerHTML=`<h3>Voz de Gemini <small style="font-weight:400">· laboratorio</small></h3>
+const box=document.createElement('div');box.innerHTML=`<h3>Motor y voces <small style="font-weight:400">· Gemini o tu PC</small></h3>
  <label>Motor de voz<select id="cTts"><option value="gemini">Gemini (la más natural; si no hay internet o cupo, usa la de tu PC)</option><option value="local">Voz de tu PC (sin internet ni Gemini, gratis)</option><option value="nav">Voz del navegador (la más básica)</option></select></label>
  <div id="vlBox"></div>
  <label>Voz<select id="cTtsVoice"><optgroup label="Recomendadas para Capri">${VOCES.slice(0,RECOM).map(([n,d])=>`<option value="${n}">${n} — ${d}</option>`).join('')}</optgroup><optgroup label="Todas">${VOCES.slice(RECOM).map(([n,d])=>`<option value="${n}">${n} — ${d}</option>`).join('')}</optgroup></select></label>
@@ -173,7 +173,7 @@ function pintaVL(){const b=$('vlBox');if(!b||!VL())return;const L=VL(),B=L.bajad
    <div class="row" style="justify-content:flex-start;gap:8px">${B.has(cfg.vlVoz)?`<button class="btn" id="vlTry" style="width:auto;flex:1;padding:8px 10px">▶ Probar voz de tu PC</button><button class="btn" id="vlDel" style="width:auto;flex:0 0 auto;padding:8px 10px" title="Borrar esta voz">✕</button>`
      :`<button class="btn" id="vlGet" style="width:auto;flex:1;padding:8px 10px">⬇ Bajar esta voz (una sola vez, ~60-110 MB)</button>`}
      <label class="btn" style="width:auto;flex:0 0 auto;padding:8px 10px;margin:0;cursor:pointer" title="Si ya tienes el .onnx y su .onnx.json">📁 Desde archivo<input type="file" id="vlFile" accept=".onnx,.json" multiple hidden></label></div>
-   <small>Habla con tu procesador, sin internet y sin gastar nada; tu GPU queda libre para el cerebro. Tono, velocidad, pausas y cómo suena se afinan abajo, en «Afinar su voz».</small></fieldset>`;
+   <small>Habla con tu procesador, sin internet y sin gastar nada; tu GPU queda libre para el cerebro. Tono, velocidad, pausas y cómo suena se afinan en la pestaña «Afinar».</small></fieldset>`;
   $('vlVoz').onchange=()=>{cfg.vlVoz=$('vlVoz').value;store.set('cfg',cfg);pintaVL();};
   if($('vlGet'))$('vlGet').onclick=async()=>{$('vlGet').disabled=true;try{await L.descargar(cfg.vlVoz,t=>st(t));st('✓ Voz lista. Ya puedes probarla.');}
     catch(e){st('No pude bajarla ('+String(e.message).slice(0,80)+'). ¿Hay internet? También puedes bajar el .onnx y el .onnx.json de huggingface.co/rhasspy/piper-voices y cargarlos con 📁.');}pintaVL();};

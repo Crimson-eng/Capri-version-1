@@ -3,9 +3,10 @@
 //   02 lóbulo parietal → APRENDIZAJE Y VELOCIDAD: cuánto ha aprendido y qué tan rápido piensa cada cerebro (medido en cada respuesta)
 //   03 lóbulo temporal → RECUERDOS: lo que guarda de ti, para buscar u olvidar
 //   04 tronco y chip → MEJORAS DEL CHIP: módulos instalados, ajustes de rendimiento y puertos de expansión (plan tipo Flipper Zero)
+//   05 corteza auditiva → VOZ (2.16): todo lo de su voz junto (motor, afinar, entrenar una voz propia y oído), sacado de Ajustes
 // Todo es local (localStorage), igual que el resto de Capri.
 (()=>{
-const VER='2.12';
+const VER='2.16';
 const css=document.createElement('style');css.textContent=`
 #vRelic{padding:0;overflow:hidden}
 .rl{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,440px);height:100%}
@@ -21,7 +22,7 @@ const css=document.createElement('style');css.textContent=`
 .rlst .fb{position:absolute;inset:0;display:grid;place-items:center;color:#a0565e;font:12px var(--mono)}
 #rlHost{position:absolute;inset:0}
 .rlp{border-left:1px solid var(--hr2);background:rgba(10,4,6,.92);display:flex;flex-direction:column;min-height:0}
-.rlz{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--hr2)}
+.rlz{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--hr2)}
 .rlz button{background:none;border:0;border-bottom:2px solid transparent;color:#c96a73;font:600 10px/1.25 var(--sans);letter-spacing:.06em;text-transform:uppercase;padding:10px 4px 8px;cursor:pointer}
 .rlz button i{display:block;font:9px var(--mono);font-style:normal;color:#7d4a50;letter-spacing:.2em}
 .rlz button:hover{color:#ffd0d4}.rlz button.on{color:var(--zc,var(--hc));border-bottom-color:var(--zc,var(--hc));background:rgba(255,255,255,.02)}
@@ -60,11 +61,20 @@ const css=document.createElement('style');css.textContent=`
 .mod p{margin:4px 0 0;color:#9bb;font-size:10px}.mod .row{margin-top:6px}
 .mod select{font-size:10px;padding:2px 4px}
 .rlb label.sw{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #1d0b0e;font-size:12px;color:#ffd0d4}
+/* VOZ: los controles vienen de Ajustes, así que aquí se les da el mismo estilo que allá */
+.rvt{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0 12px}.rvt button{background:none;border:1px solid #3a1a20;color:#c96a73;font:600 10px var(--sans);letter-spacing:.1em;text-transform:uppercase;padding:6px 10px;cursor:pointer}
+.rvt button.on{color:var(--zc);border-color:var(--zc);background:rgba(199,125,255,.07)}
+.rvz{display:flex;flex-direction:column;gap:12px}.rvz h3{margin:10px 0 0;color:var(--grn);font:700 11px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase}
+.rvz label{font:13px/1.4 var(--sans);color:var(--mut);display:flex;flex-direction:column;gap:6px}.rvz label.ck{flex-direction:row;align-items:center;gap:8px}
+.rvz input,.rvz select,.rvz textarea{border:1px solid #2a2733;padding:8px 10px;background:#000;color:var(--grn);font:13px var(--mono)}
+.rvz input[type=range],.rvz input[type=checkbox]{padding:0;accent-color:var(--yel)}.rvz small{color:var(--dim);line-height:1.45}
+.rvz details>summary{cursor:pointer;color:#c96a73;font:600 11px var(--sans);letter-spacing:.08em}
 @media (max-width:980px){#vRelic{overflow:auto}.rl{grid-template-columns:1fr;height:auto}.rlst{height:420px;min-height:420px}.rlp{border-left:0;border-top:1px solid var(--hr2)}.rlb{overflow:visible}.rlst .bl,.rlst .hint{display:none}}
 `;document.head.appendChild(css);
 
 const ZON=[{k:'constructos',n:'Constructos',l:'Lóbulo frontal',c:'#ff4d5e'},{k:'aprendizaje',n:'Aprendizaje y velocidad',l:'Lóbulo parietal',c:'#5ef6ff'},
-  {k:'recuerdos',n:'Recuerdos',l:'Lóbulo temporal',c:'#f3c84b'},{k:'chip',n:'Mejoras del chip',l:'Tronco · chip Relic',c:'#6bffb0'}];
+  {k:'recuerdos',n:'Recuerdos',l:'Lóbulo temporal',c:'#f3c84b'},{k:'chip',n:'Mejoras del chip',l:'Tronco · chip Relic',c:'#6bffb0'},
+  {k:'voz',n:'Voz',l:'Corteza auditiva · cómo habla y cómo te oye',c:'#c77dff'}];
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=ms=>ms==null||isNaN(ms)?'—':ms<1000?Math.round(ms)+' ms':(ms/1000).toFixed(ms<10000?2:1)+' s';
 const hace=ts=>{if(!ts)return 'nunca';const m=(Date.now()-ts)/60000;return m<1?'hace un momento':m<60?'hace '+Math.round(m)+' min':m<1440?'hace '+Math.round(m/60)+' h':'hace '+Math.round(m/1440)+' días';};
@@ -83,13 +93,13 @@ function montar(el){if(v)return;v=el;
   monta3D();hudLoop();}
 function monta3D(){const R=window.Relic3D,h=v?.querySelector('#rlHost');if(!R||!h||mounted)return;
   if(!R.attach(h)){h.innerHTML='<div class="fb">Tu equipo no pudo abrir el cerebro 3D (WebGL). Los apartados de la derecha funcionan igual.</div>';return;}
-  mounted=true;R.onPick(z=>abrir(z,true));R.select(zona);cuentas();}
+  mounted=true;R.onPick(z=>abrir(z,true));R.select(zona<4?zona:-1);cuentas();}
 addEventListener('relic3d:ready',monta3D);
 
-function abrir(z,del3D){zona=z;store.set('relicZona',z);if(!del3D)window.Relic3D?.select(z);render();}
-function render(){if(!body||!v.classList.contains('on'))return;const z=ZON[zona];v.querySelectorAll('.rlz button').forEach(b=>b.classList.toggle('on',+b.dataset.z===zona));
-  body.style.setProperty('--zc',z.c);body.innerHTML=`<h4>${z.n}</h4><div class="zt">Zona 0${zona+1} · ${z.l}</div>`+[pConstructos,pAprendizaje,pRecuerdos,pChip][zona]();
-  [aConstructos,aAprendizaje,aRecuerdos,aChip][zona]();cuentas();}
+function abrir(z,del3D){zona=z;store.set('relicZona',z);if(!del3D){window.Relic3D?.select(z<4?z:-1);if(z===4)window.Relic3D?.pulse(2,1800);}render();}
+function render(){if(!body||!v.classList.contains('on'))return;guardaVoz();const z=ZON[zona];v.querySelectorAll('.rlz button').forEach(b=>b.classList.toggle('on',+b.dataset.z===zona));
+  body.style.setProperty('--zc',z.c);body.innerHTML=`<h4>${z.n}</h4><div class="zt">Zona 0${zona+1} · ${z.l}</div>`+[pConstructos,pAprendizaje,pRecuerdos,pChip,pVoz][zona]();
+  [aConstructos,aAprendizaje,aRecuerdos,aChip,aVoz][zona]();cuentas();}
 
 // ---------- engramas por zona (las luces del cerebro) ----------
 function aprendido(){const ci=window.cerebroInfo?.()||{},ap=window.aprendeInfo?.()||{},sa=window.saberInfo?.()||{},ta=window.tallerInfo?.()||{},cr=window.crimsonInfo?.()||{};
@@ -243,6 +253,52 @@ addEventListener('capri:recuerdo',()=>{window.Relic3D?.pulse(2,3000);if(zona===2
 addEventListener('capri:fragmento',()=>window.Relic3D?.pulse(0,4000));
 addEventListener('capri:constructos',()=>{if(zona===0)render();else cuentas();});
 addEventListener('capri:medida',()=>{window.Relic3D?.pulse(1,1500);if(zona===1)render();});
+// ---------- 05 VOZ ----------
+// Junta en un solo lugar lo que estaba regado por Ajustes (voz del navegador, motor Gemini / tu PC, afinar, entrenar y oído).
+// Los controles se MUEVEN (no se copian), así que siguen funcionando igual y Ajustes → Guardar también los lee.
+const VT=[['motor','Motor'],['afinar','Afinar'],['entrenar','Entrenar'],['oido','Oído']];
+let vozTab=store.get('relicVozTab','motor'),vozP=null;
+const $$=id=>document.getElementById(id);
+// el panel siempre vive dentro de la página (escondido cuando no se ve), porque Ajustes y voz.js buscan sus controles por id
+const vozCasa=document.createElement('div');vozCasa.hidden=true;document.body.appendChild(vozCasa);
+const guardaVoz=()=>{if(vozP&&vozP.parentNode!==vozCasa)vozCasa.appendChild(vozP);};
+function armaVoz(){if(vozP)return vozP;vozP=document.createElement('div');vozP.className='rvz';vozCasa.appendChild(vozP);
+  const sec={};for(const [k] of VT){sec[k]=document.createElement('div');sec[k].className='rvz';sec[k].dataset.s=k;vozP.appendChild(sec[k]);}
+  const lab=id=>$$(id)?.closest('label'),sig=el=>el?.nextElementSibling;
+  const hVoz=[...document.querySelectorAll('#modal h3')].find(h=>/^Voz de Capri$/i.test(h.textContent.trim()));
+  const hOido=[...document.querySelectorAll('#modal h3')].find(h=>/^O[ií]do$/i.test(h.textContent.trim()));
+  const gem=$$('cTts')?.closest('div'),afinar=$$('vfDesc')?.closest('div'),grab=$$('vfGrab')?.closest('.row'),fxL=lab('cFx'),fxS=sig(fxL);
+  // Motor: Gemini / tu PC (con su laboratorio) y, guardada, la voz del navegador
+  if(gem){afinar?.remove();sec.motor.appendChild(gem);}
+  const nav=document.createElement('details');nav.innerHTML='<summary>Voz del navegador (la más básica, último respaldo)</summary>';
+  const nb=document.createElement('div');nb.className='rvz';nb.style.marginTop='8px';nav.appendChild(nb);
+  for(const el of [lab('cVoice'),sig(lab('cVoice')),lab('cRate'),lab('cPitch'),$$('cTest')?.closest('.row')])if(el)nb.appendChild(el);
+  sec.motor.appendChild(nav);
+  // Afinar: efectos y el laboratorio de afinación
+  for(const el of [fxL,fxS,afinar])if(el)sec.afinar.appendChild(el);
+  // Entrenar: la grabadora
+  const ex=document.createElement('small');ex.textContent='Para una voz de tu PC que suene humana de verdad: graba el guion (o tus frases) con tu voz o la de alguien que te dé permiso, exporta el .zip y entrénala en tu PC.';
+  sec.entrenar.appendChild(ex);if(grab)sec.entrenar.appendChild(grab);
+  // Oído: sensibilidad del micrófono y reconocer tu voz
+  if(hOido){let el=hOido.nextElementSibling;const fin=[...document.querySelectorAll('#modal h3')].find(h=>/Vida propia/i.test(h.textContent));
+    while(el&&el!==fin){const n=el.nextElementSibling;sec.oido.appendChild(el);el=n;}hOido.remove();}
+  // en Ajustes queda un atajo
+  if(hVoz){const a=document.createElement('div');a.innerHTML='<small>Todo lo de la voz (motor, afinar, entrenar una voz propia y oído) está ahora en <b>RELIC → Voz</b>.</small><div class="row" style="justify-content:flex-start;margin-top:6px"><button class="btn" id="cIrVoz" style="width:auto;padding:8px 12px">Abrir RELIC → Voz</button></div>';
+    hVoz.textContent='Voz';hVoz.after(a);a.querySelector('#cIrVoz').onclick=()=>{$$('modal')?.classList.remove('show');window.relicAbrir(4);};}
+  // aquí no hay botón «Guardar»: cada cambio se guarda al momento
+  const guarda=()=>{const v=k=>$$(k)?.value;if(v('cVoice')!=null)cfg.voiceName=v('cVoice');if(v('cRate'))cfg.rate=+v('cRate');if(v('cPitch'))cfg.pitch=+v('cPitch');if(v('cFx'))cfg.fx=v('cFx');if(v('cSens'))cfg.sens=+v('cSens');store.set('cfg',cfg);};
+  for(const id of ['cVoice','cRate','cPitch','cFx','cSens'])$$(id)?.addEventListener('change',guarda);
+  return vozP;}
+// trae los valores guardados a los controles (antes solo se cargaban al abrir Ajustes)
+function syncVoz(){const set=(id,v)=>{if($$(id)&&v!=null)$$(id).value=v;};try{window.loadVoices?.();}catch(e){}
+  set('cRate',cfg.rate);set('cPitch',cfg.pitch);set('cFx',cfg.fx||'off');set('cSens',cfg.sens);try{window.syncLbl?.();}catch(e){}
+  $$('cTts')?.dispatchEvent(new Event('change'));}
+const pVoz=()=>`<div class="rvt">${VT.map(([k,n])=>`<button data-t="${k}" class="${k===vozTab?'on':''}">${n}</button>`).join('')}</div><div id="rvHost"></div>`;
+function aVoz(){const p=armaVoz();body.querySelector('#rvHost').appendChild(p);syncVoz();
+  const show=()=>{p.querySelectorAll(':scope>[data-s]').forEach(s=>s.style.display=s.dataset.s===vozTab?'':'none');body.querySelectorAll('.rvt button').forEach(b=>b.classList.toggle('on',b.dataset.t===vozTab));};
+  body.querySelector('.rvt').onclick=e=>{const b=e.target.closest('[data-t]');if(!b)return;vozTab=b.dataset.t;store.set('relicVozTab',vozTab);show();};show();}
+// en cuanto carga, la voz se muda a RELIC (así Ajustes queda limpio aunque nunca abras la pestaña)
+setTimeout(()=>{try{armaVoz();}catch(e){console.warn('RELIC voz',e);}},0);
 addEventListener('hud:view',e=>{const {v:vv,el}=e.detail||{};if(vv!=='relic'||!el)return;montar(el);monta3D();render();});
 window.relicAbrir=z=>{hudGo('relic');setTimeout(()=>abrir(z),60);};
 })();
