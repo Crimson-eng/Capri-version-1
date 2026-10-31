@@ -54,6 +54,13 @@ function metal(ctx){if(impulse)return impulse;const L=Math.floor(ctx.sampleRate*
     for(const ms of [7,11,17,23,31])for(let k=0;k<6;k++){const i=Math.floor((ms*(k+1)+c*1.3)*ctx.sampleRate/1000);if(i<L)d[i]+=.5*Math.pow(.62,k);}}
   return impulse=b;}
 function cadena(ctx,mode,dur){const out=ctx.createGain();out.gain.value=1;if(mode==='off'){out.connect(ctx.destination);return out;}
+  if(mode==='mosaico'){const M=+cfg.mosaico,hp=ctx.createBiquadFilter();hp.type='highpass';hp.frequency.value=110;
+    const neon=ctx.createBiquadFilter();neon.type='peaking';neon.frequency.value=3300;neon.Q.value=1;neon.gain.value=1+3*M; // brillo «eléctrico»
+    const dry=ctx.createGain(),wet=ctx.createGain(),cv=ctx.createConvolver();cv.buffer=metal(ctx);wet.gain.value=.1*M;
+    out.connect(hp);hp.connect(neon);neon.connect(dry);neon.connect(cv);cv.connect(wet);const end=ctx.createGain();dry.connect(end);wet.connect(end);
+    if(SOBRECARGA.includes(curState)){const ws=ctx.createWaveShaper(),cu=new Float32Array(1024);for(let i=0;i<1024;i++){const x=i/511.5-1;cu[i]=Math.tanh((1.5+2*M)*x)*.8;}ws.curve=cu;end.connect(ws);ws.connect(ctx.destination);}
+    else end.connect(ctx.destination);
+    return out;}
   const hp=ctx.createBiquadFilter();hp.type='highpass';hp.frequency.value=140;out.connect(hp);
   const dry=ctx.createGain();dry.gain.value=.85;const wet=ctx.createGain();wet.gain.value=mode==='glitch'?.34:.24;const cv=ctx.createConvolver();cv.buffer=metal(ctx);
   const chip=ctx.createBiquadFilter();chip.type='peaking';chip.frequency.value=2800;chip.Q.value=1.2;chip.gain.value=4;
@@ -64,6 +71,28 @@ function cadena(ctx,mode,dur){const out=ctx.createGain();out.gain.value=1;if(mod
     for(let t=.3;t<dur;t+=.09)if(Math.random()<.07){g.gain.setValueAtTime(1,t0+t);g.gain.setValueAtTime(.12,t0+t+.005);g.gain.setValueAtTime(1,t0+t+.05);}}
   else end.connect(ctx.destination);
   return out;}
+// mosaico (2.14): una voz principal y, detrás, ecos de otras psiques del biochip que emergen y Capri suprime;
+// micro-cortes de estática y fluctuaciones de frecuencia. Con su ánimo cambia: enojada se sobrecarga, intensa se enfría.
+cfg.mosaico=cfg.mosaico??.5;cfg.mosGlitch=cfg.mosGlitch??.35;
+const SOBRECARGA=['enojada','glitch_fuerte','glitch_entrada','risa_malvada'],FRIA=['mirada_intensa','hipnosis','pensando'];
+function mosaico(ctx,buf,rate,t0,inp){const M=+cfg.mosaico,G=+cfg.mosGlitch,D=buf.duration/rate,fria=FRIA.includes(curState),sobre=SOBRECARGA.includes(curState);
+  // la voz principal, con micro-cortes y fluctuaciones
+  const main=ctx.createBufferSource();main.buffer=buf;main.playbackRate.value=rate;const gl=ctx.createGain();main.connect(gl);gl.connect(inp);playing.push(main);
+  for(let t=.25;t<D-.1;t+=.08){const r=Math.random();
+    if(r<.035*G){const d=.006+Math.random()*.02;gl.gain.setValueAtTime(1,t0+t);gl.gain.setValueAtTime(.04,t0+t+.002);gl.gain.setValueAtTime(1,t0+t+d);}
+    else if(r<.05*G){const c=(Math.random()<.5?-1:1)*(40+Math.random()*80);main.detune.setValueAtTime(0,t0+t);main.detune.linearRampToValueAtTime(c,t0+t+.03);main.detune.linearRampToValueAtTime(0,t0+t+.11);}}
+  main.start(t0);
+  // los ecos: la misma frase un poquito desafinada, retrasada, a los lados y más oscura
+  const n=M<=0?0:M<.4?1:M<.75?2:3;
+  for(let k=0;k<n;k++){const s=ctx.createBufferSource();s.buffer=buf;s.playbackRate.value=rate;s.detune.value=(k%2?1:-1)*(fria?90:45)*(1+k*.6);
+    const lp=ctx.createBiquadFilter();lp.type=k===1?'bandpass':'lowpass';lp.frequency.value=fria?1400:k===1?2400:3200;lp.Q.value=k===1?.9:.7;
+    const g=ctx.createGain(),peak=(fria?.2:.13)*M*(sobre?1.3:1);g.gain.value=0;
+    // emergen y se apagan solos, cada uno a su ritmo
+    for(let t=0;t<D;t+=.25+Math.random()*.5)g.gain.setTargetAtTime(Math.random()<.45?peak*(.4+Math.random()*.6):0,t0+t,.12);
+    const pan=ctx.createStereoPanner?ctx.createStereoPanner():null;s.connect(lp);lp.connect(g);
+    if(pan){pan.pan.value=[-.55,.55,0][k];g.connect(pan);pan.connect(inp);}else g.connect(inp);
+    s.start(t0+.014+k*.013);s.stop(t0+D+.05);playing.push(s);}
+  return t0+D;}
 let playing=[],ends=0;
 // rate > 1 sube el tono (la voz local se genera más lenta para compensar)
 function tocar(buf,mode,rate=1){const ctx=AC();if(ctx.state==='suspended')ctx.resume();const D=buf.duration/rate,inp=cadena(ctx,mode,D+1);let t=Math.max(ctx.currentTime+.02,ends);const t0=t;
@@ -72,8 +101,13 @@ function tocar(buf,mode,rate=1){const ctx=AC();if(ctx.state==='suspended')ctx.re
       src().start(t,off,len);t+=len/rate;
       if(off+len<buf.duration&&Math.random()<.28){for(let k=0;k<2;k++){src().start(t,Math.max(0,off+len-.07*rate),.07*rate);t+=.07;}}
       off+=len;}}
+  else if(mode==='mosaico')t=mosaico(ctx,buf,rate,t,inp);
   else{src().start(t);t+=D;}
   ends=t;return {start:t0,end:t};}
+window.vozCtx=AC;
+window.vozGeminiBuf=async text=>decode(await pedir(text,cfg.ttsVoice,styleNow(),cfg.ttsModel));
+// para el laboratorio de vozlab.js: tocar un audio con los efectos elegidos y saber cuándo termina
+window.vozDemo=(buf,rate=1,mode=cfg.fx||'off')=>{const r=tocar(buf,mode,rate);return {fin:r.end,ahora:()=>AC().currentTime,ctx:AC()};};
 function parar(){for(const s of playing)try{s.stop();}catch(e){}playing=[];ends=0;cola=[];enVuelo=false;gen++;}
 window.ttsBusy=()=>enVuelo||cola.length>0||(actx&&actx.currentTime<ends);
 
@@ -107,7 +141,7 @@ if('speechSynthesis' in window){const c=speechSynthesis.cancel.bind(speechSynthe
 
 // ---------- laboratorio en Ajustes ----------
 const row=$('cPreset')?.parentElement;if(!row)return;
-const box=document.createElement('div');box.innerHTML=`<h3>Voz de Gemini <small style="font-weight:400">· laboratorio</small></h3>
+const box=document.createElement('div');box.innerHTML=`<h3>Motor y voces <small style="font-weight:400">· Gemini o tu PC</small></h3>
  <label>Motor de voz<select id="cTts"><option value="gemini">Gemini (la más natural; si no hay internet o cupo, usa la de tu PC)</option><option value="local">Voz de tu PC (sin internet ni Gemini, gratis)</option><option value="nav">Voz del navegador (la más básica)</option></select></label>
  <div id="vlBox"></div>
  <label>Voz<select id="cTtsVoice"><optgroup label="Recomendadas para Capri">${VOCES.slice(0,RECOM).map(([n,d])=>`<option value="${n}">${n} — ${d}</option>`).join('')}</optgroup><optgroup label="Todas">${VOCES.slice(RECOM).map(([n,d])=>`<option value="${n}">${n} — ${d}</option>`).join('')}</optgroup></select></label>
@@ -136,15 +170,11 @@ function pintaVL(){const b=$('vlBox');if(!b||!VL())return;const L=VL(),B=L.bajad
   if(!ids.includes(cfg.vlVoz))cfg.vlVoz=ids[0];
   b.innerHTML=`<fieldset style="border:1px solid #2a2733;padding:8px 10px;margin:6px 0"><legend><small>Voz de tu PC (Piper)</small></legend>
    <label>Voz<select id="vlVoz">${ids.map(id=>{const v=L.VOCES.find(x=>x[0]===id);return `<option value="${id}" ${id===cfg.vlVoz?'selected':''}>${v?v[1]:'Tu voz propia (archivo)'}${B.has(id)?' ✓':''}</option>`;}).join('')}</select></label>
-   <label>Tono <small id="vlTonoV">${(+cfg.vlTono).toFixed(2)}</small><input type="range" id="vlTono" min="0.85" max="1.3" step="0.01" value="${cfg.vlTono}"></label>
-   <label>Velocidad <small id="vlVelV">${(+cfg.vlVel).toFixed(2)}</small><input type="range" id="vlVel" min="0.7" max="1.4" step="0.01" value="${cfg.vlVel}"></label>
    <div class="row" style="justify-content:flex-start;gap:8px">${B.has(cfg.vlVoz)?`<button class="btn" id="vlTry" style="width:auto;flex:1;padding:8px 10px">▶ Probar voz de tu PC</button><button class="btn" id="vlDel" style="width:auto;flex:0 0 auto;padding:8px 10px" title="Borrar esta voz">✕</button>`
      :`<button class="btn" id="vlGet" style="width:auto;flex:1;padding:8px 10px">⬇ Bajar esta voz (una sola vez, ~60-110 MB)</button>`}
      <label class="btn" style="width:auto;flex:0 0 auto;padding:8px 10px;margin:0;cursor:pointer" title="Si ya tienes el .onnx y su .onnx.json">📁 Desde archivo<input type="file" id="vlFile" accept=".onnx,.json" multiple hidden></label></div>
-   <small>Habla con tu procesador, sin internet y sin gastar nada; tu GPU queda libre para el cerebro. Los efectos cyber de arriba también se le ponen.</small></fieldset>`;
-  const set2=()=>{cfg.vlVoz=$('vlVoz').value;cfg.vlTono=+$('vlTono').value;cfg.vlVel=+$('vlVel').value;store.set('cfg',cfg);};
-  $('vlVoz').onchange=()=>{set2();pintaVL();};
-  for(const k of ['vlTono','vlVel'])$(k).oninput=()=>{set2();$(k+'V').textContent=(+$(k).value).toFixed(2);};
+   <small>Habla con tu procesador, sin internet y sin gastar nada; tu GPU queda libre para el cerebro. Tono, velocidad, pausas y cómo suena se afinan en la pestaña «Afinar».</small></fieldset>`;
+  $('vlVoz').onchange=()=>{cfg.vlVoz=$('vlVoz').value;store.set('cfg',cfg);pintaVL();};
   if($('vlGet'))$('vlGet').onclick=async()=>{$('vlGet').disabled=true;try{await L.descargar(cfg.vlVoz,t=>st(t));st('✓ Voz lista. Ya puedes probarla.');}
     catch(e){st('No pude bajarla ('+String(e.message).slice(0,80)+'). ¿Hay internet? También puedes bajar el .onnx y el .onnx.json de huggingface.co/rhasspy/piper-voices y cargarlos con 📁.');}pintaVL();};
   if($('vlDel'))$('vlDel').onclick=async()=>{if(!confirm('¿Borrar esta voz de tu PC?'))return;await L.borrar(cfg.vlVoz);pintaVL();};

@@ -11,7 +11,12 @@ const VOCES=[['es_MX-claude-high','Claude · México, femenina (la más clara)',
  ['es_ES-sharvard-medium','Sharvard · España, femenina','es/es_ES/sharvard/medium/es_ES-sharvard-medium.onnx','F'],
  ['es_MX-ald-medium','Ald · México, masculina','es/es_MX/ald/medium/es_MX-ald-medium.onnx']];
 const FUENTES=['https://huggingface.co/rhasspy/piper-voices/resolve/main/','https://huggingface.co/diffusionstudio/piper-voices/resolve/main/'];
-cfg.vlVoz=cfg.vlVoz||'es_MX-claude-high';cfg.vlTono=cfg.vlTono||1.08;cfg.vlVel=cfg.vlVel||1;
+cfg.vlVoz=cfg.vlVoz||'es_MX-claude-high';cfg.vlTono=cfg.vlTono||1;cfg.vlVel=cfg.vlVel||1;
+// 2.14: afinación para que suene humana. El tono subido por velocidad de reproducción le cambia el timbre (suena a ardilla),
+// así que de fábrica queda en 1; la expresión y el ritmo son los controles de Piper; las pausas y la «vida» las pone Capri
+const VL_FAB={vlVel:1,vlTono:1,vlExpr:.667,vlRitmo:.8,vlPausa:.3,vlCalidez:.3,vlVida:.5};
+if(!cfg.vlV2){cfg.vlV2=true;if(cfg.vlTono===1.08)cfg.vlTono=1;store.set('cfg',cfg);}
+for(const k in VL_FAB)if(cfg[k]==null)cfg[k]=VL_FAB[k];
 // según su ánimo habla un poco más rápido o más despacio, y más agudo o más grave (como hace Gemini con el «tono»)
 const ANIMO={emocionada:[1.12,1.03],risa_malvada:[1.04,.98],enojada:[1.06,.96],pensando:[.9,1],hipnosis:[.85,.97],sorpresa:[1.08,1.04],presumida:[1,1.02],mirada_intensa:[.95,.97]};
 // ---------- guardar las voces ----------
@@ -53,24 +58,50 @@ async function cargaVoz(){const id=cfg.vlVoz;if(voz?.id===id)return voz;if(vozP?
     const v=VOCES.find(x=>x[0]===id),spk=c.speaker_id_map||{};const sid=Object.keys(spk).length?(spk[v?.[3]]??Object.values(spk)[0]??0):null;
     return voz={id,ses,c,sid};})();
   vozP={id,p};try{return await p;}finally{vozP=null;}}
-const trozos=t=>{t=t.replace(/\s+/g,' ').trim();if(t.length<=260)return t?[t]:[];const out=[];let cur='';
-  for(const f of t.match(/[^.!?…;]+[.!?…;]*\s*/g)||[t]){if((cur+f).length>260&&cur){out.push(cur.trim());cur='';}cur+=f;}if(cur.trim())out.push(cur.trim());return out;};
+// frase por frase: así cada una sale con su propia entonación y entre ellas Capri respira (pausa)
+const frases=t=>{t=t.replace(/\s+/g,' ').trim();const out=[];
+  for(const f of t.match(/[^.!?…;]+[.!?…;]*["»”)]*\s*/g)||[t]){let x=f.trim();if(!x)continue;
+    while(x.length>260){let c=x.lastIndexOf(',',260);if(c<80)c=x.lastIndexOf(' ',260);if(c<80)c=260;out.push(x.slice(0,c+1).trim());x=x.slice(c+1).trim();}
+    if(x)out.push(x);}
+  return out;};
 // limpia lo que Piper leería raro: <laugh>, emojis, ~, asteriscos
 const limpia=t=>String(t).replace(/<[^>]{1,20}>/g,' ').replace(/[\u{1F000}-\u{1FFFF}☀-➿]/gu,'').replace(/[~*_#`>]|:3|[:;]\)/g,' ').replace(/\s+/g,' ').trim();
-// texto → AudioBuffer (en el AudioContext de voz.js); rate = cuánto subirle el tono al tocarlo
-async function sintetiza(text,ctx){const v=await cargaVoz(),o=await ortCarga(),inf=v.c.inference||{};const [velA,tonA]=ANIMO[curState]||[1,1];
-  const tono=+cfg.vlTono*tonA,vel=+cfg.vlVel*velA,pcms=[];
-  for(const t of trozos(limpia(text))){const ids=await fonemas(t,v.c.espeak.voice);if(!ids.length)continue;
-    const feeds={input:new o.Tensor('int64',BigInt64Array.from(ids,BigInt),[1,ids.length]),input_lengths:new o.Tensor('int64',BigInt64Array.from([BigInt(ids.length)]),[1]),
+const lim=(x,a,b)=>Math.min(b,Math.max(a,x));
+// calidez: un poco más de cuerpo en los graves y menos siseo en los agudos (Piper a 22 kHz silba algo)
+async function calida(pcm,sr,c){if(!(c>0)||!window.OfflineAudioContext)return pcm;try{const off=new OfflineAudioContext(1,pcm.length,sr),b=off.createBuffer(1,pcm.length,sr);b.getChannelData(0).set(pcm);
+  const s=off.createBufferSource();s.buffer=b;const lo=off.createBiquadFilter();lo.type='lowshelf';lo.frequency.value=260;lo.gain.value=4*c;
+  const hi=off.createBiquadFilter();hi.type='highshelf';hi.frequency.value=5500;hi.gain.value=-7*c;s.connect(lo).connect(hi).connect(off.destination);s.start();
+  return (await off.startRendering()).getChannelData(0);}catch(e){return pcm;}}
+// quita el silencio que a veces deja el modelo al principio y al final de una frase (así la pausa es la que tú eliges)
+function recorta(p,sr){let mx=0;for(const x of p)mx=Math.max(mx,Math.abs(x));const th=mx*.02,m=Math.floor(sr*.03);let a=0,b=p.length-1;
+  while(a<b&&Math.abs(p[a])<th)a++;while(b>a&&Math.abs(p[b])<th)b--;return p.slice(Math.max(0,a-m),Math.min(p.length,b+m+1));}
+// texto → AudioBuffer (en el AudioContext de voz.js); rate = cuánto subirle el tono al tocarlo. o = ajustes de prueba (laboratorio A/B)
+async function sintetiza(text,ctx,o={}){const v=await cargaVoz(),ort_=await ortCarga(),inf=v.c.inference||{};const [velA,tonA]=ANIMO[curState]||[1,1];
+  const P=Object.assign({},...Object.keys(VL_FAB).map(k=>({[k]:+cfg[k]})),o);
+  const tono=P.vlTono*tonA,vel=P.vlVel*velA,sr=v.c.audio.sample_rate,pcms=[];
+  for(const t of frases(limpia(text))){const ids=await fonemas(t,v.c.espeak.voice);if(!ids.length)continue;
+    // «vida»: cada frase sale un pelín distinta de ritmo y expresión, como cuando una persona habla
+    const r=()=>(Math.random()*2-1)*P.vlVida,vF=vel*(1+r()*.05),eF=lim(P.vlExpr*(1+r()*.15),.1,1.2),wF=lim(P.vlRitmo*(1+r()*.15),.1,1.5);
+    const feeds={input:new ort_.Tensor('int64',BigInt64Array.from(ids,BigInt),[1,ids.length]),input_lengths:new ort_.Tensor('int64',BigInt64Array.from([BigInt(ids.length)]),[1]),
       // length_scale: con el tono subido, el audio se toca más rápido; se compensa para que la velocidad sea la que elegiste
-      scales:new o.Tensor('float32',Float32Array.from([inf.noise_scale??.667,(inf.length_scale??1)*tono/vel,inf.noise_w??.8]),[3])};
-    if(v.sid!=null)feeds.sid=new o.Tensor('int64',BigInt64Array.from([BigInt(v.sid)]),[1]);
-    pcms.push((await v.ses.run(feeds)).output.data);}
+      scales:new ort_.Tensor('float32',Float32Array.from([eF,(inf.length_scale??1)*tono/vF,wF]),[3])};
+    if(v.sid!=null)feeds.sid=new ort_.Tensor('int64',BigInt64Array.from([BigInt(v.sid)]),[1]);
+    const pcm=recorta((await v.ses.run(feeds)).output.data,sr),fd=Math.min(pcm.length>>2,Math.floor(sr*.008));
+    for(let i=0;i<fd;i++){const g=i/fd;pcm[i]*=g;pcm[pcm.length-1-i]*=g;} // sin chasquidos al empezar o cortar
+    pcms.push(pcm);
+    // pausa entre frases: más larga tras ? o ! o …, y nunca exactamente igual
+    if(P.vlPausa>0)pcms.push(new Float32Array(Math.floor(sr*P.vlPausa*(/[?!…]$/.test(t)?1.25:1)*(.8+Math.random()*.4))));}
   if(!pcms.length)throw new Error('no hubo nada que decir');
-  const n=pcms.reduce((a,p)=>a+p.length,0),sr=v.c.audio.sample_rate,buf=ctx.createBuffer(1,n,sr),ch=buf.getChannelData(0);let off=0;
-  for(const p of pcms){let mx=0;for(const x of p)mx=Math.max(mx,Math.abs(x));const g=mx>0?Math.min(1.6,.92/mx):1;for(let i=0;i<p.length;i++)ch[off+i]=p[i]*g;off+=p.length;}
+  if(P.vlPausa>0)pcms.pop(); // sin silencio al final: la siguiente frase de la cola llega cuando llega
+  const n=pcms.reduce((a,p)=>a+p.length,0);let all=new Float32Array(n),off=0;for(const p of pcms){all.set(p,off);off+=p.length;}
+  all=await calida(all,sr,P.vlCalidez);
+  // un solo volumen para todo el audio (normalizar frase por frase aplana la entonación)
+  let mx=0;for(const x of all)mx=Math.max(mx,Math.abs(x));const g=mx>0?Math.min(1.6,.92/mx):1;
+  const buf=ctx.createBuffer(1,all.length,sr),ch=buf.getChannelData(0);for(let i=0;i<all.length;i++)ch[i]=all[i]*g;
+  // RVC (rvc.js): le cambia el timbre por el del modelo elegido; el tono ya lo pone RVC, así que se toca a velocidad normal
+  if(!o.sinRVC&&window.vozRVC?.activo())return {buf:await window.vozRVC.convierte(buf,ctx),rate:1};
   return {buf,rate:tono};}
-window.vozLocal={VOCES,bajadas:()=>bajadas,lista:()=>bajadas.has(cfg.vlVoz),descargar,importar,sintetiza,refresca,borrar:async id=>{await almacen.borrar(id+'.onnx');await almacen.borrar(id+'.onnx.json');if(voz?.id===id)voz=null;await refresca();},
+window.vozLocal={VOCES,VL_FAB,bajadas:()=>bajadas,lista:()=>bajadas.has(cfg.vlVoz),descargar,importar,sintetiza,refresca,borrar:async id=>{await almacen.borrar(id+'.onnx');await almacen.borrar(id+'.onnx.json');if(voz?.id===id)voz=null;await refresca();},
   precalienta:()=>bajadas.has(cfg.vlVoz)?cargaVoz().then(()=>fonoCarga()).catch(()=>{}):null};
 // si es tu voz, se prepara en cuanto Capri está quieta (así la primera frase no espera a que cargue el modelo)
 // con Gemini como motor también se deja lista (más tarde), para que el respaldo sin internet no tarde
