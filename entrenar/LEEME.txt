@@ -29,6 +29,8 @@ Consejos para que suene más humana
 - Mientras más grabes, mejor: 20-30 min ya funciona, 1 hora suena bastante mejor.
 - Siempre el mismo micrófono, el mismo cuarto y la misma distancia.
 - Lee natural, como si platicaras, con la actitud de Capri. La voz va a imitar justo eso.
+- Tus propias frases (las que agregaste en la grabadora) van como propia_0001.wav, etc. Sirven igual,
+  siempre que cada audio diga exactamente lo que está escrito.
 
 Importante: solo graba tu voz o la de alguien que te dio permiso. Nada de audios de actrices,
 personajes o personas que no lo autorizaron.
