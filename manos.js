@@ -70,7 +70,7 @@ async function ventana(kind,arg){if(!PC)return line('s','(Guardar y cerrar venta
 const RUN={abrir,escribir,cursor:agarrar,guardar:a=>ventana('guardar',a),cerrar:a=>ventana('cerrar',a)};
 
 // pedir permiso con botones dentro de la terminal
-function permiso(kind,arg){return new Promise(res=>{if(man.libre)return res(true);
+function permiso(kind,arg){return new Promise(res=>{if(man.libre&&!window.vozId?.invitado())return res(true); // a un invitado por voz siempre le pregunta
   const what=kind==='guardar'?'guardar «'+arg+'» (Ctrl+S)':kind==='cerrar'?(/sin\s*guardar/i.test(arg)?'cerrar «'+arg.split('|')[0].trim()+'» sin guardar':'guardar y cerrar «'+arg+'»'):kind==='abrir'?'abrir «'+arg+'»':kind==='escribir'?'escribir: «'+arg.slice(0,80)+(arg.length>80?'…':'')+'»':'atrapar tu puntero un momento';
   // en modo escritorio la terminal no se ve: ahí pregunta con una ventanita
   if(document.body.classList.contains('desk')){say('¿me dejas? '+what,3000);return setTimeout(()=>res(confirm('Capri quiere '+what+'.\n¿La dejas?')),300);}
