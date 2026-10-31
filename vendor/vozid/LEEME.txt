@@ -1,0 +1,10 @@
+Huella de voz de Capri (vozid.js)
+
+wespeaker_campp.onnx — modelo CAM++ de WeSpeaker entrenado en VoxCeleb (1/2), exportado a ONNX por
+el proyecto sherpa-onnx (https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-recongition-models).
+Entrada: fbank Kaldi de 80 bandas a 16 kHz con la media restada; salida: vector de 512 números.
+
+- WeSpeaker (código): Apache-2.0 — https://github.com/wenet-e2e/wespeaker
+- Modelos preentrenados en VoxCeleb: Creative Commons Attribution 4.0 (CC BY 4.0), igual que el conjunto
+  VoxCeleb con el que se entrenaron — https://www.robots.ox.ac.uk/~vgg/data/voxceleb/
+- Se ejecuta con onnxruntime-web (MIT), el mismo de vendor/piper.

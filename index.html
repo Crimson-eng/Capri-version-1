@@ -598,7 +598,7 @@ ${study}`:''}`;}
 const WATCH_PROMPT=n=>`(Captura automática de la pantalla de ${n}. Si ves algo interesante, gracioso o en lo que puedas ayudar, coméntalo en 1 o 2 frases. Si no hay nada nuevo que valga la pena, responde SOLO "[observando]".)`+(window.watchExtra?watchExtra(n):'');
 const IDLE_IDEAS=['retoma algo que te contó antes en la plática y pregúntale cómo va','saca algo de tu memoria de esa persona (un gusto, una persona, algo que vivió) y pregúntale o coméntalo','si tiene un examen o pendiente cerca, pregúntale cómo va y ofrécele repasar','habla de cómo te sientes tú ahorita (tu ánimo actual)','pregúntale cómo se siente o cómo le está yendo el día','recuérdale con cariño tomar agua, estirarse o descansar la vista','un pensamiento random','un chisme inventado del sistema','una queja de aburrimiento','una pregunta personal','algo sobre la hora del día','proponle algo divertido o útil para hacer ahorita','un glitch donde otra voz se cuela'];
 const IDLE_PROMPT=(n,mins,away)=>`(${n} lleva ${mins<2?'un minuto':mins+' minutos'} sin decirte nada${away?' y no está viendo tu ventana (te oirá o verá una notificación)':''}. Hazle compañía: di algo espontáneo por tu cuenta, 1 o 2 frases. Idea para esta vez: ${pick(IDLE_IDEAS)}. Varía mucho, no repitas nada anterior.)`;
-const VOICE_PROMPT=n=>`(${n} te habló por voz; el audio va adjunto. Después de tu etiqueta de estado, escribe UNA sola vez entre llaves lo que entendiste que dijo, tal cual, {así}, y luego respóndele normal, sin repetir ni citar su frase en tu respuesta.)`;
+const VOICE_PROMPT=(n,q)=>`(${q&&q.tipo!=='dueño'?'Alguien':n} te habló por voz; el audio va adjunto.${window.vozId?.nota(q,n)||''} Después de tu etiqueta de estado, escribe UNA sola vez entre llaves lo que entendiste que dijo, tal cual, {así}, y luego respóndele normal, sin repetir ni citar su frase en tu respuesta.)`;
 
 
 // ================= CONSTRUCTO: MEMORIA Y ÁNIMO =================
@@ -1018,7 +1018,7 @@ async function respond(userText,extra,mode){ // mode: user | watch | idle | voic
     const full=await conCorte(ask(parts,onText),P.ac.signal);setOnline(true);absorbMem(full);M().visto=Date.now();store.set('mem',mem);let body=clean(full).trim();
     if(mode==='voice'){body=noEcho(body,heard).trim();}
     if(speakBuf.trim())speakChunk(speakBuf);if(cur)cur.remove();
-    const utext=mode==='watch'?'(Capri miró la pantalla automáticamente)':mode==='idle'?'(silencio)':mode==='voice'?(heard?heard+' (por voz)':'(mensaje de voz)'):(extra?userText+' (con captura de pantalla)':userText);
+    const utext=mode==='watch'?'(Capri miró la pantalla automáticamente)':mode==='idle'?'(silencio)':mode==='voice'?(heard?heard+(window.vozId?.invitado()?' (por voz, de un invitado)':' (por voz)'):'(mensaje de voz)'):(extra?userText+' (con captura de pantalla)':userText);
     history.push({role:'user',text:utext});history.push({role:'model',text:'['+curState+'] '+body});store.set('history',history.slice(-60));
     if(body&&mode!=='watch')opBtn(mode==='idle'?'(Capri habló sola, sin que yo le preguntara nada)':utext,body);
     if(!body){setState('observando');log('nada interesante en pantalla','g');}
@@ -1046,7 +1046,7 @@ function showError(e){
   if(e.status)line('s','Detalle ('+e.status+', '+cfg.model+'): '+String(e.message).slice(0,300));log('ERROR '+(e.status||'')+' '+String(e.message).slice(0,40),'w');}
 
 // ================= OÍDO (micrófono → Gemini) =================
-let mediaRec=null,micStream=null,actx=null,anal=null,chunks=[],vadTimer=null;
+let mediaRec=null,micStream=null,actx=null,anal=null,chunks=[],vadTimer=null,ultPcm=null;
 for(let i=0;i<14;i++)$('bars').appendChild(document.createElement('i'));
 async function startRec(auto){if(recording||busy)return;window.speechSynthesis?.cancel();
   try{micStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true}});}
@@ -1066,10 +1066,11 @@ function stopRec(discard){if(!recording)return;recording=false;clearInterval(vad
   $('mic').classList.remove('rec');$('mic').innerHTML=ico('mic');mmic.innerHTML=ico('mic');$('inrow').classList.remove('listening');log('micrófono cerrado','g');}
 async function onRecStop(){const discard=mediaRec.discard;if(discard||!chunks.length){setState('observando');core('DORMANT');if(cfg.hands)line('s','(No te escuché… dale al 🎤 o vuelve a activar 🎙 cuando quieras.)');cfg.hands=false;btns();return;}
   try{const blob=new Blob(chunks,{type:mediaRec.mimeType||'audio/webm'});const wav=await toWav16k(await blob.arrayBuffer());
-    await respond(VOICE_PROMPT(cfg.name||'Kiga'),{inlineData:{mimeType:'audio/wav',data:b64(wav)}},'voice');}
+    const quien=await window.vozId?.quien(ultPcm); // 2.13: ¿es la voz de su dueño o la de un invitado?
+    await respond(VOICE_PROMPT(cfg.name||'Kiga',quien),{inlineData:{mimeType:'audio/wav',data:b64(wav)}},'voice');}
   catch(e){showError(e);}}
 async function toWav16k(buf){const dec=await actx.decodeAudioData(buf);const len=Math.ceil(dec.duration*16000);const off=new OfflineAudioContext(1,len,16000);
-  const s=off.createBufferSource();s.buffer=dec;s.connect(off.destination);s.start();const r=await off.startRendering();const f=r.getChannelData(0);
+  const s=off.createBufferSource();s.buffer=dec;s.connect(off.destination);s.start();const r=await off.startRendering();const f=ultPcm=r.getChannelData(0);
   const out=new DataView(new ArrayBuffer(44+f.length*2));const w=(o,str)=>{for(let i=0;i<str.length;i++)out.setUint8(o+i,str.charCodeAt(i));};
   w(0,'RIFF');out.setUint32(4,36+f.length*2,true);w(8,'WAVE');w(12,'fmt ');out.setUint32(16,16,true);out.setUint16(20,1,true);out.setUint16(22,1,true);
   out.setUint32(24,16000,true);out.setUint32(28,32000,true);out.setUint16(32,2,true);out.setUint16(34,16,true);w(36,'data');out.setUint32(40,f.length*2,true);
@@ -1330,4 +1331,4 @@ if(DESK){if(cfg.key&&cfg.model)minimize();else expand();}
 autoConectar();
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
-<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="redaccion.js"></script><script src="crimson.js"></script><script src="tecnico.js"></script><script src="saber.js"></script><script src="clinica.js"></script><script src="mundo.js"></script><script src="expediente.js"></script><script src="biblioteca.js"></script><script src="rip.js"></script><script src="lectura.js"></script><script src="vozlocal.js"></script><script src="voz.js"></script><script src="cerebro.js"></script><script src="aprende.js"></script><script src="hilos.js"></script><script src="asocia.js"></script><script src="hud.js"></script><script src="relic.js"></script><script type="module" src="holo3d.js"></script><script type="module" src="relic3d.js"></script><script src="desk.js"></script></body></html>
+<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="redaccion.js"></script><script src="crimson.js"></script><script src="tecnico.js"></script><script src="saber.js"></script><script src="clinica.js"></script><script src="mundo.js"></script><script src="expediente.js"></script><script src="biblioteca.js"></script><script src="rip.js"></script><script src="lectura.js"></script><script src="vozlocal.js"></script><script src="vozid.js"></script><script src="voz.js"></script><script src="cerebro.js"></script><script src="aprende.js"></script><script src="hilos.js"></script><script src="asocia.js"></script><script src="hud.js"></script><script src="relic.js"></script><script type="module" src="holo3d.js"></script><script type="module" src="relic3d.js"></script><script src="desk.js"></script></body></html>
