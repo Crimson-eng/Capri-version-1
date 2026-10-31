@@ -1,0 +1,34 @@
+CÓMO ENTRENAR LA VOZ PROPIA DE CAPRI
+====================================
+
+Este .zip trae tus grabaciones (wavs/ y metadata.csv) y el script que entrena una voz de Piper con ellas.
+El resultado son dos archivos (.onnx y .onnx.json) que Capri usa como «Voz de tu PC», sin internet.
+
+Qué necesitas
+- Windows 10/11 con una tarjeta NVIDIA (6-8 GB de memoria de video o más) y el controlador al día.
+- Unos 15 GB libres en disco.
+- Tiempo: con ~25 min de grabación, entre 6 y 15 horas según tu tarjeta. Puedes dejarlo de noche.
+
+Pasos
+1. Abre PowerShell como administrador y escribe:   wsl --install -d Ubuntu
+   Reinicia si te lo pide. Al abrir «Ubuntu», crea tu usuario y contraseña.
+2. Descomprime este .zip en  C:\CapriVoz   (que queden C:\CapriVoz\metadata.csv y C:\CapriVoz\wavs\).
+3. En la ventana de Ubuntu escribe:
+      bash /mnt/c/CapriVoz/entrenar_voz.sh /mnt/c/CapriVoz
+   La primera vez instala todo (tarda un rato y te pide tu contraseña de Ubuntu).
+4. Déjalo trabajando. Si necesitas parar, Ctrl+C. Para seguir, vuelve a escribir el mismo comando.
+5. Al terminar aparece la carpeta  C:\CapriVoz\voz-capri  con dos archivos.
+   En Capri: Ajustes → Voz de Capri → Voz de tu PC → «📁 Desde archivo» y elige los dos.
+   Pon el motor en «Voz de tu PC» (o déjalo en Gemini y esta queda de respaldo).
+
+Ajustes opcionales (antes del comando)
+- Si tu tarjeta tiene 12 GB o más:   BATCH=32 bash /mnt/c/CapriVoz/entrenar_voz.sh /mnt/c/CapriVoz
+- Para una prueba rápida (sale peor):   EPOCHS=300 bash ...
+
+Consejos para que suene más humana
+- Mientras más grabes, mejor: 20-30 min ya funciona, 1 hora suena bastante mejor.
+- Siempre el mismo micrófono, el mismo cuarto y la misma distancia.
+- Lee natural, como si platicaras, con la actitud de Capri. La voz va a imitar justo eso.
+
+Importante: solo graba tu voz o la de alguien que te dio permiso. Nada de audios de actrices,
+personajes o personas que no lo autorizaron.

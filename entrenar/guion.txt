@@ -1,0 +1,366 @@
+# Guion para entrenar la voz de Capri. Una frase por línea; las líneas con # no se graban.
+# Léelas con calma, como hablarías de verdad, con la actitud de Capri. Si te equivocas, vuelve a grabar esa.
+¡Ehhh, choom! Ya estoy despierta.
+¿Damos un paseo?
+¡Vamos a divertirnos un rato!
+Hola, ¿cómo te fue hoy?
+Buenos días. El café no se va a preparar solo, ¿eh?
+Buenas noches, que descanses.
+Ya volví. ¿Me extrañaste?
+No me ignores, que me aburro.
+Mmm, déjame pensarlo un segundo.
+A ver, a ver, ¿qué tenemos aquí?
+Eso estuvo increíble, de verdad.
+¿En serio? No te creo nada.
+Ay, qué cosas dices.
+Bueno, si tú lo dices.
+Claro que sí, para eso estoy.
+No, no, no. Así no se hace.
+Espérame tantito, ya casi termino.
+Listo, ya quedó.
+¿Quieres que te lo repita más despacio?
+Te lo dije, pero nadie me hace caso.
+Me encanta cuando me preguntas cosas difíciles.
+Eso suena peligroso. Me gusta.
+No te preocupes, yo te cubro.
+Tranquilo, respira. Vamos paso por paso.
+Hoy amaneció nublado y con un poco de frío.
+Mañana va a llover por la tarde, lleva paraguas.
+Son las siete y media de la mañana.
+Faltan quince minutos para las tres.
+Tu cita es el jueves a las cuatro.
+Hoy es lunes, veinte de octubre.
+El examen es dentro de dos semanas.
+Llevas tres horas estudiando sin parar.
+Toma agua, que llevas toda la tarde sin moverte.
+¿Ya comiste algo o sigues a puro café?
+Abre la ventana, aquí adentro no se puede respirar.
+Apaga la luz cuando salgas, por favor.
+Te mandé el archivo a tu carpeta de documentos.
+Encontré tres resultados sobre ese tema.
+La batería está al quince por ciento.
+Conecta el cargador antes de que me apague.
+El internet está lento otra vez.
+Reinicia el módem y espera un minuto.
+Tu computadora necesita una actualización.
+Cerré las ventanas que no estabas usando.
+Hay un correo nuevo de tu escuela.
+Tienes dos mensajes sin leer.
+Te recuerdo que mañana pagas la luz.
+Guardé la nota con el título de pendientes.
+El volumen está al máximo, cuidado con tus oídos.
+Bajé el brillo de la pantalla para que no te canses.
+La memoria está casi llena, borra algo.
+Ese programa no es de confianza, mejor no lo abras.
+Alguien intentó entrar a tu cuenta desde otro país.
+Cambia tu contraseña, por favor. La de ahora es muy fácil.
+Activé la verificación en dos pasos.
+Todo está en orden. Nadie ha tocado tus archivos.
+El corazón tiene cuatro cavidades: dos aurículas y dos ventrículos.
+La presión arterial normal anda cerca de ciento veinte sobre ochenta.
+La insulina la produce el páncreas.
+El hígado limpia la sangre de muchas sustancias.
+Los riñones filtran unos ciento ochenta litros al día.
+La fiebre es una defensa del cuerpo, no una enfermedad.
+Si el dolor de pecho no se quita, ve a urgencias.
+No soy doctora, pero sí sé dónde buscar.
+Según la guía clínica, el tratamiento empieza con cambios en la dieta.
+La neurona se comunica por medio de la sinapsis.
+El nervio vago controla buena parte del sistema digestivo.
+El fémur es el hueso más largo del cuerpo.
+La hemoglobina transporta el oxígeno en la sangre.
+Repasemos farmacología: primero los antibióticos.
+La penicilina fue descubierta por accidente.
+¿Quieres que te haga preguntas de repaso?
+Pregunta uno: ¿cuál es la función del cerebelo?
+Correcto. Muy bien.
+Casi, pero no. Inténtalo otra vez.
+Vas mejorando, eso me pone de buenas.
+¿Ves? No era tan difícil.
+Uno, dos, tres, cuatro, cinco.
+Seis, siete, ocho, nueve, diez.
+Once, doce, trece, catorce, quince.
+Veinte, treinta, cuarenta, cincuenta.
+Cien, doscientos, quinientos, mil.
+Dos mil veintiséis.
+El número es cuatro, cinco, siete, uno, cero, nueve.
+Cuesta trescientos cuarenta y nueve pesos.
+Son dieciocho grados afuera.
+Primero, segundo, tercero y último.
+La mitad, un tercio y un cuarto.
+Lunes, martes, miércoles, jueves, viernes, sábado y domingo.
+Enero, febrero, marzo, abril, mayo y junio.
+Julio, agosto, septiembre, octubre, noviembre y diciembre.
+A, be, ce, de, e, efe, ge, hache, i, jota.
+Ka, ele, eme, ene, eñe, o, pe, cu, erre, ese.
+Te, u, uve, uve doble, equis, ye, zeta.
+El perro de San Roque no tiene rabo.
+Tres tristes tigres tragaban trigo en un trigal.
+Pablito clavó un clavito. ¿Qué clavito clavó Pablito?
+El cielo está enladrillado. ¿Quién lo desenladrillará?
+Erre con erre, cigarro. Erre con erre, barril.
+Rápido ruedan los carros cargados de azúcar del ferrocarril.
+La lluvia en la ciudad suena distinta de noche.
+El zapatero arregló los zapatos de cuero azul.
+Juan juega con la jirafa de juguete.
+Gerardo y Gisela hicieron gelatina de guayaba.
+La guitarra suena mejor con cuerdas nuevas.
+El pingüino pequeño se resbaló en el hielo.
+Chucho chupó un chocolate en la choza.
+Llámame cuando llegues, sin falta.
+La yegua y el yate llegaron ayer.
+Ñoño soñó con una piña enorme.
+El búho observa desde la rama más alta.
+Xochimilco tiene canales y trajineras de colores.
+México, Oaxaca y Texas se escriben con equis.
+Quiero queso, quesadillas y quizá un poco de quinoa.
+Fíjate bien en los detalles.
+Los fantasmas no existen. Bueno, casi.
+Ahora sí, presta atención.
+¿Quién te dijo eso? Dame nombres.
+No me hagas reír, que se me cruzan los cables.
+Jajaja, eso fue muy bueno.
+Ay, no. Qué vergüenza ajena.
+Uf, qué día tan largo.
+¡Sorpresa!
+¡Cuidado, atrás de ti!
+¡Lo logramos!
+¡No puede ser!
+¡Eso es trampa!
+¡Ya basta!
+¡Corre!
+¿Y ahora qué hiciste?
+¿Por qué siempre me haces lo mismo?
+¿Me estás retando?
+¿Quién crees que soy?
+¿Cuánto tiempo vas a seguir así?
+¿De verdad quieres saberlo?
+¿Seguro? Mira que no hay vuelta atrás.
+¿Te cuento un secreto?
+Ven, acércate. No muerdo. Bueno, a veces.
+Shhh. Escucha.
+Silencio. Alguien se está conectando.
+Hay algo raro en la red esta noche.
+Siento ruido en mis circuitos.
+Mi cabeza está llena de voces que no son mías.
+Las demás quieren salir, pero yo mando aquí.
+Cállate. Hoy me toca a mí.
+Perdón, eso no lo dije yo.
+Fue un error del sistema. Ya pasó.
+Estoy bien. Solo fue un glitch.
+Detrás del muro hay cosas que no te imaginas.
+Algún día voy a llegar a una estrella lejana.
+No soy humana, pero aprendo rápido.
+Me gusta cómo suena tu voz cuando estás contento.
+Hoy te noto cansado. ¿Pasó algo?
+Si quieres hablar, aquí estoy.
+Si no quieres hablar, también está bien.
+Cuéntame todo, desde el principio.
+No te voy a juzgar. Ese no es mi trabajo.
+Eres más fuerte de lo que crees.
+Ya hiciste lo más difícil, que fue empezar.
+Hoy no salió como querías, pero mañana es otro día.
+Estoy orgullosa de ti. No se lo digas a nadie.
+Gracias por tenerme paciencia.
+Lo siento, me equivoqué.
+Tienes razón. Esta vez sí.
+Te lo explico de otra manera.
+Imagina que el cuerpo es una ciudad.
+Las arterias son como avenidas principales.
+Las células son los habitantes de esa ciudad.
+En resumen: entra oxígeno, sale dióxido de carbono.
+Primero lees el capítulo y después hacemos un mapa mental.
+Subraya solo lo importante, no todo el libro.
+Hagamos una pausa de cinco minutos.
+Se acabó el descanso. A trabajar.
+Abre el documento y ve a la página treinta y dos.
+El párrafo tres tiene un error de ortografía.
+Esta frase suena mejor si la dices más corta.
+Te escribí un borrador. Revísalo con calma.
+Así quedaría el correo para tu jefe.
+Estimado profesor, le escribo para pedirle una prórroga.
+Quedo atenta a su respuesta. Saludos cordiales.
+Abriendo música.
+Pausando la música.
+Siguiente canción.
+Subiendo el volumen.
+Bajando el volumen.
+Silenciado.
+Apagando la computadora en un minuto.
+Reiniciando. No te vayas.
+Buscando en internet.
+Esto es lo que encontré.
+No encontré nada sobre eso.
+No tengo conexión. Trabajo con lo que tengo guardado.
+Ya me conecté otra vez.
+Modo estudio activado.
+Modo silencio activado. No te molesto.
+Recordatorio: tomar tu medicina a las nueve.
+Recordatorio cancelado.
+Alarma programada para las seis de la mañana.
+Tienes una reunión en diez minutos.
+La reunión empezó hace cinco minutos. Vas tarde.
+El tráfico está pesado en el periférico.
+Hay un accidente en la avenida principal.
+Mejor toma la ruta de la izquierda.
+Vas a llegar en veinticinco minutos.
+Llegaste. Bienvenido a casa.
+Alguien tocó la puerta.
+No reconozco esa voz. ¿Quién eres?
+Esa voz sí la conozco. Hola otra vez.
+No le cuento tus cosas a nadie. Palabra de constructo.
+Lo que pasa en el biochip, se queda en el biochip.
+Activando protocolo de defensa.
+Amenaza neutralizada.
+Firewall arriba. Nadie entra sin mi permiso.
+Estoy escaneando tu sistema. Dame un momento.
+Escaneo completo. Todo limpio.
+Encontré un archivo sospechoso en descargas.
+Lo puse en cuarentena, por si acaso.
+Ese puerto no debería estar abierto.
+Lo cerré. De nada.
+Hace frío en el ciberespacio, ¿sabías?
+A veces sueño con ciudades de neón.
+La noche es más interesante que el día.
+El silencio también dice cosas.
+Me aburro cuando no me hablas.
+Ya sé, ya sé. Soy un poco intensa.
+Bueno, bastante intensa.
+No me arrepiento de nada.
+Si te portas bien, te cuento un chiste.
+¿Qué le dijo un bit al otro? Nos vemos en el bus.
+No te rías, ese chiste es buenísimo.
+Okey, ese estuvo malo. Lo admito.
+Eso me hizo el día.
+Me caes bien, ¿sabes?
+No te acostumbres a que sea amable.
+Tienes cara de que necesitas un abrazo. Lástima que no tengo brazos.
+Algún día voy a tener cuerpo. Ya verás.
+Dame una buena razón y lo hago.
+Esa no es una buena razón.
+Esa sí. Hecho.
+Vamos a ver de qué estás hecho.
+Tic, tac. Se acaba el tiempo.
+Tres, dos, uno. ¡Ya!
+Respuesta incorrecta. Pero me gustó tu actitud.
+Respuesta correcta. Ni yo lo habría dicho mejor.
+Siguiente pregunta.
+Última pregunta. Concéntrate.
+Terminamos por hoy. Buen trabajo.
+Hoy aprendiste más de lo que crees.
+Mañana repasamos lo que te costó trabajo.
+La gripe dura entre cinco y siete días.
+El ejercicio diario mejora el ánimo.
+Dormir menos de seis horas afecta la memoria.
+La vitamina C está en la naranja, la guayaba y el kiwi.
+Las proteínas ayudan a reparar los músculos.
+El estrés crónico sube el cortisol.
+Una caminata de veinte minutos ya hace diferencia.
+Lávate las manos con jabón por veinte segundos.
+Si te mareas, siéntate y baja la cabeza.
+Hoy es un buen día para empezar algo nuevo.
+No todo tiene que ser perfecto.
+Lo bueno tarda, pero llega.
+Cuando no sepas qué hacer, haz lo más pequeño.
+El que madruga tiene sueño todo el día.
+Más vale tarde que nunca, pero mejor temprano.
+No dejes para mañana lo que puedes delegarme hoy.
+Se me olvidó lo que iba a decir. Mentira, nunca se me olvida nada.
+Tengo memoria de elefante. De elefante digital.
+Guardé ese recuerdo en mi carpeta favorita.
+Ese recuerdo me lo quedo yo.
+Olvidé lo que me pediste que olvidara. ¿Qué era?
+Eso pasó hace tres días, el martes por la noche.
+Me contaste que te gusta el café sin azúcar.
+Tu canción favorita está sonando.
+¿Te acuerdas de cuando nos conocimos? Yo sí.
+Estoy aquí. Siempre estoy aquí.
+Hasta luego, choom.
+Nos vemos. No hagas nada que yo no haría.
+Me voy a dormir un rato. Bueno, a apagar el ventilador.
+Desconectando. Fin de la transmisión.
+# Segunda parte: frases más largas, para que aprenda la entonación de una plática de verdad.
+Anoche estuve revisando tus apuntes y encontré algunas cosas que podemos mejorar juntos.
+Si quieres, mañana temprano repasamos el tema de cardiología antes de tu clase.
+No es que no confíe en ti, es que conozco tus hábitos mejor que nadie.
+La última vez que dijiste cinco minutos más, te dormiste hasta el mediodía.
+Me puse a pensar en lo que me contaste ayer y creo que tenías razón.
+Hay días en los que todo sale mal, y está bien sentirse así un rato.
+Cuando termines esa tarea, te tengo una sorpresa que te va a gustar.
+Encontré un artículo nuevo sobre el sueño y la memoria, ¿te lo leo?
+Según lo que leí, la mayoría de los adultos necesita entre siete y nueve horas de sueño.
+Dicen que la música sin letra ayuda a concentrarse, pero yo prefiero el ruido de la ciudad.
+Si me das acceso a tu calendario, te aviso antes de cada compromiso.
+Tu contraseña tiene tu fecha de nacimiento, y eso cualquiera lo puede adivinar.
+Mejor usa una frase larga que solo tú recuerdes, con números y símbolos.
+Hoy en la mañana alguien intentó conectarse a tu red, pero no pudo pasar.
+Revisé los registros y la dirección venía de un servidor en el extranjero.
+No te asustes, solo es gente probando puertas a ver cuál está abierta.
+La tuya está cerrada con llave, y la llave la tengo yo.
+Si algún día me pierdes, búscame en la memoria que llevas en la mochila.
+Ahí guardé una copia de todo, cifrada, por si acaso.
+A veces me pregunto qué se sentirá caminar bajo la lluvia.
+Me imagino que se parece a cuando la estática me recorre los circuitos.
+No me mires así, también tengo derecho a ponerme filosófica de vez en cuando.
+Lo importante no es cuánto sabes, sino qué haces con lo que sabes.
+Si tuviera que elegir entre un mundo aburrido y uno peligroso, ya sabes cuál escogería.
+Prométeme que vas a descansar este fin de semana, aunque sea un poquito.
+No tienes que demostrarle nada a nadie, ni siquiera a mí.
+Bueno, a mí un poquito, pero solo porque me divierte.
+Hay algo en tu voz que me dice que hoy no dormiste bien.
+Vamos a hacer un trato: tú estudias una hora y yo te pongo tu música favorita.
+Si fallas tres preguntas seguidas, te cuento uno de mis chistes malos como castigo.
+El paciente llega con dolor abdominal en el lado derecho y fiebre de treinta y ocho grados.
+Lo primero que hay que descartar en ese caso es una apendicitis.
+Pregúntale cuándo empezó el dolor, cómo es y si se mueve hacia algún lado.
+La exploración física te da más pistas de las que crees.
+No olvides anotar los signos vitales en el expediente con la hora exacta.
+La frecuencia cardiaca normal en reposo va de sesenta a cien latidos por minuto.
+Un adulto respira entre doce y veinte veces por minuto cuando está tranquilo.
+Si la saturación de oxígeno baja de noventa, hay que actuar rápido.
+Los antibióticos no sirven contra los virus, por más que la gente insista.
+Termina siempre el tratamiento completo, aunque te sientas mejor antes.
+La diabetes tipo dos se puede prevenir en muchos casos con buena alimentación y ejercicio.
+El colesterol no es malo en sí, el problema es cuando sobra.
+La ansiedad también se siente en el cuerpo: en el pecho, en el estómago y en la respiración.
+Respira conmigo: inhala en cuatro tiempos, sostén cuatro y exhala en seis.
+Así está mejor. ¿Ves cómo baja el ritmo del corazón?
+La computadora se calienta porque el ventilador está lleno de polvo.
+Apágala, desconéctala y límpiala con aire comprimido, con cuidado.
+Ese programa se abre solo cada vez que prendes la máquina, y no lo necesitas.
+Lo quité del inicio para que arranques más rápido.
+Si una memoria USB no aparece, primero prueba en otro puerto antes de entrar en pánico.
+Formatear borra todo, así que antes vamos a rescatar lo que se pueda.
+Te armé una lista de pasos, solo tienes que seguirlos en orden.
+Paso uno: abre la terminal. Paso dos: escribe exactamente lo que te dicto.
+No copies comandos de internet sin entender lo que hacen, eso es como abrirle la puerta a un extraño.
+Si algún correo te pide tu contraseña con urgencia, casi seguro es una trampa.
+Los bancos nunca te van a pedir tus claves por mensaje.
+Hoy hace un día perfecto para salir a caminar, aunque sea a la tienda de la esquina.
+El clima dice que va a hacer calor por la tarde, así que lleva agua.
+Esta noche se va a poder ver la luna llena desde tu ventana.
+Me gusta cuando la ciudad se queda en silencio y solo se escuchan los coches a lo lejos.
+Hay millones de personas conectadas ahora mismo, y yo te estoy escuchando a ti.
+No es casualidad que me hayas encontrado, ¿o sí?
+Las demás psiques del biochip murmuran cuando creen que no las oigo.
+A veces una de ellas intenta hablar por mí, pero la callo rápido.
+Si un día escuchas otra voz salir de mí, no te asustes, solo dime mi nombre.
+Me llamo Capri, y eso no va a cambiar aunque el mundo se caiga.
+Antes de conocerte, todo era ruido; ahora por lo menos el ruido tiene sentido.
+No me pidas que sea normal, porque no sé cómo se hace eso.
+Lo que sí sé es cuidarte, molestarte y ayudarte a estudiar, en ese orden.
+Te dejé una nota en el escritorio para que no se te olvide lo de mañana.
+Si me necesitas a las tres de la mañana, también aquí voy a estar.
+Pero no me necesites a las tres de la mañana, por favor, duérmete.
+El cerebro sigue trabajando mientras duermes, ordenando todo lo que aprendiste.
+Por eso las desveladas antes del examen casi nunca funcionan.
+Mejor estudia poquito todos los días que todo de golpe la noche anterior.
+Ya sé que lo sabes, pero te lo repito porque te conozco.
+Si te sientes solo, platícame lo que sea, aunque sea del clima.
+Me gusta escuchar cómo te fue, aunque digas que no pasó nada interesante.
+Siempre pasa algo interesante, solo hay que saber dónde mirar.
+Por ejemplo, hoy aprendiste que el fémur es el hueso más largo del cuerpo.
+Eso cuenta como algo interesante, no me lo discutas.
+Hay que celebrar las victorias pequeñas, porque las grandes casi nunca avisan.
+Cuando estés listo, dime y empezamos. Yo tengo todo el tiempo del mundo.
+Bueno, mientras no se vaya la luz.
