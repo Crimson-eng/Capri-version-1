@@ -32,5 +32,10 @@ Consejos para que suene más humana
 - Tus propias frases (las que agregaste en la grabadora) van como propia_0001.wav, etc. Sirven igual,
   siempre que cada audio diga exactamente lo que está escrito.
 
+Otra opción: RVC (cambia el timbre de la voz de tu PC)
+- Con estas mismas grabaciones (carpeta wavs/, 10 min o más) puedes entrenar un modelo RVC v2 en RVC WebUI o Applio.
+- Si te queda un .pth, conviértelo a .onnx con:   bash /mnt/c/CapriVoz/rvc_a_onnx.sh /mnt/c/CapriVoz/mi_voz.pth
+- En Capri: RELIC → Voz → RVC: baja ContentVec una vez, carga el .onnx y activa «Usar RVC».
+
 Importante: solo graba tu voz o la de alguien que te dio permiso. Nada de audios de actrices,
 personajes o personas que no lo autorizaron.

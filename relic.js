@@ -6,7 +6,7 @@
 //   05 corteza auditiva → VOZ (2.16): todo lo de su voz junto (motor, afinar, entrenar una voz propia y oído), sacado de Ajustes
 // Todo es local (localStorage), igual que el resto de Capri.
 (()=>{
-const VER='2.16';
+const VER='2.17';
 const css=document.createElement('style');css.textContent=`
 #vRelic{padding:0;overflow:hidden}
 .rl{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,440px);height:100%}
@@ -256,7 +256,7 @@ addEventListener('capri:medida',()=>{window.Relic3D?.pulse(1,1500);if(zona===1)r
 // ---------- 05 VOZ ----------
 // Junta en un solo lugar lo que estaba regado por Ajustes (voz del navegador, motor Gemini / tu PC, afinar, entrenar y oído).
 // Los controles se MUEVEN (no se copian), así que siguen funcionando igual y Ajustes → Guardar también los lee.
-const VT=[['motor','Motor'],['afinar','Afinar'],['entrenar','Entrenar'],['oido','Oído']];
+const VT=[['motor','Motor'],['afinar','Afinar'],['rvc','RVC'],['entrenar','Entrenar'],['oido','Oído']];
 let vozTab=store.get('relicVozTab','motor'),vozP=null;
 const $$=id=>document.getElementById(id);
 // el panel siempre vive dentro de la página (escondido cuando no se ve), porque Ajustes y voz.js buscan sus controles por id
@@ -276,6 +276,8 @@ function armaVoz(){if(vozP)return vozP;vozP=document.createElement('div');vozP.c
   sec.motor.appendChild(nav);
   // Afinar: efectos y el laboratorio de afinación
   for(const el of [fxL,fxS,afinar])if(el)sec.afinar.appendChild(el);
+  // RVC: modelos de conversión de voz (rvc.js)
+  if($$('rvcBox'))sec.rvc.appendChild($$('rvcBox'));
   // Entrenar: la grabadora
   const ex=document.createElement('small');ex.textContent='Para una voz de tu PC que suene humana de verdad: graba el guion (o tus frases) con tu voz o la de alguien que te dé permiso, exporta el .zip y entrénala en tu PC.';
   sec.entrenar.appendChild(ex);if(grab)sec.entrenar.appendChild(grab);

@@ -98,6 +98,8 @@ async function sintetiza(text,ctx,o={}){const v=await cargaVoz(),ort_=await ortC
   // un solo volumen para todo el audio (normalizar frase por frase aplana la entonación)
   let mx=0;for(const x of all)mx=Math.max(mx,Math.abs(x));const g=mx>0?Math.min(1.6,.92/mx):1;
   const buf=ctx.createBuffer(1,all.length,sr),ch=buf.getChannelData(0);for(let i=0;i<all.length;i++)ch[i]=all[i]*g;
+  // RVC (rvc.js): le cambia el timbre por el del modelo elegido; el tono ya lo pone RVC, así que se toca a velocidad normal
+  if(!o.sinRVC&&window.vozRVC?.activo())return {buf:await window.vozRVC.convierte(buf,ctx),rate:1};
   return {buf,rate:tono};}
 window.vozLocal={VOCES,VL_FAB,bajadas:()=>bajadas,lista:()=>bajadas.has(cfg.vlVoz),descargar,importar,sintetiza,refresca,borrar:async id=>{await almacen.borrar(id+'.onnx');await almacen.borrar(id+'.onnx.json');if(voz?.id===id)voz=null;await refresca();},
   precalienta:()=>bajadas.has(cfg.vlVoz)?cargaVoz().then(()=>fonoCarga()).catch(()=>{}):null};

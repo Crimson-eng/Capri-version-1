@@ -103,7 +103,7 @@ g('gExp').onclick=async()=>{await refresca();if(hechas.size<20){msg('Graba por l
   msg('Armando el .zip…');try{if(!window.JSZip)await script('vendor/lectores/jszip.min.js');const z=new JSZip(),csv=[];let s=0;
     for(const k of [...hechas].sort((a,b)=>a-b)){const r=await toma(k),n=(k<10000?'capri_'+String(k+1).padStart(4,'0'):'propia_'+String(k-9999).padStart(4,'0'))+'.wav';z.file('wavs/'+n,r.wav);csv.push(n+'|'+r.texto.replace(/\|/g,' '));s+=r.dur;}
     z.file('metadata.csv',csv.join('\n')+'\n');
-    for(const f of ['entrenar_voz.sh','LEEME.txt'])z.file(f,await (await fetch('entrenar/'+f)).text());
+    for(const f of ['entrenar_voz.sh','rvc_a_onnx.sh','LEEME.txt'])z.file(f,await (await fetch('entrenar/'+f)).text());
     z.file('PERMISO.txt',`Voz de: ${g('gQuien').value.trim()}\nFecha: ${new Date().toLocaleString()}\nQuien grabó confirmó que la voz es suya o que tiene permiso de su dueña/dueño para usarla en Capri.\n`);
     const blob=await z.generateAsync({type:'blob'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='capri-voz-entrenar.zip';document.body.appendChild(a);a.click();a.remove();
     msg(`✓ Listo: ${hechas.size} frases, ${(s/60).toFixed(1)} min. Abre LEEME.txt dentro del .zip para entrenar.`,'ok');}

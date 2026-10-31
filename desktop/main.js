@@ -632,7 +632,8 @@ const vozOk = (n) => typeof n === 'string' && /^[A-Za-z0-9_.-]{3,80}\.onnx(\.jso
 ipcMain.handle('voz:lista', () => { try { return fs.readdirSync(VOCES()).filter(vozOk); } catch { return []; } });
 ipcMain.handle('voz:leer', (e, n) => { if (!vozOk(n)) throw new Error('nombre'); return fs.promises.readFile(path.join(VOCES(), n)); });
 ipcMain.handle('voz:guardar', async (e, n, bytes) => {
-  if (!vozOk(n) || !(bytes instanceof Uint8Array) || bytes.byteLength > 200 * 1024 * 1024) throw new Error('nombre');
+  // ContentVec (el extractor de RVC) pesa ~360 MB; las voces, menos de 200
+  if (!vozOk(n) || !(bytes instanceof Uint8Array) || bytes.byteLength > (n.startsWith('contentvec') ? 600 : 200) * 1024 * 1024) throw new Error('nombre');
   await fs.promises.mkdir(VOCES(), { recursive: true });
   await escribeAtomico(path.join(VOCES(), n), Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)); return true;
 });
