@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cerebro de Capri</title>
+<style>
+:root{--bg:#07030a;--pan:#12060c;--hud:#ff4d5e;--cy:#5ef6ff;--ink:#f3e6ea;--mut:#9a7f88;--mono:ui-monospace,Consolas,"Cascadia Mono",monospace}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono)}
+body{min-height:100vh;display:flex;flex-direction:column;background:radial-gradient(ellipse at top,#2a0610 0,#07030a 60%)}
+header{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid #ff4d5e55;color:var(--hud);letter-spacing:.15em}
+header b{font-size:15px}header small{color:var(--mut);letter-spacing:0}.dot{width:9px;height:9px;border-radius:50%;background:var(--hud);box-shadow:0 0 10px var(--hud)}
+.dot.on{background:#2dff8f;box-shadow:0 0 10px #2dff8f}main{flex:1;display:grid;grid-template-columns:1fr 320px;gap:14px;padding:14px 16px;max-width:1100px;width:100%;margin:0 auto}
+@media(max-width:820px){main{grid-template-columns:1fr}}
+.pan{background:linear-gradient(180deg,#1a070e,#0c0407);border:1px solid #ff4d5e44;padding:12px;position:relative}
+.pan h3{margin:0 0 10px;font-size:12px;color:var(--cy);letter-spacing:.2em}
+#chat{display:flex;flex-direction:column;min-height:60vh}
+#log{flex:1;overflow:auto;max-height:62vh;padding-right:4px}
+.m{margin:0 0 10px;line-height:1.45;white-space:pre-wrap;word-wrap:break-word}.m.u{color:var(--cy)}.m.u::before{content:"> "}
+.m.c::before{content:"CAPRI // ";color:var(--hud);font-size:11px}.m.s{color:var(--mut);font-size:12px}
+form{display:flex;gap:8px;margin-top:8px}input,select{background:#0a0306;color:var(--ink);border:1px solid #ff4d5e66;padding:9px;font:inherit;min-width:0}
+input:focus{outline:1px solid var(--cy)}#q{flex:1}
+button{background:#2a0610;color:var(--hud);border:1px solid var(--hud);padding:8px 12px;font:inherit;cursor:pointer;letter-spacing:.08em}
+button:hover{background:var(--hud);color:#07030a}button:disabled{opacity:.5;cursor:wait}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 0;font-size:13px}
+.row input[type=number]{width:62px}.k{color:var(--mut);font-size:12px;line-height:1.5}.k b{color:var(--ink)}
+input[type=checkbox]{accent-color:var(--hud);width:18px;height:18px}
+code{color:var(--cy);word-break:break-all}.solo-pc{}
+</style></head><body>
+<header><span class="dot" id="dot"></span><b>CEREBRO DE CAPRI</b><small id="sub">conectando…</small></header>
+<main>
+  <section class="pan" id="chat"><h3>PLÁTICA</h3><div id="log"></div>
+    <form id="f"><input id="q" placeholder="Háblale a Capri…" autocomplete="off"><button id="b">ENVIAR</button></form></section>
+  <aside>
+    <div class="pan"><h3>ESTADO</h3><div class="k" id="est"></div></div>
+    <div class="pan solo-pc" style="margin-top:14px"><h3>VIDA PROPIA</h3>
+      <div class="row">Hablarme con la app cerrada <input type="checkbox" id="corazon"></div>
+      <div class="row">Cada (min) <span><input type="number" id="lo" min="5"> a <input type="number" id="hi" min="5"></span></div>
+      <div class="row">Silencio de <span><input type="number" id="s1" min="0" max="23"> a <input type="number" id="s2" min="0" max="23"> h</span></div>
+      <div class="row">Máximo al día <input type="number" id="max" min="1" max="48"></div>
+      <div class="row">Notificación <input type="checkbox" id="notif"></div>
+      <div class="row">En voz alta (voz de la PC) <input type="checkbox" id="voz"></div>
+      <div class="row">Prender con la PC <input type="checkbox" id="inicio"></div>
+      <div class="row"><button id="ya" type="button">QUE HABLE YA</button></div>
+    </div>
+    <div class="pan solo-pc" style="margin-top:14px"><h3>CONEXIONES</h3>
+      <div class="k">Key de Gemini (para que piense con la app cerrada; si no hay, usa Ollama de tu PC):</div>
+      <form id="fk"><input id="key" type="password" placeholder="pega tu key o deja vacío"><button>GUARDAR</button></form>
+      <div class="row">Celular en mi wifi <input type="checkbox" id="red"></div><div class="k" id="redinfo"></div>
+    </div>
+  </aside>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const tk=new URLSearchParams(location.search).get('t');try{if(tk)localStorage.setItem('cerebroToken',tk);}catch(e){}
+const TOKEN=tk||(()=>{try{return localStorage.getItem('cerebroToken')||''}catch(e){return ''}})();
+const H={'Content-Type':'application/json','X-Capri':'1','X-Capri-Token':TOKEN};
+const api=(r,b)=>fetch(r,b===undefined?{headers:H}:{method:'POST',headers:H,body:JSON.stringify(b)}).then(async x=>{const j=await x.json().catch(()=>({}));if(!x.ok)throw new Error(j.error||x.status);return j;});
+const local=['127.0.0.1','localhost'].includes(location.hostname);
+if(!local)document.querySelectorAll('.solo-pc').forEach(e=>e.style.display='none');
+function msg(c,t){const d=document.createElement('div');d.className='m '+c;d.textContent=t;$('log').appendChild(d);$('log').scrollTop=1e9;return d;}
+const sinEtiqueta=t=>t.replace(/^\s*\[[a-z_]+\]\s*/i,'');
+let primera=true;
+function pinta(s){
+  $('dot').classList.toggle('on',true);
+  $('sub').textContent='v'+s.version+' · '+(s.cerebro==='gemini'?'piensa con Gemini':s.cerebro==='ollama'?'piensa con Ollama (local)':'SIN cerebro para hablar sola');
+  const prox=s.proximo?new Date(s.proximo).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}):'—';
+  $('est').innerHTML=`App de Capri: <b>${s.app_abierta?'abierta (ella habla ahí)':'cerrada'}</b><br>Recuerdos compartidos: <b>${s.recuerdos}</b><br>`+
+    `Personalidad: <b>${s.persona?'la de tu app':'básica (abre la app una vez)'}</b><br>Habló sola hoy: <b>${s.hoy}</b> · próxima ≈ <b>${s.corazon&&!s.app_abierta?prox:'—'}</b><br>`+
+    `Memoria: <b>${s.cifrado?'cifrada con tu usuario':'sin cifrar'}</b><br><span style="font-size:11px">${s.datos||''}</span>`;
+  if(s.cerebro==='ninguno')$('est').innerHTML+='<br><b style="color:var(--hud)">Pon tu key de Gemini abajo o abre Ollama para que pueda hablar.</b>';
+  if(local&&primera){$('corazon').checked=s.corazon;$('lo').value=s.cada_min[0];$('hi').value=s.cada_min[1];$('s1').value=s.silencio[0];$('s2').value=s.silencio[1];
+    $('max').value=s.max_dia;$('notif').checked=s.notif;$('voz').checked=s.voz;$('inicio').checked=s.inicio;$('red').checked=s.red;$('key').placeholder=s.key?'•••••• (ya hay una; pega otra para cambiarla)':'pega tu key';}
+  $('redinfo').innerHTML=s.red?(s.ips.length?'Desde el celular (misma wifi) abre:<br>'+s.ips.map(ip=>`<code>http://${ip}:${s.puerto}/?t=${s.token}</code>`).join('<br>')+'<br>Si acabas de prenderlo, reinicia el cerebro.':'Reinicia el cerebro para que escuche en tu red.'):'';
+  if(primera){for(const h of s.history)msg(h.role==='model'?'c':/^\(/.test(h.text)?'s':'u',h.role==='model'?sinEtiqueta(h.text):h.text);primera=false;}
+}
+async function refresca(){try{pinta(await api('/api/estado'));}catch(e){$('dot').classList.remove('on');$('sub').textContent=e.message==='código'?'falta el código: abre el enlace con ?t=…':'sin conexión con el cerebro';}}
+$('f').onsubmit=async e=>{e.preventDefault();const t=$('q').value.trim();if(!t)return;$('q').value='';msg('u',t);$('b').disabled=true;const p=msg('s','pensando…');
+  try{const r=await api('/api/chat',{texto:t});p.remove();msg('c',r.texto);}catch(err){p.textContent='(no pude pensar: '+err.message+')';}finally{$('b').disabled=false;$('q').focus();}};
+const cfg=b=>api('/api/cfg',b).then(pinta).catch(e=>msg('s','(no se guardó: '+e.message+')'));
+['corazon','notif','voz','inicio','red'].forEach(k=>$(k).onchange=()=>cfg({[k]:$(k).checked}));
+['lo','hi'].forEach(k=>$(k).onchange=()=>cfg({cada_min:[+$('lo').value,+$('hi').value]}));
+['s1','s2'].forEach(k=>$(k).onchange=()=>cfg({silencio:[+$('s1').value,+$('s2').value]}));
+$('max').onchange=()=>cfg({max_dia:+$('max').value});
+$('fk').onsubmit=e=>{e.preventDefault();cfg({key:$('key').value.trim()});$('key').value='';};
+$('ya').onclick=async()=>{$('ya').disabled=true;try{const r=await api('/api/hablar_ya',{});msg('c',r.texto||'(no pudo hablar: revisa la key u Ollama)');}catch(e){msg('s','('+e.message+')');}finally{$('ya').disabled=false;}};
+refresca();setInterval(refresca,15000);
+</script></body></html>

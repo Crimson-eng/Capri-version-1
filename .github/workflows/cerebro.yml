@@ -1,0 +1,31 @@
+# Prueba el cerebro Python de Capri en Windows, Mac y Linux y arma un ejecutable para cada uno (no necesita Python).
+name: Cerebro de Capri
+on:
+  push:
+    paths: ['capri-cerebro/**', '.github/workflows/cerebro.yml']
+  workflow_dispatch:
+jobs:
+  cerebro:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: capri-cerebro
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Pruebas
+        run: python prueba_cerebro.py
+      - name: Armar ejecutable
+        run: |
+          python -m pip install pyinstaller==6.11.1
+          python -m PyInstaller --onefile ${{ runner.os == 'Windows' && '--noconsole' || '' }} --name Capri-Cerebro --add-data "pagina.html${{ runner.os == 'Windows' && ';' || ':' }}." capri_cerebro.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Capri-Cerebro-${{ runner.os }}
+          path: capri-cerebro/dist/*
