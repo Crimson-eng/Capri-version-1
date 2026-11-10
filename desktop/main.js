@@ -628,7 +628,8 @@ ipcMain.handle('capri:portatil', () => ({ portatil: PORTATIL, dir: PORTATIL ? DA
 // voces locales (Piper): el modelo .onnx se baja una vez y se queda en la carpeta Voces junto a tus datos (en modo USB, en la USB).
 // No son datos tuyos, así que no van en la bóveda: así Capri habla desde que arranca, sin descifrar nada.
 const VOCES = () => path.join(app.getPath('userData'), 'Voces');
-const vozOk = (n) => typeof n === 'string' && /^[A-Za-z0-9_.-]{3,80}\.onnx(\.json)?$/.test(n);
+// 2.19: también las canciones que Capri ya aprendió a cantar (canto_*.wav)
+const vozOk = (n) => typeof n === 'string' && (/^[A-Za-z0-9_.-]{3,80}\.onnx(\.json)?$/.test(n) || /^canto_[A-Za-z0-9_-]{3,60}\.wav$/.test(n));
 ipcMain.handle('voz:lista', () => { try { return fs.readdirSync(VOCES()).filter(vozOk); } catch { return []; } });
 ipcMain.handle('voz:leer', (e, n) => { if (!vozOk(n)) throw new Error('nombre'); return fs.promises.readFile(path.join(VOCES(), n)); });
 ipcMain.handle('voz:guardar', async (e, n, bytes) => {
@@ -638,6 +639,50 @@ ipcMain.handle('voz:guardar', async (e, n, bytes) => {
   await escribeAtomico(path.join(VOCES(), n), Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength)); return true;
 });
 ipcMain.handle('voz:borrar', (e, n) => { if (!vozOk(n)) throw new Error('nombre'); fs.rmSync(path.join(VOCES(), n), { force: true }); return true; });
+// ---------- servidor RVC (2.19) ----------
+// Usa TU instalación de Applio (open source, MIT) para convertir con tu modelo .pth + .index tal cual, con GPU si hay.
+// Capri solo arranca el servidor (entrenar/capri_rvc_servidor.py) con el Python de Applio; escucha solo en 127.0.0.1:5050.
+let rvcProc = null;
+const RVC_DIR = () => carpetaDatos('RVC');
+const RVC_MODELOS = () => path.join(RVC_DIR(), 'modelos');
+const applioPy = (d) => [path.join(d, 'env', 'python.exe'), path.join(d, '.venv', 'Scripts', 'python.exe'), path.join(d, '.venv', 'bin', 'python'), path.join(d, 'env', 'bin', 'python')].find((p) => fs.existsSync(p));
+const esApplio = (d) => !!d && fs.existsSync(path.join(d, 'core.py')) && !!applioPy(d);
+function buscaApplio() {
+  const h = os.homedir();
+  const cands = [loadPrefs().rvcApplio, path.join(h, 'Applio'), path.join(h, 'Desktop', 'Applio'), path.join(h, 'Documents', 'Applio'), path.join(h, 'Downloads', 'Applio'), 'C:\\Applio', 'D:\\Applio'];
+  for (const base of [h, path.join(h, 'Desktop'), path.join(h, 'Downloads'), 'C:\\']) {   // también «ApplioV3.5» y parecidas
+    try { for (const f of fs.readdirSync(base)) if (/^applio/i.test(f)) cands.push(path.join(base, f), path.join(base, f, 'Applio')); } catch {}
+  }
+  return cands.find(esApplio) || null;
+}
+ipcMain.handle('rvc:iniciar', async (_e, elegir) => {
+  if (rvcProc && rvcProc.exitCode === null) return { ok: true, ya: true };
+  let dir = elegir ? null : buscaApplio();
+  if (!dir) {
+    const { dialog } = require('electron');
+    const r = await dialog.showOpenDialog(win, { title: 'Elige la carpeta de Applio (donde está run-applio.bat)', properties: ['openDirectory'] });
+    if (r.canceled || !r.filePaths[0]) return { ok: false, why: 'cancelado' };
+    dir = r.filePaths[0];
+    if (!esApplio(dir)) return { ok: false, why: 'no-applio', dir };
+  }
+  setPrefs({ rvcApplio: dir });
+  fs.mkdirSync(RVC_MODELOS(), { recursive: true });
+  // el script viaja dentro de la app; se copia a tu carpeta RVC para que el Python de Applio lo pueda abrir
+  const script = path.join(RVC_DIR(), 'capri_rvc_servidor.py');
+  fs.writeFileSync(script, fs.readFileSync(path.join(__dirname, 'web', 'entrenar', 'capri_rvc_servidor.py')));
+  const logF = path.join(RVC_DIR(), 'servidor.log');
+  const out = fs.openSync(logF, 'w');
+  try {
+    rvcProc = spawn(applioPy(dir), ['-u', script, '--applio', dir, '--modelos', RVC_MODELOS(), '--puerto', '5050'],
+      { cwd: dir, windowsHide: true, stdio: ['ignore', out, out], env: { ...process.env, PYTHONIOENCODING: 'utf-8' } });
+  } catch (e) { return { ok: false, why: 'spawn', msg: e.message }; }
+  rvcProc.on('exit', (c) => { rvcProc = null; send('desk:cmd', { name: 'rvc:salio', code: c }); });
+  return { ok: true, dir, modelos: RVC_MODELOS() };
+});
+ipcMain.handle('rvc:detener', () => { try { rvcProc?.kill(); } catch {} rvcProc = null; return true; });
+ipcMain.handle('rvc:carpeta', () => { fs.mkdirSync(RVC_MODELOS(), { recursive: true }); shell.openPath(RVC_MODELOS()); return RVC_MODELOS(); });
+ipcMain.handle('rvc:log', () => { try { return fs.readFileSync(path.join(RVC_DIR(), 'servidor.log'), 'utf8').split(/\r?\n/).slice(-30).join('\n'); } catch { return ''; } });
+ipcMain.handle('rvc:info', () => ({ corriendo: !!rvcProc && rvcProc.exitCode === null, applio: loadPrefs().rvcApplio || buscaApplio(), modelos: RVC_MODELOS() }));
 ipcMain.on('retry', () => { if (win) { offline = false; ready = false; win.loadURL(deskURL()); } });
 
 app.whenReady().then(async () => {
@@ -667,7 +712,7 @@ app.whenReady().then(async () => {
   globalShortcut.register('Control+Alt+C', toggleStow);
 });
 
-app.on('will-quit', () => { globalShortcut.unregisterAll(); watch?.stop(); });
+app.on('will-quit', () => { globalShortcut.unregisterAll(); watch?.stop(); try { rvcProc?.kill(); } catch {} });
 
 app.on('second-instance', (_e, _argv, _cwd, data) => {
   if (data && data.version && newer(data.version, app.getVersion())) { vaciarBoveda().then(() => { cerrando = true; app.relaunch({ execPath: data.exe, args: [] }); app.exit(0); }); return; }
