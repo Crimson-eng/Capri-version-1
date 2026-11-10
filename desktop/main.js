@@ -44,6 +44,37 @@ function serveWeb() {
     server.listen(PORT, '127.0.0.1', () => { CAPRI_URL = `http://127.0.0.1:${PORT}/`; resolve(); });
   });
 }
+// 2.20: cerebro Python (opcional). Si la carpeta capri-cerebro está junto al .exe, Capri lo prende al abrir;
+// él se queda vivo aunque cierres la app (memoria compartida y vida propia). Si no está, todo sigue igual.
+const CEREBRO_PUERTO = 47824;
+function cerebroVivo() {
+  return new Promise((res) => {
+    const r = http.get({ host: '127.0.0.1', port: CEREBRO_PUERTO, path: '/salud', timeout: 800 }, (x) => { x.resume(); res(x.statusCode === 200); });
+    r.on('timeout', () => { r.destroy(); res(false); });
+    r.on('error', () => res(false));
+  });
+}
+function cerebroComando() {
+  for (const base of [DIR_EXE, path.join(__dirname, '..', '..')]) {
+    const dir = path.join(base, 'capri-cerebro');
+    const exe = path.join(dir, process.platform === 'win32' ? 'Capri-Cerebro.exe' : 'Capri-Cerebro');
+    if (fs.existsSync(exe)) return [exe, ['--datos', path.join(dir, 'datos')], dir];
+    const py = path.join(dir, 'capri_cerebro.py');
+    if (fs.existsSync(py)) return [process.platform === 'win32' ? 'pyw' : 'python3', [py, '--datos', path.join(dir, 'datos')], dir];
+  }
+  return null;
+}
+async function prenderCerebro() {
+  if (await cerebroVivo()) return true;
+  const c = cerebroComando();
+  if (!c) return false;
+  try {
+    const p = spawn(c[0], c[1], { detached: true, stdio: 'ignore', windowsHide: true, cwd: c[2] });
+    p.on('error', () => {});
+    p.unref();
+    return true;
+  } catch { return false; }
+}
 let win = null, tray = null, trayMenu = null, mode = 'desk', offline = false, ready = false, readyT = null;
 let watch = null, lastWins = null;
 
@@ -302,6 +333,7 @@ function rebuildMenu() {
     { label: 'Abrir Capri completa', click: () => run('expand()') },
     { label: 'Mini Capri', click: () => run('minimize()') },
     { label: 'Abrir mi Claude (claude.ai)', click: openClaude },
+    { label: '🧠 Cerebro de Capri (con la app cerrada)', click: async () => { await prenderCerebro(); setTimeout(() => shell.openExternal(`http://127.0.0.1:${CEREBRO_PUERTO}/`), 1500); } },
     { type: 'separator' },
     { label: 'Teletransportarse', click: () => cmd('teleport') },
     { label: 'Hacer un truco', click: () => cmd('flourish') },
@@ -706,6 +738,7 @@ app.whenReady().then(async () => {
   cses.setPermissionCheckHandler((wc, perm) => cok.includes(perm));
   if (BOVEDA_ON) cses.cookies.on('changed', () => { claudeCambio = true; });
   await serveWeb();
+  prenderCerebro().catch(() => {});
   createWindow();
   createTray();
   watch = startWindowWatch({ win, onUpdate: (d) => { lastWins = d; send('desk:windows', d); } });

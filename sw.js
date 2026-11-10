@@ -1,6 +1,6 @@
 // Guarda la app en el dispositivo para que abra rápido y funcione sin internet (menos el cerebro).
 // Sube VERSION cada vez que cambies archivos para que los celulares descarguen lo nuevo.
-const VERSION='capri-v40';
+const VERSION='capri-v41';
 const SHELL=[
   './',
   './index.html',
@@ -38,6 +38,7 @@ const SHELL=[
   './aprende.js',
   './hilos.js',
   './asocia.js',
+  './cerebropy.js',
   './boveda.js',
   './boveda.html',
   './hud.js',
