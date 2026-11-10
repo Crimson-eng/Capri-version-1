@@ -153,7 +153,7 @@ async function desbloquear(pass){const rec=await kv('readonly',s=>s.get('datos')
   try{const k=await derivar(pass,fromB64(rec.salt));ex=Object.assign(nuevo(),await abrirSello(rec,k));llave=k;sal=fromB64(rec.salt);toque();bit('abrió el expediente');return true;}catch(e){return false;}}
 async function crear(pass){sal=crypto.getRandomValues(new Uint8Array(16));llave=await derivar(pass,sal);ex=nuevo();bit('creó el expediente cifrado');await persistir();toque();}
 async function cambiarLlave(pass){sal=crypto.getRandomValues(new Uint8Array(16));llave=await derivar(pass,sal);bit('cambió la llave');await persistir();}
-function bloquear(motivo){if(!llave)return;ex=null;llave=null;vista={v:'lista'};pac=null;render();if(motivo)log('expediente: bloqueado ('+motivo+')','g');}
+function bloquear(motivo){if(!llave)return;window.recetaCerrar?.();ex=null;llave=null;vista={v:'lista'};pac=null;render();if(motivo)log('expediente: bloqueado ('+motivo+')','g');}
 // ---------- código de recuperación y respaldo automático (se manejan desde la pestaña R.I.P) ----------
 // El código es una llave AES al azar que solo existe en el papel de Kiga. Aquí se guarda importada «solo para cifrar»:
 // con ella Capri sella una copia cada vez que guardas, pero no puede abrirla; para abrirla hay que teclear el código.
@@ -405,7 +405,7 @@ function fNuevo(){return `<fieldset><legend>Nuevo paciente <i>· ficha de identi
   <label class="ck" style="flex-direction:row;gap:8px;align-items:flex-start"><input type="checkbox" id="exCons" style="width:auto;margin-top:3px"><span>Le di al paciente (o a su representante) el aviso de privacidad y tengo su <b>consentimiento expreso y por escrito</b> para tratar sus datos de salud, o se trata de una urgencia.</span></label>
   <div class="row"><span class="sp"></span><button class="mini" data-a="cancel">Cancelar</button><button class="hbtn c" data-a="crear">Crear expediente del paciente</button></div><small class="warn" id="exNMsg"></small></fieldset>`;}
 function vPac(){const p=pac;if(!p)return vLista();const docs=(p.docs||[]).slice().sort((a,b)=>(b.fecha+b.hora).localeCompare(a.fecha+a.hora));
-  H(lado()+`<div class="main"><div class="row"><h3>${esc(nombreDe(p))}</h3><span class="sp"></span><button class="mini" data-a="imprimirTodo">🖨 Imprimir expediente</button><button class="mini" data-a="ficha">✎ Ficha</button></div>
+  H(lado()+`<div class="main"><div class="row"><h3>${esc(nombreDe(p))}</h3><span class="sp"></span><button class="mini" data-a="receta" title="Diseñar e imprimir una receta para este paciente">℞ Receta${(p.recetas||[]).length?' ('+p.recetas.length+')':''}</button><button class="mini" data-a="imprimirTodo">🖨 Imprimir expediente</button><button class="mini" data-a="ficha">✎ Ficha</button></div>
    <div class="sub">${esc(p.nexp)} · ${esc(edad(p))} · ${esc(p.sexo)} · nacimiento ${esc(fechaL(p.fnac))}</div>
    ${p.alergias?`<div class="alergia">⚠ ALERGIAS: ${esc(p.alergias)}</div>`:''}
    ${vista.ficha?fFicha(p):''}
@@ -426,7 +426,7 @@ function campo(f,v,ia,nuevas,ro){const [k,lab,req,tipo,num]=f,val=v?.[k]??'';con
   return `<label class="${cls}">${L}<textarea data-k="${k}">${esc(val)}</textarea>${nuevas?.[k]?`<small class="warn">⚠ ${nuevas[k].c?.length?'Cifras que no están en tu dictado: '+esc(nuevas[k].c.join(', '))+'. ':''}${nuevas[k].p?.length?'Escribió cosas que no dijiste ('+esc(nuevas[k].p.slice(0,6).join(', '))+'…): ¿lo inventó? ':''}Revísalo antes de firmar.</small>`:''}</label>`;}
 function vDoc(){const p=pac,d=p?.docs.find(x=>x.id===vista.d);if(!d)return vPac();const T=DOCS[d.tipo],v=d.c,ro=!!d.firma;
   const grupos=d.tipo==='hc'?HC:[[T[0],T[1],T[2]]];const extra=extrasDe(d.tipo);
-  H(lado()+`<div class="main"><div class="row"><h3>${esc(T[0])}</h3><span class="sp"></span><button class="mini" data-a="volver">← ${esc(nombreDe(p))}</button><button class="mini" data-a="imprimir">🖨 Imprimir / PDF</button></div>
+  H(lado()+`<div class="main"><div class="row"><h3>${esc(T[0])}</h3><span class="sp"></span><button class="mini" data-a="volver">← ${esc(nombreDe(p))}</button><button class="mini" data-a="recetaDoc" title="Capri arma la receta con el tratamiento de esta nota">℞ Receta</button><button class="mini" data-a="imprimir">🖨 Imprimir / PDF</button></div>
    <div class="sub">${NOM} · numeral ${esc(T[1])}${T[3]?' · '+esc(T[3]):''}</div>
    ${p.alergias?`<div class="alergia">⚠ ALERGIAS: ${esc(p.alergias)}</div>`:''}
    <div class="g2"><label class="req"><span>Fecha</span><input type="date" id="exF" value="${esc(d.fecha)}" ${ro?'readonly':''}></label><label class="req"><span>Hora</span><input type="time" id="exH" value="${esc(d.hora)}" ${ro?'readonly':''}></label>
@@ -525,6 +525,8 @@ async function accion(a,el){toque();const p=pac;
     const h=[...new Uint8Array(await crypto.subtle.digest('SHA-256',enc.encode(cuerpo)))].map(b=>b.toString(16).padStart(2,'0')).join('');
     d.firma={ts:Date.now(),nombre:d.elab,ced:d.ced,hash:h};delete d.ia;delete d.nuevas;bit('firmó '+DOCS[d.tipo][0],p);await persistir();return render();}
   if(a==='aclarar'){const t=$e('exAdd').value.trim();if(!t)return;const d=p.docs.find(x=>x.id===vista.d);(d.add=d.add||[]).push({ts:Date.now(),t,autor:ex.cfg.med?.nombre||'—'});bit('nota aclaratoria',p);await persistir();return render();}
+  if(a==='receta')return abrirReceta(p,null);
+  if(a==='recetaDoc'){const d=leeDoc();await persistir();return abrirReceta(p,d);}
   if(a==='imprimir'){const d=leeDoc();await persistir();bit('imprimió '+DOCS[d.tipo][0],p);return imprimir(p,[d]);}
   if(a==='imprimirTodo'){bit('imprimió el expediente completo',p);await persistir();return imprimir(p,p.docs.slice().sort((a,b)=>(a.fecha+a.hora).localeCompare(b.fecha+b.hora)));}
   if(a==='respaldo'){const blob=new Blob([JSON.stringify({app:'capri-expediente',...await sellar(ex)})],{type:'application/json'});const u=URL.createObjectURL(blob),l=document.createElement('a');
@@ -576,6 +578,22 @@ function imprimir(p,docs){const E=ex.cfg.est||{};const w=window.open('','_blank'
   table{width:100%;border-collapse:collapse;margin-bottom:8px}td{border:1px solid #999;padding:4px 6px;vertical-align:top}h2{font-size:13px;background:#eee;padding:3px 6px;margin:12px 0 4px;text-transform:uppercase}
   h3{font-size:11.5px;margin:8px 0 1px;text-transform:uppercase;color:#333}p{margin:0 0 4px;white-space:normal}i{color:#888}footer{display:flex;gap:30px;margin-top:22px;flex-wrap:wrap}small{color:#666;font-size:10px}
   @page{size:letter;margin:0}</style>${docs.map(hoja).join('')}<script>print()<\/script>`);w.document.close();}
+
+// ---------- receta (receta.js): se llena con el paciente y el tratamiento; se guarda cifrada aquí ----------
+const TXK=['tx','plan','ter','sug','cuid'];
+function abrirReceta(p,doc){if(!window.recetaAbrir)return alert('Falta receta.js');
+  const ds=docsRec(p),conSV=ds.find(d=>SVmin.some(k=>d.c?.['sv_'+k])||d.c?.sv_peso),v=conSV?.c||{};
+  const fuente=doc&&TXK.some(k=>doc.c?.[k])?doc:ds.find(d=>TXK.some(k=>d.c?.[k]));const tx=fuente?TXK.map(k=>fuente.c[k]).filter(Boolean).join('\n'):'';
+  const M=ex.cfg.med||{},E=ex.cfg.est||{},est=/estudiante|alumn|intern|mip\b|pregrado/i.test(M.grado||'');
+  const anios=p.fnac?Math.floor((Date.now()-new Date(p.fnac+'T12:00'))/(365.25*864e5)):null;
+  bit('abrió receta',p);
+  window.recetaAbrir({pac:{nombre:nombreDe(p),edad:edad(p),anios,sexo:p.sexo||'',peso:v.sv_peso||'',talla:v.sv_talla||'',ta:v.sv_ta||'',temp:v.sv_temp||'',fc:v.sv_fc||'',alergias:p.alergias||''},
+    dx:(doc?.c?.dx)||dxDe(p),tx,estudiante:est?M.nombre:'',
+    emisor:{nombre:est?(M.valida||''):(M.nombre||''),ced:est?'':(M.cedula||''),esp:est?'':(M.grado||''),inst:E.inst||E.nombre||'',dom:[E.nombre,E.dom].filter(Boolean).join(', ')},
+    toque,motor:ex.cfg.motor||'auto',nubeOk:ex.cfg.nubeOk,nubeSi:()=>{ex.cfg.nubeOk=true;},tapar:t=>tapar(t,p),recetas:()=>p.recetas||[],
+    guardar:async(r,a)=>{if(!ex||!llave)throw new Error('expediente bloqueado');const q=ex.pacs.find(x=>x.id===p.id);if(!q)return;q.recetas=q.recetas||[];
+      const i=q.recetas.findIndex(x=>x.id===r.id);r.ts=Date.now();if(i>=0)q.recetas[i]=r;else q.recetas.push(r);q.upd=Date.now();
+      bit((a==='imprimir'?'imprimió':'guardó')+' receta '+r.folio,q);await persistir();if(vista.v==='pac'&&pac===q)render();}});}
 
 // ---------- eventos ----------
 function montar(el){if(sec)return;sec=el;

@@ -271,7 +271,7 @@ function pintaMeds(r){const ic=['?','◐','▲','✖'],cl=['mut','mod','imp','gr
      ${f.cruces.map(c=>`<div class="rp-q">Sobre ${esc(c.con)}: «${esc(c.txt)}»</div>`).join('')}
      ${!f.cruces.length&&r.meds.filter(m=>m.d).length>1?'<small class="rp-mut">Su sección de interacciones no menciona a los otros por nombre ni por grupo.</small>':''}</div>`).join('')}
     <small class="rp-mut">Texto de la etiqueta en inglés, tal cual. openFDA avisa que sus datos no están validados para decidir atención médica.</small></div>`:''}
-  <div class="rp-in"><button class="mini" data-a="medcapri">Que Capri me lo explique</button></div>`;}
+  <div class="rp-in"><button class="mini" data-a="medcapri">Que Capri me lo explique</button><button class="mini" data-a="medreceta">℞ Hacer receta con esto</button></div>`;}
 async function verificar(){const txt=$r('rpMeds').value;rip.meds=txt;rip.al=$r('rpAl').value;rip.kg=$r('rpKg').value;rip.ed=$r('rpEd').value;rip.tfg=$r('rpTfg').value;rip.emb=$r('rpEmb').checked;rip.fda=$r('rpFda').checked;save();
   const meds=txt.split(/\n|;/).map(s=>s.trim()).filter(Boolean).map(parsea);if(!meds.length)return;
   const op={alergias:rip.al.split(/[,;\n]/).map(s=>s.trim()).filter(Boolean),kg:+rip.kg||null,edad:rip.ed===''?null:+rip.ed,tfg:rip.tfg===''?null:+rip.tfg,emb:rip.emb};
@@ -572,6 +572,7 @@ async function accion(a,el){
     $r('rpOr').innerHTML=hs.map(o=>{const d=by[o.t.doc];return `<div class="rp-q"><b>${esc([d.oficial.tipo,d.oficial.clave,d.oficial.anio].filter(Boolean).join(' '))}${o.t.pag?', p. '+o.t.pag:''}</b><br>${esc(o.t.text.slice(0,420))}…</div>`;}).join('')||'<small class="rp-mut">No viene en tus fuentes oficiales.</small>';return;}
   if(a==='verif')return verificar();
   if(a==='medcapri')return medACapri();
+  if(a==='medreceta')return window.recetaAbrir?.({tx:rip.meds||'',pac:{alergias:rip.al||'',peso:rip.kg||'',edad:rip.ed?rip.ed+' años':'',anios:rip.ed===''||rip.ed==null?null:+rip.ed,emb:!!rip.emb}});
   if(a==='ocrcp'){navigator.clipboard?.writeText(ocrRes.text);el.textContent='✓ Copiado';return;}
   if(a==='ocrbib'){await window.bibAgregar([new File([ocrRes.text],ocrRes.name.replace(/\.[^.]+$/,'')+' (texto).txt',{type:'text/plain'})],{});el.textContent='✓ En la biblioteca';return;}
   if(a==='ocrcapri'){window.hudGo?.('capri',true);setTimeout(()=>respond(`(${cfg.name||'Kiga'} pasó a texto un escaneo con el lector de R.I.P; confianza ${Math.round(ocrRes.conf)}%. Ordénalo en apartados claros sin agregar nada que no diga. Las palabras que parezcan mal leídas márcalas entre [¿?] en vez de adivinarlas.)\n\n${ocrRes.text.slice(0,12000)}`),380);return;}
@@ -621,5 +622,6 @@ send=async v=>{const raw=(v||'').trim(),k=norm(raw);
   if(m&&!busy){line('u',raw);rip.meds=m[1].split(/[,;]\s*|\n/).join('\n');medRes=null;window.ripIr('meds');setTimeout(()=>sec&&verificar(),450);return;}
   if(/^calcula(dora)?s?$/.test(k)&&!busy){line('u',raw);window.ripIr('calc');return;}
   await _send(v);if(k==='help')line('t','  rip — Pestaña R.I.P: fuentes oficiales, verificador de medicamentos, lector de escaneos, estudio, respaldo y calculadoras\n  verifica: paracetamol 1 g c/8h, … — revisa una receta\n  calculadoras — calculadoras clínicas');};
+window.ripReceta={parsea,revisa,busca};   // la receta (receta.js) revisa con lo mismo
 window.__ripTest={parsea,revisa,busca,CALC,resCalc:(k,v)=>{calcV[k]=v;return resCalc(CALC.find(x=>x.k===k));},enTexto,extracto,pedazo};
 })();

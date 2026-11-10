@@ -6,7 +6,7 @@
 //   05 corteza auditiva → VOZ (2.16): todo lo de su voz junto (motor, afinar, entrenar una voz propia y oído), sacado de Ajustes
 // Todo es local (localStorage), igual que el resto de Capri.
 (()=>{
-const VER='2.17';
+const VER='2.18';
 const css=document.createElement('style');css.textContent=`
 #vRelic{padding:0;overflow:hidden}
 .rl{display:grid;grid-template-columns:minmax(0,1fr) minmax(340px,440px);height:100%}
