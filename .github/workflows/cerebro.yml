@@ -9,8 +9,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        # Mac solo al lanzarlo a mano: en las corridas automáticas el runner de Mac se quedó en cola y GitHub canceló el trabajo
+        os: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '["windows-latest","ubuntu-latest","macos-14"]' || '["windows-latest","ubuntu-latest"]') }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: capri-cerebro
