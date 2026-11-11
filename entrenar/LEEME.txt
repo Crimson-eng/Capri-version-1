@@ -39,3 +39,9 @@ Otra opción: RVC (cambia el timbre de la voz de tu PC)
 
 Importante: solo graba tu voz o la de alguien que te dio permiso. Nada de audios de actrices,
 personajes o personas que no lo autorizaron.
+
+Nuevo en 2.19: usar tu .pth + .index tal cual (sin convertir) y que Capri cante
+- Instala Applio (https://github.com/IAHispano/Applio, gratis y MIT) y entrena ahí tu voz con la carpeta wavs/.
+- En Capri: RELIC → Voz → RVC → «Servidor con Applio» → «Iniciar servidor». Ve solo los modelos de Applio\logs.
+- Luego RELIC → Voz → Cantar: carga una voz cantada (o grábate cantando) y Capri la canta con tu modelo.
+- Guía completa: capri-rvc.md en el repositorio.
