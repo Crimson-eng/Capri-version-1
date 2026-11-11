@@ -16,6 +16,7 @@ Tu key, tu memoria y tus documentos se guardan solo en el navegador de cada disp
 | --- | --- |
 | `index.html` | Toda la app (pantalla, voz, cerebro con Gemini, estudio) |
 | `rip.js` | Pestaña R.I.P: fuentes oficiales (GPC, NOM, Compendio), verificador de medicamentos, lector de escaneos, modo estudio, respaldo del expediente y calculadoras clínicas |
+| `receta.js` | Receta médica para imprimir o guardar en PDF: Capri la redacta con el tratamiento del expediente, revisa lo que pide el Reglamento de Insumos para la Salud (arts. 28–31), alergias, interacciones, antibióticos y controlados; tres estilos, media carta o carta, logo y color. Botón ℞ en el expediente o comando `receta` |
 | `vendor/ocr/` | Lector de escaneos (Tesseract.js, Apache-2.0) con español e inglés, para leer fotos y PDF escaneados sin internet |
 | `assets/*.webp` | Las animaciones de Capri |
 | `manifest.webmanifest`, `icons/` | Lo que permite instalarla como app |

@@ -10,6 +10,9 @@ contextBridge.exposeInMainWorld('capriDesk', {
   // voces locales (Piper) guardadas en la carpeta Voces
   voz: { lista: () => ipcRenderer.invoke('voz:lista'), leer: (n) => ipcRenderer.invoke('voz:leer', n),
     guardar: (n, b) => ipcRenderer.invoke('voz:guardar', n, b), borrar: (n) => ipcRenderer.invoke('voz:borrar', n) },
+  // servidor RVC con tu Applio (2.19): arrancar/parar, abrir la carpeta de tus .pth/.index, ver qué dijo
+  rvc: { iniciar: (elegir) => ipcRenderer.invoke('rvc:iniciar', !!elegir), detener: () => ipcRenderer.invoke('rvc:detener'),
+    carpeta: () => ipcRenderer.invoke('rvc:carpeta'), log: () => ipcRenderer.invoke('rvc:log'), info: () => ipcRenderer.invoke('rvc:info') },
   // bóveda: la página cifra; aquí solo se leen y escriben sus archivos ya cifrados (carpeta Boveda)
   boveda: {
     activa: ipcRenderer.sendSync('boveda:activa'),
