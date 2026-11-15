@@ -1,7 +1,7 @@
 {
   "name": "capri-desktop",
   "productName": "Capri",
-  "version": "2.21.0",
+  "version": "2.22.0",
   "description": "Mini Capri rondando por tu escritorio",
   "author": "Kiga",
   "private": true,
@@ -25,6 +25,7 @@
       "preload.js",
       "windows.js",
       "windows.ps1",
+      "presenta.ps1",
       "icon.png",
       "offline.html",
       "LICENSES/**",
@@ -46,7 +47,8 @@
       "artifactName": "Capri-portable-${version}.exe"
     },
     "asarUnpack": [
-      "windows.ps1"
+      "windows.ps1",
+      "presenta.ps1"
     ]
   }
 }
