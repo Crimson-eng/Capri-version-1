@@ -648,6 +648,7 @@ const MOOD={observando:'CHILL',pensando:'PROCESSING',sonrisa_traviesa:'GREMLIN',
 const EYE={observando:'mirada_intensa',pensando:'hipnosis',sonrisa_traviesa:'presumida',sorpresa:'sorpresa',risa_malvada:'risa_malvada',glitch_entrada:'glitch_fuerte',glitch_fuerte:'hipnosis',enojada:'mirada_intensa',mirada_intensa:'escuchando',escuchando:'escuchando',hipnosis:'hipnosis',emocionada:'sorpresa',presumida:'presumida'};
 const CORE={DORMANT:['#ff1f55',9],LISTENING:['#2dff8f',2.5],THINKING:['#fff200',1.2],TALKING:['#22e5f0',4]};
 const store={get(k,d){try{const v=localStorage.getItem('capri_'+k);return v===null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('capri_'+k,JSON.stringify(v))}catch(e){}}};
+if(store.get('ui',{}).ligero)document.body.classList.add('ligero'); // 2.23 modo ligero (interfaz.js)
 let cfg=Object.assign({key:'',model:'',models:[],name:'Kiga',every:60,voice:false,voiceName:'',rate:1.1,pitch:1.4,fx:'suave',idle:3,alive:true,noThink:{},sens:5,study:false,hands:false,notif:true,claudeKey:'',claudeModel:'claude-opus-5-5'},store.get('cfg',{}));
 if(!cfg.v3){cfg.v3=true;if(!cfg.idle||cfg.idle===6)cfg.idle=3;store.set('cfg',cfg);}
 // quita la frase del usuario que Capri repetía entre {llaves} al inicio de sus respuestas por voz
@@ -1264,7 +1265,9 @@ function vitTargets(){const h=new Date().getHours(),m=document.body.dataset.core
   VT.mood=Math.min(100,(MOODV[curState]||60)+joy);
   VT.bored=busy||recording||isSpeaking()?0:Math.min(100,cfg.idle&&nextIdle?el/nextIdle*100:el/(8*60000)*100);
   VT.relic=Date.now()<relicDrop?52+Math.random()*14:curState==='glitch_fuerte'?61:95+Math.sin(Date.now()/7000)*3;}
-function vitDraw(){vitTargets();joy*=.985;
+let vitN=0;const vitVer=()=>!document.hidden&&(document.body.dataset.view||'capri')==='capri';
+function vitDraw(){if(!vitVer()&&++vitN%8)return; // 2.23: fuera de vista se actualiza 8 veces menos
+  vitTargets();joy*=.985;
   for(const k in VIT){VIT[k]+=(VT[k]-VIT[k])*.12;const v=Math.round(VIT[k]),m=MT[k];if(!m)continue;
     m.querySelector('b').textContent=v;const on=Math.round(v/100*16);m.querySelectorAll('.cl i').forEach((c,i)=>c.classList.toggle('on',i<on));}
   const e=Math.round(VIT.en);$('gEnV').textContent=e;gArc.style.strokeDashoffset=G_L*(1-VIT.en/100);
@@ -1277,12 +1280,12 @@ const VSAY={en:v=>v>70?'batería al tope. ¿hacemos algo?':v>45?'energía media�
 function vitPoke(k){const v=Math.round(VIT[k]);petSays(VSAY[k](v),3000);joy=Math.min(18,joy+6);bump();petEl.classList.remove('hop');void petEl.offsetWidth;petEl.classList.add('hop');log('vitals → '+k+' '+v+'%','y');}
 $('gEn').onclick=()=>vitPoke('en');Object.entries(MT).forEach(([k,m])=>m.onclick=()=>vitPoke(k));
 setInterval(()=>{if(cfg.alive&&Math.random()<.25){relicDrop=Date.now()+2600;log('relic.sys: fluctuación detectada','w');}},60000);
-setInterval(()=>{$('hfR').textContent='0x'+Math.floor(Math.random()*65535).toString(16).toUpperCase().padStart(4,'0')+' · '+Math.round(VIT.relic)+'%';},450);
+setInterval(()=>{if(!vitVer())return;$('hfR').textContent='0x'+Math.floor(Math.random()*65535).toString(16).toUpperCase().padStart(4,'0')+' · '+Math.round(VIT.relic)+'%';},450);
 setInterval(()=>{$('hfL').textContent=pick(['NEURAL ACTIVITY','ENGRAM SYNC','RELIC PULSE','SOULKILLER: CONTENIDO','ECO SIGNAL']);},5000);
 // onda neural (se agita cuando habla o escucha)
 const wv=$('wave'),wx=wv.getContext('2d');let wph=0,wamp=.2;
 let wf=0;(function wave(){requestAnimationFrame(wave);if(document.hidden||!wv.offsetWidth||(document.body.dataset.view||'capri')!=='capri')return;
-  if(!['TALKING','LISTENING','THINKING'].includes(document.body.dataset.core)&&++wf%2)return; // en reposo basta con 30 cuadros por segundo
+  if(!['TALKING','LISTENING','THINKING'].includes(document.body.dataset.core)&&++wf%(document.body.classList.contains('ligero')?4:2))return; // en reposo basta con 30 cuadros por segundo (15 en modo ligero)
   const d=devicePixelRatio||1,W=Math.round(wv.offsetWidth*d),H=Math.round(wv.offsetHeight*d);
   if(wv.width!==W||wv.height!==H){wv.width=W;wv.height=H;}const m=document.body.dataset.core;const tg=({TALKING:1,LISTENING:.7,THINKING:.5})[m]||(.16+joy/100);wamp+=(tg-wamp)*.05;wph+=m==='THINKING'?.2:.07;
   wx.clearRect(0,0,W,H);wx.fillStyle='rgba(255,59,85,.16)';for(let x=0;x<W;x+=14*d)wx.fillRect(x,H/2-1*d,1*d,2*d);
@@ -1300,7 +1303,9 @@ camVis.addEventListener('click',e=>{ret.classList.add('flash');setTimeout(()=>re
 
 // ================= PANTALLA DE ARRANQUE (HUD) =================
 let bootDone;const bootP=new Promise(r=>bootDone=r);
-(function(){const B=$('boot');if(!B||DESK){B?.remove();bootDone();return;}const fast=matchMedia('(prefers-reduced-motion: reduce)').matches,T=fast?900:3400;
+(function(){const B=$('boot');if(!B||DESK){B?.remove();bootDone();return;}// 2.23: la animación completa (más corta) solo la primera vez del día; las demás veces, ~1 s
+  const hoy=new Date().toDateString(),primera=store.get('bootDia','')!==hoy;store.set('bootDia',hoy);
+  const fast=matchMedia('(prefers-reduced-motion: reduce)').matches||!primera||store.get('ui',{}).bootCorto||store.get('ui',{}).ligero,T=fast?650:2200;
   const C=$('btCells');C.innerHTML='<i></i>'.repeat(24);const cells=[...C.children],arc=$('btArc'),L=2*Math.PI*77;arc.style.strokeDasharray=L;arc.style.strokeDashoffset=L;
   const ok=cfg.key&&cfg.model,S=[[.06,'relic.sys','montando núcleo','OK'],[.2,'neural_link','sincronizando','ESTABLE'],[.36,'engramas',history.length+' recuerdos','OK'],
    [.5,'soulkiller','aislando ecos','CONTENIDO'],[.66,'voz / oído','calibrando','OK'],[.8,'cerebro',cfg.model||'sin modelo',ok?'EN LÍNEA':'SIN KEY ⚠']];
@@ -1314,8 +1319,8 @@ let bootDone;const bootP=new Promise(r=>bootDone=r);
     while(si<S.length&&p>=S[si][0]){const [,a,b,c]=S[si],d=document.createElement('div');if(/⚠/.test(c))d.className='warn';
       d.innerHTML=`<span>&gt; ${a}</span><span style="opacity:.6">${b}</span><span class="d"></span><b>${c}</b>`;$('btLog').appendChild(d);$('btPh').textContent=PH[si];si++;}
     if(p<1)requestAnimationFrame(fr);else finish();}
-  function finish(){if(done)return;done=true;B.classList.add('ok');setTimeout(()=>B.classList.add('out'),fast?150:1000);
-    setTimeout(()=>{B.remove();bootDone();petEl.classList.remove('hop');void petEl.offsetWidth;petEl.classList.add('hop');},fast?500:1650);}
+  function finish(){if(done)return;done=true;B.classList.add('ok');setTimeout(()=>B.classList.add('out'),fast?120:600);
+    setTimeout(()=>{B.remove();bootDone();petEl.classList.remove('hop');void petEl.offsetWidth;petEl.classList.add('hop');},fast?380:1000);}
   B.addEventListener('pointerdown',finish);addEventListener('keydown',finish,{once:true});requestAnimationFrame(fr);})();
 
 // ================= ARRANQUE =================
@@ -1331,4 +1336,4 @@ if(DESK){if(cfg.key&&cfg.model)minimize();else expand();}
 autoConectar();
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
-<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="redaccion.js"></script><script src="crimson.js"></script><script src="tecnico.js"></script><script src="saber.js"></script><script src="clinica.js"></script><script src="mundo.js"></script><script src="expediente.js"></script><script src="biblioteca.js"></script><script src="rip.js"></script><script src="receta.js"></script><script src="lectura.js"></script><script src="vozlocal.js"></script><script src="vozid.js"></script><script src="voz.js"></script><script src="vozlab.js"></script><script src="grabadora.js"></script><script src="rvc.js"></script><script src="canto.js"></script><script src="cerebro.js"></script><script src="aprende.js"></script><script src="hilos.js"></script><script src="asocia.js"></script><script src="cerebropy.js"></script><script src="hud.js"></script><script src="relic.js"></script><script src="sigilo.js"></script><script type="module" src="holo3d.js"></script><script type="module" src="relic3d.js"></script><script src="desk.js"></script></body></html>
+<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="redaccion.js"></script><script src="crimson.js"></script><script src="tecnico.js"></script><script src="saber.js"></script><script src="clinica.js"></script><script src="mundo.js"></script><script src="expediente.js"></script><script src="biblioteca.js"></script><script src="rip.js"></script><script src="receta.js"></script><script src="lectura.js"></script><script src="vozlocal.js"></script><script src="vozid.js"></script><script src="voz.js"></script><script src="vozlab.js"></script><script src="grabadora.js"></script><script src="rvc.js"></script><script src="canto.js"></script><script src="cerebro.js"></script><script src="aprende.js"></script><script src="hilos.js"></script><script src="asocia.js"></script><script src="cerebropy.js"></script><script src="hud.js"></script><script src="relic.js"></script><script src="sigilo.js"></script><script src="desk.js"></script><script src="interfaz.js"></script></body></html>

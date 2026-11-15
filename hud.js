@@ -3,7 +3,7 @@
 // CIBERWARE: las habilidades de Capri como implantes en un cuerpo holográfico (se activan desde ahí).
 // MÉDICO: cuerpo por sistemas para consultar o estudiar, y el interruptor del reservorio médico.
 // DIARIO: lo que Capri recuerda de ti, como lista de misiones, y las tarjetas de perfil.
-// Cambiar de sección pasa con rayas de glitch; la primera vez de cada sección, con la pantalla CONNECT.
+// Cambiar de sección pasa con rayas de glitch cortas (2.23: sin la pantalla CONNECT, el 3D se carga al abrir su pestaña).
 (()=>{
 // también corre en el .exe: ahí Capri completa es la misma página en modo escritorio, expandida
 const css=document.createElement('style');css.textContent=`
@@ -15,6 +15,9 @@ const css=document.createElement('style');css.textContent=`
 .htabs{display:flex;align-items:center;gap:4px;margin:0 auto;overflow-x:auto;scrollbar-width:none}
 .htabs .k{border:1px solid var(--hc2);color:var(--hc);font:11px var(--mono);padding:2px 6px;cursor:pointer;background:none}
 .htabs button.t{background:none;border:0;border-bottom:2px solid transparent;color:var(--hr);font:600 13px/1 var(--sans);letter-spacing:.08em;padding:14px 12px 12px;cursor:pointer;white-space:nowrap;position:relative}
+.htabs .vi{width:14px;height:14px;margin-right:6px;vertical-align:-2px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linejoin:round;opacity:.85}
+.htabs .gsep{flex:0 0 1px;align-self:stretch;margin:10px 6px;background:var(--hr2)}
+.htabs button.t.g-salud:not(.on){color:#ff8f9a}.htabs button.t.g-herr:not(.on){color:#ffb27a}
 .htabs button.t:hover{color:#ffc2c8}.htabs button.t.on{color:var(--hc);border-bottom-color:var(--hc);text-shadow:0 0 12px var(--hc2)}
 .htabs button.t::after{content:'';position:absolute;left:0;right:0;bottom:-2px;height:2px;background:var(--hr2)}.htabs button.t.on::after{background:var(--hc)}
 body:not([data-view=capri]) .app .desk>:not(.hview){visibility:hidden}
@@ -152,11 +155,19 @@ const AB=[
 const icon=k=>k==='mundo'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M12 3 A9 9 0 1 0 12.01 3 Z M3 12 H21 M12 3 C8.5 6.5 8.5 17.5 12 21 M12 3 C15.5 6.5 15.5 17.5 12 21"/><path class="a2 k" d="M17 4 L20 1 M19 7 L22 6"/></svg>':k==='clinica'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M6 4 H15 L19 8 V20 H6 Z M15 4 V8 H19"/><path class="a2 k" d="M12.5 10 V17 M9 13.5 H16"/></svg>':k==='saber'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M12 3 L20 7.5 V16.5 L12 21 L4 16.5 V7.5 Z"/><path class="a2 k" d="M8.5 12 L11 14.5 L15.5 9.5"/></svg>':k==='tecnico'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M9 3 H15 V9 H9 Z M8 9 H16 V17 C16 19 14 21 12 21 C10 21 8 19 8 17 Z"/><path class="a2 k" d="M11 5 V7 M13 5 V7 M12 12 V18 M10 14 L12 12 L14 14"/></svg>':k==='crimson'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M12 20 C6 16 3 12.5 3 9 C3 6 5.2 4 7.6 4 C9.6 4 11 5.2 12 6.6 C13 5.2 14.4 4 16.4 4 C18.8 4 21 6 21 9 C21 12.5 18 16 12 20 Z"/><path class="a2 k" d="M6 11 H9 L10.5 8 L12.5 14 L14 11 H18"/></svg>':k==='claudecpu'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M7 7 H17 V17 H7 Z M10 3 V7 M14 3 V7 M10 17 V21 M14 17 V21 M3 10 H7 M3 14 H7 M17 10 H21 M17 14 H21"/><path class="a2 k" d="M12 9 L15 12 L12 15 L9 12 Z"/></svg>':k==='cerebro'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M12 4 C8 3 5 5 5 8 C3 9 3 13 5 14 C5 17 8 19 12 18 C16 19 19 17 19 14 C21 13 21 9 19 8 C19 5 16 3 12 4 Z M12 4 V18"/><path class="a2 k" d="M8 21 H16 M10 18 V21 M14 18 V21"/></svg>':k==='redac'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M4 20 L5 15 L16 4 L20 8 L9 19 Z M14 6 L18 10"/><path class="a2 k" d="M13 20 H21"/></svg>':k==='brazos'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M7 21 V11 L5 8 V4 M7 11 L9 4 M7 11 L12 3 M7 11 L15 5 M7 11 L17 9"/><path class="a2 k" d="M15 16 H21 M18 13 V19"/></svg>':k==='ingles'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d="M4 19 L9 5 L14 19 M6 14 H12"/><path class="a2 k" d="M15 12 H21 M18 9 V19"/></svg>':(typeof ico==='function'?ico(k):'');
 
 // ---------- estructura ----------
-const VIEWS=[['capri','CAPRI'],['ciberware','CIBERWARE'],['relic','RELIC'],['medico','MÉDICO'],['expediente','EXPEDIENTE'],['biblioteca','BIBLIOTECA'],['rip','R.I.P'],['mundo','MUNDO'],['diario','DIARIO']];
+// 2.23: agrupadas (ella · salud · herramientas) y con ícono, todas a la vista; 1-9 siguen este orden
+const VIEWS=[['capri','CAPRI'],['relic','RELIC'],['diario','DIARIO'],['ciberware','CIBERWARE'],['medico','MÉDICO'],['expediente','EXPEDIENTE'],['rip','R.I.P'],['biblioteca','BIBLIOTECA'],['mundo','MUNDO']];
+const VGRP={capri:'ella',relic:'ella',diario:'ella',ciberware:'ella',medico:'salud',expediente:'salud',rip:'salud',biblioteca:'herr',mundo:'herr'};
+const VGN={ella:'ella',salud:'salud',herr:'herramientas'};
+const VIC={capri:'<path d="M12 2 L14 10 L22 12 L14 14 L12 22 L10 14 L2 12 L10 10 Z"/>',relic:'<path d="M7 9 C7 5 10 3 12 3 C14 3 17 5 17 9 C19 10 19 14 17 15 C16 18 14 19 12 19 C10 19 8 18 7 15 C5 14 5 10 7 9 Z M12 3 V19 M12 21 V19"/>',
+ diario:'<path d="M5 3 H17 L19 5 V21 H5 Z M8 8 H16 M8 12 H16 M8 16 H13"/>',ciberware:'<path d="M12 3 A3 3 0 1 0 12.01 3 Z M7 10 H17 L15 21 H9 Z M7 10 L4 16 M17 10 L20 16"/>',
+ medico:'<path d="M9 3 H15 V9 H21 V15 H15 V21 H9 V15 H3 V9 H9 Z"/>',expediente:'<path d="M4 4 H10 L12 6 H20 V20 H4 Z M8 11 H16 M8 15 H14"/>',
+ rip:'<path d="M3 12 H7 L9 7 L13 17 L15 12 H21"/>',biblioteca:'<path d="M3 5 L12 3 L21 5 V19 L12 21 L3 19 Z M12 3 V21"/>',mundo:'<path d="M12 3 A9 9 0 1 0 12.01 3 Z M3 12 H21 M12 3 C8.5 6.5 8.5 17.5 12 21 M12 3 C15.5 6.5 15.5 17.5 12 21"/>'};
+const vic=k=>`<svg class="vi" viewBox="0 0 24 24" aria-hidden="true">${VIC[k]||''}</svg>`;
 const SEC={ciberware:'vCiber',relic:'vRelic',medico:'vMed',expediente:'vExp',biblioteca:'vBib',rip:'vRip',mundo:'vMundo',diario:'vDiario'};
 const nav=document.createElement('div');nav.className='hnav';
 nav.innerHTML=`<div class="st"><span><b id="hvEn">--</b> <small>Energía</small></span><span><b id="hvMo">--</b> <small>Ánimo</small></span></div>
-<div class="htabs"><button class="k" id="hPrev" title="Anterior (Q)">Q</button>${VIEWS.map(([k,n])=>`<button class="t" data-v="${k}">${n}</button>`).join('')}<button class="k" id="hNext" title="Siguiente (E)">E</button></div>
+<div class="htabs"><button class="k" id="hPrev" title="Anterior (Q)">Q</button>${VIEWS.map(([k,n],i)=>`${i&&VGRP[k]!==VGRP[VIEWS[i-1][0]]?'<span class="gsep" aria-hidden="true"></span>':''}<button class="t g-${VGRP[k]}" data-v="${k}" title="${n} · ${VGN[VGRP[k]]} (tecla ${i+1})">${vic(k)}${n}</button>`).join('')}<button class="k" id="hNext" title="Siguiente (E)">E</button></div>
 <div class="st r"><span><b id="hvRe">--</b><small>/100 Relic</small></span><span><small>Recuerdos</small> <b id="hvMem">0</b></span></div>`;
 document.querySelector('.menubar').after(nav);
 const desk=document.querySelector('.app .desk');
@@ -302,9 +313,13 @@ function connect(label){return new Promise(res=>{const W=1000,H=600,n=26,ps=Arra
 
 // ---------- navegación ----------
 const seen=new Set(['capri']);let cur='capri';
-async function go(v,quick){if(v===cur)return;const name=VIEWS.find(x=>x[0]===v)[1];
-  if(!seen.has(v)&&!quick){seen.add(v);await connect('CONNECT // '+name);}
-  streaks(quick?300:420);cur=v;document.body.dataset.view=v;
+// 2.23: el 3D (three.js, ~700 KB) se carga hasta que abres RELIC, MÉDICO o CIBERWARE
+const mod3D={};function carga3D(f){if(mod3D[f])return;mod3D[f]=1;const s=document.createElement('script');s.type='module';s.src=f;document.body.appendChild(s);}
+window.hudCarga3D=carga3D;
+async function go(v,quick){if(v===cur)return;
+  // 2.23: sin pantalla CONNECT (se sentía lenta); solo las rayas, más cortas, y nada en modo ligero
+  seen.add(v);if(v==='relic')carga3D('relic3d.js');else if(v==='medico'||v==='ciberware')carga3D('holo3d.js');
+  if(!document.body.classList.contains('ligero'))streaks(quick?200:260);cur=v;document.body.dataset.view=v;
   nav.querySelectorAll('.t').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
   document.querySelectorAll('.hview').forEach(s=>s.classList.toggle('on',s.id===SEC[v]));
   dispatchEvent(new CustomEvent('hud:view',{detail:{v,el:document.getElementById(SEC[v])}}));
