@@ -49,4 +49,7 @@ contextBridge.exposeInMainWorld('capriDesk', {
   onWindows: on('desk:windows'),                      // tus ventanas (solo Windows): dónde sentarse
   onCfg: on('desk:cfg'),
   onCmd: on('desk:cmd'),                              // teletransporte, truco, etc. desde el menú
+  // sigilo (2.22): invisible al compartir pantalla, callada al presentar o en llamada, Ctrl+Alt+H para esconderla
+  sigilo: { get: () => ipcRenderer.invoke('sigilo:get'), set: (patch) => ipcRenderer.invoke('sigilo:set', patch),
+    ocultar: () => ipcRenderer.send('sigilo:ocultar'), onEstado: on('sigilo:estado') },
 });

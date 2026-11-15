@@ -79,7 +79,9 @@ let win = null, tray = null, trayMenu = null, mode = 'desk', offline = false, re
 let watch = null, lastWins = null;
 
 // lo que se elige en su menú: tamaño, si ronda sola, si se sienta en ventanas, si las posee, si está guardada
-const PREFS = { size: 'm', wander: true, sit: true, possess: true, stowed: false };
+const PREFS = { size: 'm', wander: true, sit: true, possess: true, stowed: false,
+  // 2.22 sigilo: invisible al compartir pantalla, y callada cuando presentas o estás en llamada
+  sigilo: true, silencioPresenta: true, silencioLlamada: true, callarVoz: true, silencioManual: false };
 const prefsFile = () => path.join(app.getPath('userData'), 'escritorio.json');
 let prefs = null;
 function loadPrefs() {
@@ -90,6 +92,7 @@ function setPrefs(patch) {
   prefs = { ...loadPrefs(), ...patch };
   try { fs.writeFileSync(prefsFile(), JSON.stringify(prefs, null, 2)); } catch (e) { console.error('[capri] no se guardó la config:', e.message); }
   send('desk:cfg', prefs);
+  aplicarSigilo();
   rebuildMenu();
   return prefs;
 }
@@ -271,6 +274,7 @@ function createWindow() {
     },
   });
   setMode('desk');
+  proteger(win);
   // con bóveda, primero la pantalla de la llave; ella abre a Capri ya descifrada
   win.loadURL(BOVEDA_ON ? CAPRI_URL + 'boveda.html?next=' + encodeURIComponent(deskURL()) : deskURL());
   win.webContents.on('did-navigate', () => { escucha = false; });
@@ -316,10 +320,65 @@ function openClaude() {
     if (CLAUDE_HOSTS.test(host)) return { action: 'allow', overrideBrowserWindowOptions: { autoHideMenuBar: true, icon: path.join(__dirname, 'icon.png') } };
     shell.openExternal(url); return { action: 'deny' };
   });
+  proteger(claudeWin);
+  wc.on('did-create-window', (w) => proteger(w));   // ventanitas de inicio de sesión de Google/Apple
   claudeWin.on('page-title-updated', (e, t) => { e.preventDefault(); claudeWin.setTitle('Capri // ' + (t || 'Claude')); });
   claudeWin.on('closed', () => { claudeWin = null; });
   claudeWin.loadURL('https://claude.ai/new');
 }
+
+// ---------- sigilo (2.22) ----------
+// Invisible al compartir pantalla: Windows saca las ventanas de Capri de cualquier captura (Meet, Zoom, Teams, OBS,
+// Recortes, la tecla Impr Pant…). Tú la sigues viendo y usando igual en tu monitor; los demás ven tu escritorio sin ella.
+// Ojo: el AUDIO no se puede esconder así; si compartes el sonido de la PC, su voz sí se oye. Por eso, cuando presentas
+// o estás en llamada, se queda callada (modo silencio) y no habla sola.
+const ventanasCapri = () => [win, claudeWin, ...BrowserWindow.getAllWindows()].filter((w, i, a) => w && !w.isDestroyed() && a.indexOf(w) === i);
+function proteger(w) { try { if (w && !w.isDestroyed()) w.setContentProtection(!!loadPrefs().sigilo); } catch (e) { console.error('[capri] sigilo:', e.message); } }
+function aplicarSigilo() { for (const w of ventanasCapri()) proteger(w); mandarSigilo(); }
+let escondidas = [], oculta = false, presenta = { tipo: null, por: null, llamada: null }, presentaProc = null, atajoOcultar = '';
+function estadoSigilo() {
+  const p = loadPrefs();
+  const presentando = !!presenta.tipo && p.silencioPresenta, enLlamada = !!presenta.llamada && p.silencioLlamada;
+  const silencio = !!(p.silencioManual || oculta || presentando || enLlamada);
+  const motivo = p.silencioManual ? 'a mano' : oculta ? 'oculta' : presentando ? (presenta.tipo === 'pantalla' ? 'pantalla completa: ' : presenta.tipo === 'presentacion' ? 'presentando: ' : 'compartiendo: ') + presenta.por
+    : enLlamada ? 'en llamada: ' + presenta.llamada : '';
+  return { sigilo: !!p.sigilo, oculta, silencio, callarVoz: !!p.callarVoz || oculta, motivo, presenta: { ...presenta }, atajo: atajoOcultar };
+}
+let ultSigilo = '';
+function mandarSigilo() { const e = estadoSigilo(), j = JSON.stringify(e); if (j === ultSigilo) return; ultSigilo = j; send('sigilo:estado', e); rebuildMenu(); }
+// Ctrl+Alt+H: Capri desaparece al instante (y se calla); otra vez y vuelve
+function toggleOcultar() {
+  oculta = !oculta;
+  if (oculta) { escondidas = ventanasCapri().filter((w) => w.isVisible()); escondidas.forEach((w) => w.hide()); }
+  else {
+    for (const w of escondidas) { if (w.isDestroyed()) continue;
+      if (w === win) { if (mode === 'full') { win.show(); win.focus(); } else win.showInactive(); } else w.show(); }
+    escondidas = [];
+  }
+  mandarSigilo();
+}
+function vigilarPresentacion() {
+  if (process.platform !== 'win32') return;
+  const script = path.join(__dirname, 'presenta.ps1').replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
+  let reinicios = 0;
+  const arranca = () => {
+    presentaProc = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script, String(process.pid)],
+      { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    let buf = '';
+    presentaProc.stdout.on('data', (d) => {
+      buf += d; let i;
+      while ((i = buf.indexOf('\n')) >= 0) { const l = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
+        try { const j = JSON.parse(l); presenta = { tipo: j.tipo || null, por: j.por || null, llamada: j.llamada || null }; mandarSigilo(); } catch {} }
+    });
+    presentaProc.stderr.on('data', (d) => console.error('[capri] presenta:', String(d).trim()));
+    presentaProc.on('exit', () => { presentaProc = null; if (!cerrando && reinicios++ < 5) setTimeout(arranca, 5000); });
+  };
+  arranca();
+}
+ipcMain.handle('sigilo:get', () => estadoSigilo());
+ipcMain.handle('sigilo:set', (e, patch) => { const ok = ['sigilo', 'silencioPresenta', 'silencioLlamada', 'callarVoz', 'silencioManual'];
+  const p = {}; for (const k of ok) if (patch && k in patch) p[k] = !!patch[k]; setPrefs(p); return estadoSigilo(); });
+ipcMain.on('sigilo:ocultar', toggleOcultar);
 
 function run(js) { if (win && !offline) win.webContents.executeJavaScript(js).catch(() => {}); }
 
@@ -349,6 +408,14 @@ function rebuildMenu() {
     { label: 'Poseer mis ventanas', type: 'checkbox', checked: p.possess, enabled: process.platform === 'win32',
       click: (it) => setPrefs({ possess: it.checked }) },
     { type: 'separator' },
+    { label: (oculta ? '👁 Mostrar a Capri' : '🕶 Ocultar a Capri ya'), accelerator: atajoOcultar || undefined, click: toggleOcultar },
+    { label: '🕶 Invisible al compartir pantalla (Meet, Zoom, OBS…)', type: 'checkbox', checked: p.sigilo, click: (it) => setPrefs({ sigilo: it.checked }) },
+    { label: 'Callada cuando presento o comparto pantalla', type: 'checkbox', checked: p.silencioPresenta, enabled: process.platform === 'win32', click: (it) => setPrefs({ silencioPresenta: it.checked }) },
+    { label: 'Callada cuando estoy en llamada (micrófono en uso)', type: 'checkbox', checked: p.silencioLlamada, enabled: process.platform === 'win32', click: (it) => setPrefs({ silencioLlamada: it.checked }) },
+    { label: 'En silencio también apaga su voz', type: 'checkbox', checked: p.callarVoz, click: (it) => setPrefs({ callarVoz: it.checked }) },
+    { label: 'Modo silencio a mano', type: 'checkbox', checked: p.silencioManual, click: (it) => setPrefs({ silencioManual: it.checked }) },
+    ...(estadoSigilo().motivo ? [{ label: '   🔇 Callada ahora (' + estadoSigilo().motivo + ')', enabled: false }] : []),
+    { type: 'separator' },
     { label: PORTATIL ? '💾 Datos en la USB: abrir carpeta' : '💾 Llevar mis datos junto al .exe (USB)', click: llevarAUsb },
     ...(BOVEDA_ON ? [{ label: '🔐 Bloquear Capri (guarda y pide la llave)', click: () => run('window.Boveda&&Boveda.bloquear()') }] : []),
     { label: 'Iniciar con Windows', enabled: !PORTATIL, type: 'checkbox', checked: app.getLoginItemSettings({ path: EXE }).openAtLogin,
@@ -369,6 +436,7 @@ function createTray() {
 
 ipcMain.on('hit', (e, on) => { if (win && mode === 'desk') win.setIgnoreMouseEvents(!on, { forward: true }); });
 ipcMain.on('mode', (e, m) => {
+  if (oculta && m === 'full') toggleOcultar();   // la abriste desde la bandeja: vuelve a aparecer
   setMode(m);
   if (win && !ready) { ready = true; clearTimeout(readyT); win.showInactive(); }
 });
@@ -743,9 +811,13 @@ app.whenReady().then(async () => {
   createTray();
   watch = startWindowWatch({ win, onUpdate: (d) => { lastWins = d; send('desk:windows', d); } });
   globalShortcut.register('Control+Alt+C', toggleStow);
+  // atajo para esconderla al instante; si otro programa ya usa Ctrl+Alt+H, se prueba Ctrl+Alt+Shift+H
+  for (const a of ['Control+Alt+H', 'Control+Alt+Shift+H']) { try { if (globalShortcut.register(a, toggleOcultar)) { atajoOcultar = a; break; } } catch {} }
+  vigilarPresentacion();
+  mandarSigilo(); rebuildMenu();
 });
 
-app.on('will-quit', () => { globalShortcut.unregisterAll(); watch?.stop(); try { rvcProc?.kill(); } catch {} });
+app.on('will-quit', () => { globalShortcut.unregisterAll(); watch?.stop(); try { presentaProc?.kill(); } catch {} try { rvcProc?.kill(); } catch {} });
 
 app.on('second-instance', (_e, _argv, _cwd, data) => {
   if (data && data.version && newer(data.version, app.getVersion())) { vaciarBoveda().then(() => { cerrando = true; app.relaunch({ execPath: data.exe, args: [] }); app.exit(0); }); return; }
