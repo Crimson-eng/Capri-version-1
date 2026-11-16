@@ -43,9 +43,31 @@ setTimeout(sync,4000); // después del arranque, para no frenar que Capri abra r
 
 window.cerebroPyInfo=()=>({vivo,url:S.url,key:S.key,on:S.on});
 
+// ---------- 2.24: inglés sin IA ----------
+// Si no hay ninguna IA prendida (ni Gemini, ni tu GPU con Ollama, ni Claude) o no hay internet y no hay GPU, lo que
+// escribas en inglés lo resuelve el cerebro Python con reglas y su diccionario local (ingles_offline.py).
+// «en: <texto>» lo manda ahí siempre, aunque la IA esté prendida.
+function sinIA(){const ci=window.cerebroInfo?.()||{},red=navigator.onLine!==false;
+  const gem=!!(cfg.key&&cfg.model)&&red,loc=!!(ci.ok&&ci.modelo&&ci.modo!=='gemini'),cla=!!(ci.claude&&ci.claudeKey)&&red;
+  return !gem&&!loc&&!cla;}
+window.capriSinIA=sinIA;
+const EN_CMD=/^(?:en|ingl[eé]s sin ia|english)\s*:\s*([\s\S]+)$/i;
+async function inglesSinIA(t,txt,forzado){
+  let r;try{r=await post('/api/ingles',{texto:txt},8000);}catch(e){if(forzado){line('u',t);line('c','CAPRI');line('t','…no encuentro mi cerebro Python, y ahí vive mi inglés sin IA. Prende capri-cerebro y lo vuelvo a intentar.');return true;}return false;}
+  if(!forzado&&(r.intencion==='no_ingles'||r.idioma==='es'||r.idioma==='?'))return false;
+  bump();line('u',t);line('c','CAPRI · SIN IA');line('t',r.respuesta);setState(r.estado||'sonrisa_traviesa');
+  try{speakChunk(r.respuesta.replace(/[✎🇪🇸]/gu,''));}catch(e){}
+  history.push({role:'user',text:t});history.push({role:'model',text:'['+(r.estado||'sonrisa_traviesa')+'] '+r.respuesta});store.set('history',history.slice(-60));
+  if(r.correcciones?.length)dispatchEvent(new CustomEvent('capri:ingles-correccion',{detail:r.correcciones}));
+  log('inglés sin IA: '+r.intencion+(r.puro?' (inglés puro)':' ('+r.idioma+')'),'g');return true;}
+
 // ---------- comandos en el chat ----------
 const _send=send;
 send=async v=>{const t=(v||'').trim(),k=t.toLowerCase();
+  const mEn=!busy&&t.match(EN_CMD);
+  if(mEn&&await inglesSinIA(t,mEn[1].trim(),true))return;
+  if(!busy&&t&&vivo&&!mEn&&!/^(cerebro|help|limpiar|recuerdos|olvida |ajustes|estudio|m[eé]dico|sal|fragmentos|despierta )/i.test(k)&&sinIA()
+     &&await inglesSinIA(t,t,false))return;
   if(/^cerebro(\s+(key|abrir|url|apagar|prender)\b.*)?$/.test(k)&&!busy){line('u',t);const a=t.split(/\s+/).slice(1);const sub=(a[0]||'').toLowerCase();line('c','CAPRI');
     if(sub==='key'){S.key=/^(s[ií]|si|yes|on)$/i.test(a[1]||'');guarda();if(!S.key&&vivo)post('/api/sync',{dispositivo:S.dev,cfg:{key:''}}).catch(()=>{});sync();
       return line('t',S.key?'ok, le paso tu key a mi cerebro. Se queda solo en tu PC'+(navigator.platform.startsWith('Win')?' (cifrada con tu usuario de Windows)':'')+'. Con eso te hablo aunque cierres mi ventana >:)':'listo, le quité tu key a mi cerebro. Si tienes Ollama, piensa con eso.');}
@@ -59,5 +81,5 @@ send=async v=>{const t=(v||'').trim(),k=t.toLowerCase();
       '\n  cerebro url <dirección> <código> — usar el cerebro de otra PC de tu casa'+
       '\n  cerebro apagar / prender');}
   await _send(v);
-  if(k==='help')line('t','  cerebro — mi cerebro Python: sigo viva con la app cerrada');};
+  if(k==='help')line('t','  cerebro — mi cerebro Python: sigo viva con la app cerrada\n  en: <texto> — inglés sin IA (traduzco, explico palabras, corrijo, cuentas); sin IA lo hago solita');};
 })();

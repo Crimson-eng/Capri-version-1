@@ -22,7 +22,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Pruebas
-        run: python prueba_cerebro.py
+        run: |
+          python prueba_cerebro.py
+          python prueba_ingles.py
       - name: Armar ejecutable
         run: |
           python -m pip install pyinstaller==6.11.1

@@ -7,6 +7,7 @@ Un proceso pequeño que vive en tu PC aunque la app de Capri esté cerrada:
   - guarda su memoria (recuerdos, ánimo y plática) y la comparte entre tus dispositivos,
   - le habla a Kiga por su cuenta con la app cerrada (notificación y, si quieres, en voz alta),
   - deja platicar con ella desde el navegador o el celular (misma red) en http://127.0.0.1:47824/
+  - entiende y contesta inglés aunque no haya IA (Gemini/Ollama apagados): ver ingles_offline.py
 
 Solo usa la biblioteca estándar de Python 3.8+ (nada que instalar, sin GPU).
 Si no está corriendo, la app de Capri funciona exactamente igual que siempre.
@@ -29,7 +30,12 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-VERSION = '1.0.0'
+try:  # 2.24: inglés sin IA (reglas + diccionario local). Si falta el archivo, el cerebro sigue igual.
+    import ingles_offline
+except Exception:  # pragma: no cover
+    ingles_offline = None
+
+VERSION = '1.1.0'
 PUERTO = 47824  # la app de escritorio usa 47823; el cerebro vive justo al lado
 ORIGENES = {  # páginas de Capri que pueden hablar con el cerebro desde el navegador
     'http://127.0.0.1:47823', 'http://localhost:47823', 'https://crimson-eng.github.io',
@@ -603,6 +609,7 @@ class Cerebro:
         self.lock = threading.RLock()
         self.proximo = 0
         self.pensando = False
+        self.ingles = ingles_offline.Ingles(mem.carpeta) if ingles_offline else None
         self._programar(primero=True)
 
     @property
@@ -623,7 +630,15 @@ class Cerebro:
             try:
                 sis = sistema(self.e, 'Ahora %s te escribe desde %s, fuera de tu ventana de siempre. Respóndele normal.'
                               % (self.cfg['nombre'], 'su celular o navegador' if quien != 'local' else 'el navegador de su PC'))
-                full, quien_respondio = pensar(self.cfg, sis, contenidos(self.e['history'], texto))
+                try:
+                    full, quien_respondio = pensar(self.cfg, sis, contenidos(self.e['history'], texto))
+                except Exception as ex:
+                    # sin IA: si es inglés, lo resuelve el módulo de reglas; si no, el error de siempre
+                    r = self.ingles_sin_ia(texto)
+                    if not r or r['intencion'] == 'no_ingles':
+                        raise
+                    log('sin IA (', str(ex)[:120], ') -> inglés con reglas:', r['intencion'])
+                    full, quien_respondio = '[%s] %s' % (r['estado'], r['respuesta']), 'ingles-sin-ia'
                 self._guardar_turno(texto, full)
                 return {'texto': limpiar(full), 'estado': estado_de(full), 'cerebro': quien_respondio}
             finally:
@@ -636,6 +651,12 @@ class Cerebro:
                                                   {'role': 'model', 'text': '[' + estado_de(full) + '] ' + limpiar(full)}])[-60:]
         self.e['hist_ts'] = ahora_ms()
         self.mem.guardar()
+
+    # ---- inglés sin IA
+    def ingles_sin_ia(self, texto):
+        if not self.ingles:
+            return None
+        return self.ingles.responder(texto, self.cfg.get('nombre') or 'Kiga')
 
     # ---- sincronizar con la app
     def sincronizar(self, d):
@@ -756,7 +777,8 @@ class Cerebro:
                 'notif': c.get('notif'), 'voz': c.get('voz'), 'red': c.get('red'), 'app_abierta': self.app_abierta(),
                 'proximo': self.proximo, 'hoy': self.e['latido'].get('n', 0) if self.e['latido'].get('hoy') == dt.date.today().isoformat() else 0,
                 'recuerdos': len(self.e['mem']['hechos']), 'persona': bool(self.e.get('persona')), 'cifrado': self.mem.cifrar,
-                'inicio': inicio_activo(), 'datos': self.mem.carpeta, 'puerto': self.puerto, 'pensando': self.pensando}
+                'inicio': inicio_activo(), 'datos': self.mem.carpeta, 'puerto': self.puerto, 'pensando': self.pensando,
+                'ingles': ingles_offline.VERSION if self.ingles else ''}
 
 
 def ips_locales():
@@ -906,6 +928,28 @@ def hacer_manejador(cb):
                     return self._enviar(200, {'ok': True})
                 if ruta == '/api/chat':
                     return self._enviar(200, cb.platicar(d.get('texto'), 'local' if self._local() else 'red'))
+                if ruta.startswith('/api/ingles'):
+                    if not cb.ingles:
+                        return self._enviar(501, {'error': 'falta ingles_offline.py junto al cerebro'})
+                    texto = str(d.get('texto') or '')[:4000]
+                    if ruta == '/api/ingles':  # contesta como Capri, sin IA
+                        r = cb.ingles_sin_ia(texto)
+                        if d.get('guardar') and r['intencion'] != 'no_ingles':
+                            with cb.lock:
+                                cb._guardar_turno(texto, '[%s] %s' % (r['estado'], r['respuesta']))
+                        return self._enviar(200, r)
+                    if ruta == '/api/ingles/detectar':
+                        return self._enviar(200, cb.ingles.detectar(texto))
+                    if ruta == '/api/ingles/traducir':
+                        return self._enviar(200, cb.ingles.traducir(texto) if d.get('a') != 'en' else cb.ingles.al_ingles(texto))
+                    if ruta == '/api/ingles/corregir':
+                        return self._enviar(200, ingles_offline.corregir(texto))
+                    if ruta == '/api/ingles/aprende':
+                        if d.get('olvidar'):
+                            return self._enviar(200, {'ok': cb.ingles.dic.olvidar(str(d['olvidar']))})
+                        return self._enviar(200, cb.ingles.aprender(str(d.get('en') or ''), str(d.get('es') or '')))
+                    if ruta == '/api/ingles/palabras':
+                        return self._enviar(200, {'palabras': cb.ingles.dic.propias})
                 if ruta == '/api/hablar_ya':
                     t = cb.latir(forzar=True)
                     return self._enviar(200, {'ok': bool(t), 'texto': t or ''})

@@ -232,6 +232,36 @@ class Pruebas(unittest.TestCase):
         self.assertIsNone(self.cb.latir())
         self.assertEqual(self.mem.e['buzon'], [])
 
+    # ---------- inglés sin IA (2.24)
+    def test_chat_en_ingles_sin_ia(self):
+        self.mem.e['cfg'].update(key='')  # sin Gemini y sin Ollama
+        c, h, b = self.pide('/api/chat', {'texto': 'What is 7 times 6?'})
+        self.assertEqual(c, 200)
+        r = json.loads(b)
+        self.assertEqual(r['cerebro'], 'ingles-sin-ia')
+        self.assertIn('42', r['texto'])
+        self.assertEqual(self.mem.e['history'][-2]['text'], 'What is 7 times 6?')
+        c, h, b = self.pide('/api/chat', {'texto': 'cuéntame un chiste'})  # español sin IA: el error de siempre
+        self.assertEqual(c, 500)
+
+    def test_con_ia_no_usa_reglas(self):
+        self.mem.e['cfg'].update(key='K', modelo='gemini-2.5-flash')
+        r = json.loads(self.pide('/api/chat', {'texto': 'How are you?'})[2])
+        self.assertTrue(r['cerebro'].startswith('gemini'))
+
+    def test_api_ingles(self):
+        r = json.loads(self.pide('/api/ingles', {'texto': 'My dog is sleeping', 'guardar': True})[2])
+        self.assertTrue(r['puro'])
+        self.assertIn('Mi perro está durmiendo', r['respuesta'])
+        self.assertEqual(self.mem.e['history'][-2]['text'], 'My dog is sleeping')
+        self.assertEqual(json.loads(self.pide('/api/ingles/detectar', {'texto': 'hola amigo'})[2])['idioma'], 'es')
+        self.assertEqual(json.loads(self.pide('/api/ingles/traducir', {'texto': 'gracias', 'a': 'en'})[2])['texto'], 'thank you')
+        self.assertTrue(json.loads(self.pide('/api/ingles/corregir', {'texto': 'she go home'})[2])['correcciones'])
+        self.pide('/api/ingles/aprende', {'en': 'lizard', 'es': 'lagartija'})
+        self.assertEqual(json.loads(self.pide('/api/ingles/palabras', {})[2])['palabras'], {'lizard': 'lagartija'})
+        self.assertTrue(os.path.exists(os.path.join(self.dir, 'ingles_palabras.json')))
+        self.assertEqual(self.pide('/api/ingles', {'texto': 'hi'}, cab={'X-Capri': ''})[0], 403)
+
     def test_cfg_desde_la_pagina(self):
         c, h, b = self.pide('/api/cfg', {'cada_min': [120, 10], 'voz': True, 'max_dia': 99})
         r = json.loads(b)
