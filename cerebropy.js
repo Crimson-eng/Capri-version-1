@@ -56,9 +56,11 @@ window.capriSinIA=sinIA;
 const EN_CMD=/^(?:en|ingl[eé]s sin ia|english)\s*:\s*([\s\S]+)$/i;
 const QUIZ_CMD=/^(?:quiz|resuelve)\s*:\s*([\s\S]+)$/i;
 async function inglesSinIA(t,txt,forzado){
-  let r;try{r=await post('/api/ingles',{texto:txt},8000);}catch(e){if(forzado){line('u',t);line('c','CAPRI');line('t','…no encuentro mi cerebro Python, y ahí vive mi inglés sin IA. Prende capri-cerebro y lo vuelvo a intentar.');return true;}return false;}
+  let r;try{r=await post('/api/ingles',{texto:txt},60000);}catch(e){if(forzado){line('u',t);line('c','CAPRI');line('t','…no encuentro mi cerebro Python, y ahí vive mi inglés sin IA. Prende capri-cerebro y lo vuelvo a intentar.');return true;}return false;}
   if(!forzado&&r.intencion!=='toefl'&&(r.intencion==='no_ingles'||r.idioma==='es'||r.idioma==='?'))return false;
-  bump();line('u',t);line('c','CAPRI · SIN IA');line('t',r.respuesta);setState(r.estado||'sonrisa_traviesa');
+  if(r.dudas?.length&&window.quizIA){log('quiz: '+r.dudas.length+' pregunta(s) no seguras con reglas, le pregunto a una IA…','y');
+    const q=await window.quizIA({preguntas:r.quiz,dudas:r.dudas,prompt_ia:r.prompt_ia,respuesta:r.respuesta}).catch(()=>null);if(q?.respuesta)r.respuesta=q.respuesta;}
+  bump();line('u',t);line('c',r.quiz?'CAPRI · QUIZ':'CAPRI · SIN IA');line('t',r.respuesta);setState(r.estado||'sonrisa_traviesa');
   try{speakChunk(r.respuesta.replace(/[✎🇪🇸]/gu,''));}catch(e){}
   history.push({role:'user',text:t});history.push({role:'model',text:'['+(r.estado||'sonrisa_traviesa')+'] '+r.respuesta});store.set('history',history.slice(-60));
   if(r.correcciones?.length)dispatchEvent(new CustomEvent('capri:ingles-correccion',{detail:r.correcciones}));

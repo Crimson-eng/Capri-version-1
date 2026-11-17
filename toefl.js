@@ -131,19 +131,32 @@ function vQuiz(){return `<div class="bx"><h3>Resolver quiz</h3>
    <li><b>¿Cuál oración es correcta?</b> con oraciones completas como incisos.</li>
    <li><b>Encuentra el error</b> con partes marcadas (A) (B) (C) (D).</li>
    <li><b>Sinónimos</b> («closest in meaning to…») de su lista de vocabulario académico.</li>
-   <li><b>Lectura</b>: si pegas el texto, solo da una pista por coincidencia de palabras (confianza baja).</li></ul>
-   <p class="mut">Son ~120 reglas de gramática, no una IA: si la respuesta depende del sentido o del contexto te dice «no estoy segura» en vez de inventar. Cuando diga confianza media o baja, compruébalo con tu maestro o con Gemini. En el chat: <b>quiz: &lt;pregunta&gt;</b>.</p></div>`;}
+   <li><b>Lectura</b> (pega el texto también) y cualquier pregunta que dependa del sentido: esas las contesta una IA.</li></ul>
+   <p class="mut">Primero revisa con ~120 reglas de gramática. Lo que las reglas aseguran sale al momento y sin gastar nada. Lo que no aseguran se lo pregunta a Claude (si tienes key y saldo), a Gemini o a tu GPU, y te dice cuál lo resolvió. Sin ninguna IA, en esas te dice «no la puedo asegurar» en vez de adivinar. En el chat: <b>quiz: &lt;pregunta&gt;</b>.</p></div>`;}
+// lo que las reglas no aseguran se lo pregunto a una IA: Claude (si tienes key y saldo), Gemini o tu GPU (Ollama)
+async function quizIA(r,aviso){if(!r?.dudas?.length||!r.prompt_ia)return r;
+  const ci=window.cerebroInfo?.()||{},red=navigator.onLine!==false;
+  const opciones=[];
+  if(red&&cfg.claudeKey&&ci.claude!=='off'&&!(ci.tope&&ci.gasto>=ci.tope))opciones.push(['Claude',async()=>(await claudeStream('Eres un profesor experto de inglés y TOEFL. Respondes solo JSON válido.',[{role:'user',content:r.prompt_ia}],()=>{},4096)).full]);
+  if(red&&cfg.key&&cfg.model)opciones.push(['Gemini',async()=>(await gemUna([{text:r.prompt_ia}],{responseMimeType:'application/json',maxOutputTokens:4096})).text]);
+  if(ci.ok&&ci.modelo&&window.cerebroJSON)opciones.push(['tu GPU ('+ci.modelo+')',async()=>JSON.stringify(await window.cerebroJSON('Eres un profesor experto de inglés y TOEFL. Respondes solo JSON válido.',r.prompt_ia))]);
+  for(const [quien,fn] of opciones){try{aviso?.(quien);const txt=await fn();
+      const m=await api('/api/toefl/fusionar',{preguntas:r.preguntas,texto:txt,fuente:quien},10000);
+      if(m.con_ia){log('quiz: '+m.con_ia+' pregunta(s) resueltas con '+quien,'g');return Object.assign({},m,{dudas:[]});}}
+    catch(e){log('quiz: '+quien+' no pudo ('+String(e.message).slice(0,60)+')','w');}}
+  return Object.assign({},r,{sinIA:!opciones.length});}
+window.quizIA=quizIA;
 function pintaQuiz(r){const out=$t('tfQzR');if(!out)return;
   if(!r.preguntas?.length){out.innerHTML=`<div class="bx"><pre>${esc(r.respuesta)}</pre></div>`;return;}
-  const CONF={alta:'<span class="ok">confianza alta</span>',media:'<span class="cy">confianza media</span>',baja:'<span class="no">confianza baja</span>'};
-  out.innerHTML=r.preguntas.map((q,n)=>`<div class="bx qz"><div class="mut">${r.preguntas.length>1?(n+1)+' · ':''}${esc(q.tipo)} · ${CONF[q.confianza]||''}</div>
+  const CONF={alta:'<span class="ok">segura (reglas de gramática)</span>',ia:'',media:'<span class="cy">confianza media</span>',baja:'<span class="no">no segura</span>'};
+  out.innerHTML=(r.sinIA&&r.preguntas.some(q=>!q.correcta||q.confianza!=='alta')?'<div class="bx"><p class="cy">Hay preguntas que mis reglas no aseguran. Pon tu key de Gemini o de Claude en AJUSTES (o prende tu GPU) y las contesto bien.</p></div>':'')+
+   r.preguntas.map((q,n)=>`<div class="bx qz"><div class="mut">${r.preguntas.length>1?(n+1)+' · ':''}${esc(q.tipo)} · ${q.fuente?'<span class="ok">resuelta con '+esc(q.fuente)+'</span>':(CONF[q.confianza]||'')}</div>
    <p><b>${esc(q.pregunta)}</b></p>
    ${q.correcta?`<p class="ok">✅ ${esc(q.correcta)}) ${esc(q.opciones.find(o=>o.letra===q.correcta)?.texto)}</p><p style="white-space:pre-wrap">${esc(q.explicacion)}</p>`
-     :`<p class="cy">🤔 ${esc(q.explicacion||('No estoy segura: con mis reglas quedan '+(q.empate||[]).map(x=>x+')').join(', ')+'. Puede depender del sentido.'))}</p>`}
-   <ul>${q.opciones.filter(o=>o.letra!==q.correcta).map(o=>{const p=o.problemas?.[0];
-     const por=q.tipo==='encontrar el error'&&q.correcta?'esta parte está bien escrita':p?p.mal:(q.correcta&&!/vocabulario|lectura/.test(q.tipo)?(o.forma||'no encaja aquí'):(o.coincide!=null?o.coincide+'% de sus palabras están en el texto':''));
-     const ok=!p&&!q.correcta;
-     return `<li>${ok?'·':'<span class="no">✗</span>'} <b>${esc(o.letra)})</b> ${esc(o.texto)}${por?' — '+esc(por):''}${p&&p.regla?`<br><span class="mut">Regla: ${esc(p.regla)}</span>`:''}</li>`;}).join('')}</ul></div>`).join('');}
+     :`<p class="cy">🤔 No la puedo asegurar. ${esc(q.explicacion||'')}</p>`}
+   ${q.correcta?`<ul>${q.opciones.filter(o=>o.letra!==q.correcta).map(o=>{const p=o.problemas?.[0];
+     const por=o.ia||(q.tipo==='encontrar el error'?'esta parte está bien escrita':p?p.mal:(!/vocabulario|lectura/.test(q.tipo)?(o.forma||'no encaja aquí'):''));
+     return `<li><span class="no">✗</span> <b>${esc(o.letra)})</b> ${esc(o.texto)}${por?' — '+esc(por):''}${!o.ia&&p&&p.regla?`<br><span class="mut">Regla: ${esc(p.regla)}</span>`:''}</li>`;}).join('')}</ul>`:''}</div>`).join('');}
 const VISTA={inicio:vInicio,quiz:vQuiz,practicar:vPracticar,vocab:vVocab,examen:vExamen,traductor:vTraductor,plan:vPlan};
 
 let pint=0;
@@ -195,7 +208,9 @@ async function accion(a,el){
     out.innerHTML=`<pre>${esc(r.texto)}</pre><span class="mut">${d.idioma==='en'?(d.puro?'inglés puro':'inglés con algo de español: '+esc(d.es.join(', '))):d.idioma==='es'?'español → inglés palabra por palabra':esc(d.idioma)}${r.desconocidas?.length?' · no conozco: '+esc(r.desconocidas.join(', ')):''}</span>`;return;}
   if(a==='trdecir')return decir($t('tfTr').value);
   if(a==='quiz'){const t=$t('tfQz').value.trim();T.qz=t;save();if(!t)return;$t('tfQzR').innerHTML='<p class="mut">revisando…</p>';
-    const r=await api('/api/toefl/resolver',{texto:t},10000);pintaQuiz(r);log('quiz: '+(r.preguntas||[]).length+' pregunta(s)','g');return;}
+    let r=await api('/api/toefl/resolver',{texto:t},10000);pintaQuiz(r);
+    if(r.dudas?.length){const n=r.dudas.length;r=await quizIA(r,q=>{const o=$t('tfQzR');if(o)o.insertAdjacentHTML('afterbegin',`<p class="mut" id="tfQzIA">${n} pregunta(s) no son seguras con reglas: se las pregunto a ${esc(q)}…</p>`);});pintaQuiz(r);}
+    log('quiz: '+(r.preguntas||[]).length+' pregunta(s)','g');return;}
   if(a==='qzej'){$t('tfQz').value=QZ_EJ;return accion('quiz');}
   if(a==='qzlimpiar'){$t('tfQz').value='';T.qz='';save();$t('tfQzR').innerHTML='';return;}
   if(a==='meta'){await api('/api/toefl/meta',{banda:+$t('tfMb').value||null,fecha:$t('tfMf').value||null});return render();}}

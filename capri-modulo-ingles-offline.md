@@ -1,4 +1,4 @@
-# Capri 2.24–2.26 — Inglés sin IA, profe de TOEFL y resolver quizzes (cerebro Python)
+# Capri 2.24–2.26.1 — Inglés sin IA, profe de TOEFL y resolver quizzes (cerebro Python)
 
 Capri entiende y contesta **inglés aunque no tenga ninguna IA prendida**: sin Gemini, sin Ollama en tu GPU, sin Claude
 y sin internet. Lo resuelve su cerebro Python (`capri-cerebro/`) con reglas y un diccionario local.
@@ -152,7 +152,7 @@ Regla: Presente simple: he/she/it + verbo con -s (she goes, he studies, it has).
 | ¿Cuál oración es correcta? | 4 oraciones completas | Bien si el error es de gramática |
 | Encuentra el error | `He (A) can (B) speaks English…` con o sin los incisos aparte | Bien si la parte mala rompe una regla que conoce |
 | Sinónimos | `closest in meaning to "rapid"` | Solo palabras de su lista (~110 grupos de vocabulario académico) |
-| Lectura | pegas el texto + la pregunta | **Solo pista** (compara palabras, no entiende el sentido): confianza baja |
+| Lectura | pegas el texto + la pregunta | La contesta la IA (sin IA dice que no la puede asegurar) |
 
 Varias preguntas a la vez: numéralas (`1.`, `2)`…). Los incisos pueden ir en renglones (`a)`, `A.`, `(a)`) o en la misma línea.
 
@@ -160,20 +160,23 @@ Varias preguntas a la vez: numéralas (`1.`, `2)`…). Los incisos pueden ir en 
 errores que distinguen a las opciones (si algo está mal en todas, no cuenta). La opción que no rompe ninguna regla es la
 correcta; cada regla trae su explicación en español, y de ahí salen el «por qué» de la buena y el «✗» de cada mala.
 
-**Confianza**
-- **alta**: todas las demás rompen una regla clara.
-- **media**: alguna mala solo rompe una regla «suave» (lo que se prefiere en examen, p. ej. already + present perfect).
-- **baja / no estoy segura**: dos o más opciones quedan bien con sus reglas (p. ej. `works ___ a hospital`: in y at sirven) o la
-  pregunta depende del sentido. Ahí te dice cuáles quedan y no inventa. Con artículos (a/an vs the) te explica la diferencia.
-
-**Límites honestos:** no entiende el significado. Preguntas de comprensión, de qué palabra «suena mejor» por sentido, de
-tono o de contexto de una plática, necesitan IA o a tu maestro. Se probó con 40 preguntas típicas (39 elige bien, la otra la
-marca como empate a/an–the) y con 70 oraciones correctas sin inventarles errores (`prueba_quiz.py`), pero tu quiz puede traer
-una regla que no tiene: si ves que se equivoca, pásale la pregunta a Claude en un hilo y se agrega la regla.
+**Segura o se lo pregunta a una IA (2.26.1).** Kiga pidió que no diera pistas y que estuviera segura de cada respuesta.
+Ahora funciona así:
+- **Lo que las reglas aseguran** (todas las demás opciones rompen una regla clara) sale al momento, sin gastar nada, marcado
+  «segura (reglas de gramática)».
+- **Lo que no aseguran** (dos opciones quedan bien, depende del sentido, lectura, sinónimos que no conoce, confianza media)
+  se lo manda a una IA, en este orden: **Claude** (si tienes key de Anthropic, el coprocesador no está apagado y no llegaste
+  al tope de gasto) → **Gemini** (tu key) → **tu GPU** (Ollama). Solo manda las preguntas dudosas, no todo el quiz, con lo
+  que vieron las reglas como nota. La IA contesta en JSON: la letra, por qué es la correcta y por qué cada una de las otras
+  no. Sale marcado «resuelta con Claude / Gemini / tu GPU». Si la IA contradice a las reglas, gana la IA y lo dice.
+- **Sin ninguna IA** ya no adivina ni da pistas: en esas dice «No la puedo asegurar» y te pide prender una IA. La lectura
+  ya no tiene «modo pista».
+- El cerebro Python también lo hace solo cuando tiene su propia IA (key de Gemini sincronizada u Ollama), por ejemplo desde
+  la página del cerebro en el celular. Para eso usa temperatura baja (0.1).
 
 **Archivos:** `capri-cerebro/quiz_toefl.py` (lector del quiz + reglas + explicaciones), `capri-cerebro/prueba_quiz.py`.
-**API:** `POST /api/toefl/resolver {texto}` → `{preguntas: [{pregunta, tipo, correcta, confianza, explicacion, empate?,
-opciones: [{letra, texto, frase, problemas: [{mal, regla}]}]}], respuesta}`. También lo usa `/api/ingles` cuando el texto es un quiz.
+**API:** `POST /api/toefl/resolver {texto, ia?}` (con `ia: true` el cerebro usa su propia IA en las dudosas) → `{preguntas: [{pregunta, tipo, correcta, confianza, explicacion, empate?,
+opciones: [{letra, texto, frase, problemas: [{mal, regla}]}]}], respuesta}`. Además trae `dudas` (índices) y `prompt_ia`. `POST /api/toefl/fusionar {preguntas, texto, fuente}` mete la respuesta de la IA. También lo usa `/api/ingles` cuando el texto es un quiz.
 
 ## Siguiente paso posible
 

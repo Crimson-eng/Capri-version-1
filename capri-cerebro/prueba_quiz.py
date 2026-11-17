@@ -173,5 +173,28 @@ class Quiz(unittest.TestCase):
         self.assertEqual(p['correcta'], 'b')
 
 
+    def test_dudosas_a_la_ia(self):
+        r = Q.resolver('My father works ___ a hospital.\na) in b) on c) at d) to\n\nShe ___ to school every day.\na) go b) goes')
+        self.assertEqual(Q.dudosas(r['preguntas']), [0])
+        pr = Q.prompt_ia(r['preguntas'])
+        self.assertIn('PREGUNTA 1', pr)
+        self.assertNotIn('PREGUNTA 2', pr)
+        ia = '```json\n{"preguntas":[{"n":1,"correcta":"A","por_que":"Work in + lugar de trabajo.","otras":{"b":"on no se usa","c":"at también sirve pero in es lo usual","d":"to es dirección"}}]}\n```'
+        m = Q.fusionar_ia(r['preguntas'], ia, 'Gemini')
+        p = m['preguntas'][0]
+        self.assertEqual((p['correcta'], p['fuente'], m['con_ia']), ('a', 'Gemini', 1))
+        self.assertIn('resuelta con Gemini', m['respuesta'])
+        self.assertIn('✗ d) to — to es dirección', m['respuesta'])
+        self.assertEqual(Q.dudosas(m['preguntas']), [])
+
+    def test_sin_pistas(self):
+        txt = ('The city grew quickly after the railroad arrived in 1880. Farmers could send crops to distant markets, and '
+               'new shops opened near the station. By 1900 the population had tripled, although many old buildings were lost '
+               'when the downtown was rebuilt.\nWhat caused the city to grow?\na) the railroad\nb) the farmers\nc) old buildings')
+        p = Q.resolver(txt)['preguntas'][0]
+        self.assertIsNone(p['correcta'])
+        self.assertIn('No la puedo asegurar', Q.resolver(txt)['respuesta'])
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=1)

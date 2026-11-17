@@ -6,7 +6,7 @@ Un programa chiquito que se queda vivo en tu PC aunque cierres la app de Capri.
 - **Vida propia con la app cerrada.** Cada 30 a 90 minutos (tú eliges) te habla por su cuenta con una notificación, y si quieres también en voz alta. Respeta tus horas de silencio y un máximo de mensajes al día. Cuando abres la app, te enseña lo que te dijo.
 - **Inglés sin IA.** Aunque no haya Gemini, Ollama ni internet, entiende y contesta inglés con reglas y un diccionario local: traduce, explica palabras, corrige errores típicos, cuentas, hora. Ver `capri-modulo-ingles-offline.md`.
 - **Profe de TOEFL sin IA.** La pestaña INGLÉS de la app usa este cerebro para practicar las tareas del TOEFL iBT, calificarte, repasar vocabulario y armarte un plan. Tu progreso queda en `datos/toefl_progreso.json`.
-- **Resolver quizzes sin IA (2.26).** Le pegas una pregunta de opción múltiple (en la pestaña INGLÉS → Resolver quiz, o en el chat con `quiz: …`) y `quiz_toefl.py` te dice el inciso correcto, por qué, y por qué cada uno de los otros está mal. ~120 reglas de gramática; si depende del sentido, dice que no está segura.
+- **Resolver quizzes sin IA (2.26).** Le pegas una pregunta de opción múltiple (en la pestaña INGLÉS → Resolver quiz, o en el chat con `quiz: …`) y `quiz_toefl.py` te dice el inciso correcto, por qué, y por qué cada uno de los otros está mal. ~120 reglas de gramática; lo que las reglas no aseguran se lo pregunta a Claude, Gemini o Ollama (sin IA dice que no lo puede asegurar, no adivina).
 - **Platicar desde el navegador o el celular.** Su página está en http://127.0.0.1:47824/. Si prendes «Celular en mi wifi», te da un enlace con un código para abrirla desde el celular.
 
 Si no está corriendo, **Capri funciona exactamente igual que siempre**.

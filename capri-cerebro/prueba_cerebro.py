@@ -290,6 +290,13 @@ class Pruebas(unittest.TestCase):
         r = json.loads(self.pide('/api/ingles', {'texto': 'quiz: ' + q})[2])
         self.assertEqual(r['intencion'], 'toefl')
         self.assertIn('✅ b) goes', r['respuesta'])
+        r = json.loads(self.pide('/api/toefl/resolver', {'texto': 'He works ___ a bank.\na) in b) at c) to'})[2])
+        self.assertEqual(r['dudas'], [0])
+        self.assertIn('PREGUNTA 1', r['prompt_ia'])
+        m = json.loads(self.pide('/api/toefl/fusionar', {'preguntas': r['preguntas'], 'fuente': 'Claude',
+                                                         'texto': '{"preguntas":[{"n":1,"correcta":"b","por_que":"x","otras":{}}]}'})[2])
+        self.assertEqual(m['preguntas'][0]['correcta'], 'b')
+        self.assertEqual(self.pide('/api/toefl/fusionar', {'preguntas': r['preguntas'], 'texto': 'nada'})[0], 400)
 
     def test_cfg_desde_la_pagina(self):
         c, h, b = self.pide('/api/cfg', {'cada_min': [120, 10], 'voz': True, 'max_dia': 99})

@@ -30,7 +30,7 @@ try:
 except ImportError:  # pragma: no cover
     IO = None
 
-VERSION = '1.0.0'
+VERSION = '1.1.0'
 
 # ------------------------------------------------------------------ morfología
 IRREG = """be was been|have had had|do did done|go went gone|come came come|get got gotten|give gave given|take took taken
@@ -1305,7 +1305,7 @@ def por_que_bien(frase):
 def resolver_una(q):
     preg, ops, ctx = q['pregunta'].strip(), q['opciones'], q.get('contexto', '')
     low = preg.lower()
-    res = {'pregunta': preg, 'opciones': [], 'correcta': None, 'confianza': 'baja', 'tipo': '', 'explicacion': ''}
+    res = {'pregunta': preg, 'opciones': [], 'correcta': None, 'confianza': 'baja', 'tipo': '', 'explicacion': '', 'contexto': ctx}
     # vocabulario
     mv = re.search(r'(?:closest in meaning to|nearest in meaning to|synonym (?:of|for)|similar in meaning to|same meaning as|meaning of|means the same as)\s+(?:the (?:word|phrase)\s+)?["“«\'‘]?([a-z\- ]+?)["”»\'’]?\s*(?:\s(?:in|is|as used|in paragraph)\b|[?.:,]|$)', low) \
         or re.search(r'\b(?:word|phrase)\s+["“«\'‘]([a-z\- ]+?)["”»\'’]', low)
@@ -1313,13 +1313,13 @@ def resolver_una(q):
         hits = sinonimo(mv.group(1), ops)
         res['tipo'] = 'vocabulario'
         for i, (l, o) in enumerate(ops):
-            res['opciones'].append({'letra': l, 'texto': o, 'problemas': [], 'forma': ''})
+            res['opciones'].append({'letra': l, 'texto': o, 'problemas': [], 'forma': '', 'coincide': None})
         if hits:
             i = hits[0]
             res.update(correcta=ops[i][0], confianza='alta' if len(hits) == 1 else 'media',
                        explicacion='«%s» significa lo mismo que «%s» (sinónimos de mi lista).' % (mv.group(1), ops[i][1]))
         else:
-            res['explicacion'] = 'Esa palabra no está en mi lista de sinónimos. Sin IA no la puedo deducir del contexto; prueba con Gemini o enséñamela.'
+            res['explicacion'] = 'Esa palabra no está en mi lista de sinónimos: necesito una IA (Claude, Gemini o tu GPU) para contestarla bien.'
         return res
     hay_hueco = bool(HUECO.search(preg))
     busca_error = bool(BUSCA_ERROR.search(low))
@@ -1331,7 +1331,7 @@ def resolver_una(q):
     else:
         preg_rev = preg
     # lectura (sin hueco y con texto largo): pista por coincidencias
-    if not hay_hueco and ctx and len(ctx) > 250 and not all(len(o.split()) > 4 and o[0].isupper() for _l, o in ops):
+    if not hay_hueco and ctx and len(ctx) > 120 and not all(len(o.split()) > 4 and o[0].isupper() for _l, o in ops):
         return _lectura(preg, ops, ctx, res)
     evals = []
     for l, o in ops:
@@ -1396,9 +1396,9 @@ def resolver_una(q):
         if textos <= {'a', 'an', 'the', '-', '—', 'x', 'no article', 'nothing', 'ø'} and 'the' in textos:
             res['explicacion'] = ('Gramaticalmente sirven %s. Depende del sentido: «a/an» = uno cualquiera o que se menciona por primera vez; '
                                   '«the» = uno específico que los dos ya saben cuál es. En quizzes sin más contexto casi siempre esperan a/an.') % ', '.join(x + ')' for x in res['empate'])
-    elif orden and orden[0]['puntos'] < orden[1]['puntos']:
-        res['correcta'] = orden[0]['letra']
-        res['confianza'] = 'baja'
+    elif len(orden) > 1 and orden[0]['puntos'] < orden[1]['puntos']:
+        res['inclina'] = orden[0]['letra']   # solo para la IA; a Kiga no se le da como respuesta
+        res['explicacion'] = 'Todas las opciones rompen alguna regla de las que conozco, así que no la puedo asegurar.'
     # el por qué de la correcta: las reglas que tumbaron a las demás y que esta sí cumple
     if res['correcta']:
         mejor = next(e for e in evals if e['letra'] == res['correcta'])
@@ -1434,9 +1434,9 @@ def _lectura(preg, ops, ctx, res):
         puntajes.append(pc)
         res['opciones'].append({'letra': l, 'texto': o, 'problemas': [], 'forma': '', 'coincide': round(pc * 100)})
     i = min(range(len(ops)), key=lambda k: puntajes[k]) if negativa else max(range(len(ops)), key=lambda k: puntajes[k])
-    res.update(tipo='lectura (pista)', correcta=ops[i][0], confianza='baja',
-               explicacion=('Es la opción que %s se parece a lo que dice el texto (%d%% de sus palabras aparecen). '
-                            'Sin IA solo comparo palabras, no el sentido: revísala tú.') % ('MENOS' if negativa else 'más', round(puntajes[i] * 100)))
+    res.update(tipo='lectura', correcta=None, confianza='baja', inclina=ops[i][0],
+               explicacion='Esta es de comprensión de lectura: depende del sentido del texto y con reglas no la puedo asegurar. '
+                           'Necesito una IA (Claude, Gemini o tu GPU) para contestarla bien.')
     return res
 
 
@@ -1459,6 +1459,77 @@ def resolver(texto):
             'version': VERSION}
 
 
+# ------------------------------------------------------------------ cuando duda: preguntarle a una IA
+def dudosas(preguntas):
+    """Índices de las preguntas que las reglas no aseguran (sin respuesta, empate o confianza media/baja)."""
+    return [i for i, p in enumerate(preguntas) if not p.get('fuente') and (not p.get('correcta') or p.get('confianza') != 'alta')]
+
+
+def prompt_ia(preguntas, idx=None):
+    """Instrucción + preguntas dudosas para Claude / Gemini / la GPU. Pide JSON."""
+    idx = dudosas(preguntas) if idx is None else idx
+    if not idx:
+        return ''
+    partes = []
+    for k, i in enumerate(idx, 1):
+        p = preguntas[i]
+        txt = 'PREGUNTA %d (%s)\n' % (k, p.get('tipo') or '')
+        if p.get('contexto'):
+            txt += 'Texto:\n%s\n' % p['contexto'][:6000]
+        txt += p['pregunta'] + '\n' + '\n'.join('%s) %s' % (o['letra'], o['texto']) for o in p['opciones'])
+        malas = ['%s) %s' % (o['letra'], o['problemas'][0]['mal']) for o in p['opciones'] if o.get('problemas')]
+        if malas:
+            txt += '\nNotas de un revisor automático (pueden fallar): ' + ' | '.join(malas)
+        partes.append(txt)
+    return ('Eres un profesor experto de inglés y de TOEFL. Resuelve cada pregunta de opción múltiple con seguridad. '
+            'Para cada una di la letra correcta, por qué es correcta (la regla o la razón, claro y corto) y por qué CADA una de '
+            'las otras opciones está mal. Escribe las explicaciones en español; las palabras en inglés entre «». '
+            'Responde SOLO con JSON válido, sin markdown, con esta forma exacta:\n'
+            '{"preguntas":[{"n":1,"correcta":"b","por_que":"...","otras":{"a":"...","c":"...","d":"..."}}]}\n\n'
+            + '\n\n'.join(partes))
+
+
+def _json_de(texto):
+    import json
+    t = (texto or '').strip()
+    t = re.sub(r'^```(?:json)?\s*|\s*```$', '', t)
+    m = re.search(r'\{[\s\S]*\}', t)
+    if not m:
+        raise ValueError('la IA no devolvió JSON')
+    return json.loads(m.group(0))
+
+
+def fusionar_ia(preguntas, texto_ia, fuente='IA', idx=None):
+    """Mete en las preguntas dudosas lo que contestó la IA. Regresa {'preguntas', 'respuesta', 'con_ia': n}."""
+    idx = dudosas(preguntas) if idx is None else idx
+    j = _json_de(texto_ia)
+    lista = j.get('preguntas') if isinstance(j, dict) else j
+    n = 0
+    for k, i in enumerate(idx, 1):
+        r = next((x for x in lista or [] if str(x.get('n')) == str(k)), None) if isinstance(lista, list) else None
+        if r is None and isinstance(lista, list) and len(lista) == len(idx):
+            r = lista[k - 1]
+        if not r:
+            continue
+        letra = str(r.get('correcta') or '').strip().lower().strip(')').strip()[:1]
+        p = preguntas[i]
+        if letra not in [o['letra'] for o in p['opciones']]:
+            continue
+        reglas = p.get('correcta')
+        p['correcta'], p['confianza'], p['fuente'] = letra, 'ia', fuente
+        p.pop('empate', None)
+        p['explicacion'] = str(r.get('por_que') or '').strip()
+        if reglas and reglas != letra:
+            p['explicacion'] += '\n(Mis reglas decían %s); le hago caso a %s porque lo de las reglas no era seguro.)' % (reglas, fuente)
+        otras = r.get('otras') or {}
+        for o in p['opciones']:
+            why = otras.get(o['letra']) or otras.get(o['letra'].upper())
+            if why and o['letra'] != letra:
+                o['ia'] = str(why).strip()
+        n += 1
+    return {'preguntas': preguntas, 'respuesta': formatear(preguntas), 'con_ia': n, 'version': VERSION}
+
+
 def formatear(resultados):
     out = []
     for n, r in enumerate(resultados, 1):
@@ -1466,26 +1537,33 @@ def formatear(resultados):
         out.append(cab)
         if r['correcta']:
             op = next(o for o in r['opciones'] if o['letra'] == r['correcta'])
-            out.append('✅ %s) %s%s' % (r['correcta'], op['texto'], '' if r['confianza'] == 'alta' else '   (confianza %s)' % r['confianza']))
+            nota = ''
+            if r.get('fuente'):
+                nota = '   (resuelta con %s)' % r['fuente']
+            elif r['confianza'] != 'alta':
+                nota = '   (confianza %s)' % r['confianza']
+            out.append('✅ %s) %s%s' % (r['correcta'], op['texto'], nota))
             if r.get('explicacion'):
-                out.append('Por qué: ' + r['explicacion'].replace('\n', '\n'))
-        elif r.get('empate'):
-            out.append('🤔 ' + (r.get('explicacion') or 'No estoy segura: con mis reglas quedan %s. Puede depender del sentido o de algo que no reviso.' % ', '.join(x + ')' for x in r['empate'])))
+                out.append('Por qué: ' + r['explicacion'])
         else:
-            out.append('🤔 ' + (r.get('explicacion') or 'No estoy segura: ninguna regla de las que conozco decide esta.'))
+            txt = r.get('explicacion') or ''
+            if r.get('empate') and not txt:
+                txt = 'Con mis reglas quedan bien %s; depende del sentido.' % ', '.join(x + ')' for x in r['empate'])
+            out.append('🤔 No la puedo asegurar. ' + (txt or 'Ninguna regla de las que conozco la decide.') +
+                       ('' if 'IA' in txt else ' Prende una IA (Claude, Gemini o tu GPU) y te la contesto bien.'))
         for o in r['opciones']:
-            if o['letra'] == r['correcta']:
+            if o['letra'] == r['correcta'] or not r['correcta']:
                 continue
-            if r['tipo'] == 'encontrar el error' and r['correcta']:
+            if o.get('ia'):
+                out.append('✗ %s) %s — %s' % (o['letra'], o['texto'], o['ia']))
+            elif r['tipo'] == 'encontrar el error':
                 out.append('✗ %s) %s — esta parte está bien escrita' % (o['letra'], o['texto']))
             elif o.get('problemas'):
-                p = o['problemas'][0]
-                out.append('✗ %s) %s — %s' % (o['letra'], o['texto'], p['mal']))
-            elif r['tipo'] not in ('vocabulario', 'lectura (pista)') and r['correcta']:
+                out.append('✗ %s) %s — %s' % (o['letra'], o['texto'], o['problemas'][0]['mal']))
+            elif r['tipo'] not in ('vocabulario', 'lectura'):
                 out.append('✗ %s) %s — %s' % (o['letra'], o['texto'], o['forma'] or 'no encaja aquí'))
         out.append('')
     return '\n'.join(out).strip()
-
 
 if __name__ == '__main__':
     import sys
