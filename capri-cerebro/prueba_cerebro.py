@@ -232,6 +232,72 @@ class Pruebas(unittest.TestCase):
         self.assertIsNone(self.cb.latir())
         self.assertEqual(self.mem.e['buzon'], [])
 
+    # ---------- inglés sin IA (2.24)
+    def test_chat_en_ingles_sin_ia(self):
+        self.mem.e['cfg'].update(key='')  # sin Gemini y sin Ollama
+        c, h, b = self.pide('/api/chat', {'texto': 'What is 7 times 6?'})
+        self.assertEqual(c, 200)
+        r = json.loads(b)
+        self.assertEqual(r['cerebro'], 'ingles-sin-ia')
+        self.assertIn('42', r['texto'])
+        self.assertEqual(self.mem.e['history'][-2]['text'], 'What is 7 times 6?')
+        c, h, b = self.pide('/api/chat', {'texto': 'cuéntame un chiste'})  # español sin IA: el error de siempre
+        self.assertEqual(c, 500)
+
+    def test_con_ia_no_usa_reglas(self):
+        self.mem.e['cfg'].update(key='K', modelo='gemini-2.5-flash')
+        r = json.loads(self.pide('/api/chat', {'texto': 'How are you?'})[2])
+        self.assertTrue(r['cerebro'].startswith('gemini'))
+
+    def test_api_ingles(self):
+        r = json.loads(self.pide('/api/ingles', {'texto': 'My dog is sleeping', 'guardar': True})[2])
+        self.assertTrue(r['puro'])
+        self.assertIn('Mi perro está durmiendo', r['respuesta'])
+        self.assertEqual(self.mem.e['history'][-2]['text'], 'My dog is sleeping')
+        self.assertEqual(json.loads(self.pide('/api/ingles/detectar', {'texto': 'hola amigo'})[2])['idioma'], 'es')
+        self.assertEqual(json.loads(self.pide('/api/ingles/traducir', {'texto': 'gracias', 'a': 'en'})[2])['texto'], 'thank you')
+        self.assertTrue(json.loads(self.pide('/api/ingles/corregir', {'texto': 'she go home'})[2])['correcciones'])
+        self.pide('/api/ingles/aprende', {'en': 'lizard', 'es': 'lagartija'})
+        self.assertEqual(json.loads(self.pide('/api/ingles/palabras', {})[2])['palabras'], {'lizard': 'lagartija'})
+        self.assertTrue(os.path.exists(os.path.join(self.dir, 'ingles_palabras.json')))
+        self.assertEqual(self.pide('/api/ingles', {'texto': 'hi'}, cab={'X-Capri': ''})[0], 403)
+
+    # ---------- profe de TOEFL sin IA (2.25)
+    def test_api_toefl(self):
+        j = lambda r, b=None: json.loads(self.pide(r, b or {})[2])
+        self.assertIn('secciones', j('/api/toefl/examen'))
+        it = j('/api/toefl/nueva', {'tipo': 'ordenar', 'id': 0})
+        r = j('/api/toefl/calificar', {'tipo': 'ordenar', 'id': it['id'], 'respuesta': 'Could you tell me where the library is?'})
+        self.assertTrue(r['bien'])
+        self.assertEqual(j('/api/toefl/progreso')['secciones']['writing']['intentos'], 1)
+        self.assertTrue(os.path.exists(os.path.join(self.dir, 'toefl_progreso.json')))
+        self.assertEqual(len(j('/api/toefl/vocab', {'n': 3})['tarjetas']), 3)
+        self.assertEqual(j('/api/toefl/meta', {'banda': 4.5})['banda'], 4.5)
+        self.assertIn('semanas', j('/api/toefl/plan'))
+        self.assertEqual(self.pide('/api/toefl/nueva', {'tipo': 'nada'})[0], 500)
+
+    def test_toefl_en_el_chat_sin_ia(self):
+        self.mem.e['cfg'].update(key='')
+        r = json.loads(self.pide('/api/ingles', {'texto': 'cómo es el toefl'})[2])
+        self.assertEqual(r['intencion'], 'toefl')
+        self.assertIn('Writing', r['respuesta'])
+
+    def test_quiz_sin_ia(self):
+        q = 'She ___ to school every day.\na) go\nb) goes\nc) going\nd) gone'
+        r = json.loads(self.pide('/api/toefl/resolver', {'texto': q})[2])
+        self.assertEqual(r['preguntas'][0]['correcta'], 'b')
+        self.mem.e['cfg'].update(key='')
+        r = json.loads(self.pide('/api/ingles', {'texto': 'quiz: ' + q})[2])
+        self.assertEqual(r['intencion'], 'toefl')
+        self.assertIn('✅ b) goes', r['respuesta'])
+        r = json.loads(self.pide('/api/toefl/resolver', {'texto': 'He works ___ a bank.\na) in b) at c) to'})[2])
+        self.assertEqual(r['dudas'], [0])
+        self.assertIn('PREGUNTA 1', r['prompt_ia'])
+        m = json.loads(self.pide('/api/toefl/fusionar', {'preguntas': r['preguntas'], 'fuente': 'Claude',
+                                                         'texto': '{"preguntas":[{"n":1,"correcta":"b","por_que":"x","otras":{}}]}'})[2])
+        self.assertEqual(m['preguntas'][0]['correcta'], 'b')
+        self.assertEqual(self.pide('/api/toefl/fusionar', {'preguntas': r['preguntas'], 'texto': 'nada'})[0], 400)
+
     def test_cfg_desde_la_pagina(self):
         c, h, b = self.pide('/api/cfg', {'cada_min': [120, 10], 'voz': True, 'max_dia': 99})
         r = json.loads(b)

@@ -7,6 +7,7 @@ Un proceso pequeño que vive en tu PC aunque la app de Capri esté cerrada:
   - guarda su memoria (recuerdos, ánimo y plática) y la comparte entre tus dispositivos,
   - le habla a Kiga por su cuenta con la app cerrada (notificación y, si quieres, en voz alta),
   - deja platicar con ella desde el navegador o el celular (misma red) en http://127.0.0.1:47824/
+  - entiende y contesta inglés aunque no haya IA (Gemini/Ollama apagados): ver ingles_offline.py
 
 Solo usa la biblioteca estándar de Python 3.8+ (nada que instalar, sin GPU).
 Si no está corriendo, la app de Capri funciona exactamente igual que siempre.
@@ -29,7 +30,16 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-VERSION = '1.0.0'
+try:  # 2.24: inglés sin IA (reglas + diccionario local). Si falta el archivo, el cerebro sigue igual.
+    import ingles_offline
+except Exception:  # pragma: no cover
+    ingles_offline = None
+try:  # 2.25: profe de TOEFL sin IA (módulo aparte)
+    import toefl_offline
+except Exception:  # pragma: no cover
+    toefl_offline = None
+
+VERSION = '1.3.0'
 PUERTO = 47824  # la app de escritorio usa 47823; el cerebro vive justo al lado
 ORIGENES = {  # páginas de Capri que pueden hablar con el cerebro desde el navegador
     'http://127.0.0.1:47823', 'http://localhost:47823', 'https://crimson-eng.github.io',
@@ -413,7 +423,7 @@ def gemini(cfg, sis, conv):
     modelos = [cfg.get('modelo') or 'gemini-2.5-flash'] + [m for m in _rank(cfg.get('modelos') or []) if m != cfg.get('modelo')][:5]
     err = None
     for modelo in modelos:
-        gc = {'temperature': 1.1, 'topP': 0.95, 'maxOutputTokens': 1024}
+        gc = {'temperature': cfg.get('_temp', 1.1), 'topP': 0.95, 'maxOutputTokens': cfg.get('_max', 1024)}
         tc = _think(modelo)
         if tc:
             gc['thinkingConfig'] = tc
@@ -456,7 +466,7 @@ def ollama(cfg, sis, conv):
     if not modelo:
         raise RuntimeError('Ollama no está o no tiene modelos')
     msgs = [{'role': 'system', 'content': sis}] + [{'role': 'assistant' if c['role'] == 'model' else 'user', 'content': c['text']} for c in conv]
-    j = _post(OLLAMA + '/api/chat', {'model': modelo, 'messages': msgs, 'stream': False, 'options': {'temperature': 1.1}}, t=180)
+    j = _post(OLLAMA + '/api/chat', {'model': modelo, 'messages': msgs, 'stream': False, 'options': {'temperature': cfg.get('_temp', 1.1)}}, t=180)
     txt = (j.get('message') or {}).get('content', '')
     txt = re.sub(r'<think>.*?</think>', '', txt, flags=re.S)
     if not txt.strip():
@@ -603,6 +613,8 @@ class Cerebro:
         self.lock = threading.RLock()
         self.proximo = 0
         self.pensando = False
+        self.ingles = ingles_offline.Ingles(mem.carpeta) if ingles_offline else None
+        self.toefl = toefl_offline.Toefl(mem.carpeta) if toefl_offline else None
         self._programar(primero=True)
 
     @property
@@ -623,7 +635,15 @@ class Cerebro:
             try:
                 sis = sistema(self.e, 'Ahora %s te escribe desde %s, fuera de tu ventana de siempre. Respóndele normal.'
                               % (self.cfg['nombre'], 'su celular o navegador' if quien != 'local' else 'el navegador de su PC'))
-                full, quien_respondio = pensar(self.cfg, sis, contenidos(self.e['history'], texto))
+                try:
+                    full, quien_respondio = pensar(self.cfg, sis, contenidos(self.e['history'], texto))
+                except Exception as ex:
+                    # sin IA: si es inglés, lo resuelve el módulo de reglas; si no, el error de siempre
+                    r = self.ingles_sin_ia(texto)
+                    if not r or r['intencion'] == 'no_ingles':
+                        raise
+                    log('sin IA (', str(ex)[:120], ') -> inglés con reglas:', r['intencion'])
+                    full, quien_respondio = '[%s] %s' % (r['estado'], r['respuesta']), 'ingles-sin-ia'
                 self._guardar_turno(texto, full)
                 return {'texto': limpiar(full), 'estado': estado_de(full), 'cerebro': quien_respondio}
             finally:
@@ -636,6 +656,43 @@ class Cerebro:
                                                   {'role': 'model', 'text': '[' + estado_de(full) + '] ' + limpiar(full)}])[-60:]
         self.e['hist_ts'] = ahora_ms()
         self.mem.guardar()
+
+    # ---- quiz: reglas y, en lo que duden, la IA que tenga el cerebro (Gemini con tu key o Ollama)
+    def quiz_con_ia(self, q):
+        Q = toefl_offline.quiz_toefl
+        idx = Q.dudosas(q['preguntas'])
+        if not idx or que_cerebro(self.cfg) == 'ninguno':
+            return q
+        try:
+            txt, quien = pensar(dict(self.cfg, _temp=0.1, _max=4096), 'Eres un profesor experto de inglés. Respondes solo JSON.',
+                                [{'role': 'user', 'text': Q.prompt_ia(q['preguntas'], idx)}])
+            fuente = 'Gemini' if not quien.startswith('ollama') else 'tu GPU (' + quien[7:] + ')'
+            r = Q.fusionar_ia(q['preguntas'], txt, fuente, idx)
+            log('quiz: %d pregunta(s) con %s' % (r['con_ia'], fuente))
+            return r
+        except Exception as ex:
+            log('quiz: la IA no pudo:', ex)
+            return q
+
+    # ---- inglés sin IA
+    def ingles_sin_ia(self, texto):
+        if not self.ingles:
+            return None
+        if self.toefl:
+            t = self.toefl.responder(texto)
+            if t:
+                extra = {}
+                if t.get('quiz') is not None:
+                    q = self.quiz_con_ia({'preguntas': t['quiz'], 'respuesta': t['respuesta']})
+                    t['respuesta'] = q['respuesta']
+                    Q = toefl_offline.quiz_toefl
+                    idx = Q.dudosas(q['preguntas'])
+                    extra = {'quiz': q['preguntas'], 'dudas': idx, 'prompt_ia': Q.prompt_ia(q['preguntas'], idx)}
+                d = ingles_offline.detectar(texto)
+                return dict({'idioma': d['idioma'], 'puro': d['puro'], 'confianza': d['confianza'], 'espanol': d['es'],
+                             'intencion': 'toefl', 'respuesta': t['respuesta'], 'respuesta_en': '', 'traduccion': '',
+                             'correcciones': [], 'desconocidas': [], 'estado': 'presumida', 'accion': t['accion']}, **extra)
+        return self.ingles.responder(texto, self.cfg.get('nombre') or 'Kiga')
 
     # ---- sincronizar con la app
     def sincronizar(self, d):
@@ -756,7 +813,9 @@ class Cerebro:
                 'notif': c.get('notif'), 'voz': c.get('voz'), 'red': c.get('red'), 'app_abierta': self.app_abierta(),
                 'proximo': self.proximo, 'hoy': self.e['latido'].get('n', 0) if self.e['latido'].get('hoy') == dt.date.today().isoformat() else 0,
                 'recuerdos': len(self.e['mem']['hechos']), 'persona': bool(self.e.get('persona')), 'cifrado': self.mem.cifrar,
-                'inicio': inicio_activo(), 'datos': self.mem.carpeta, 'puerto': self.puerto, 'pensando': self.pensando}
+                'inicio': inicio_activo(), 'datos': self.mem.carpeta, 'puerto': self.puerto, 'pensando': self.pensando,
+                'ingles': ingles_offline.VERSION if self.ingles else '', 'toefl': toefl_offline.VERSION if self.toefl else '',
+                'quiz': toefl_offline.quiz_toefl.VERSION if self.toefl and toefl_offline.quiz_toefl else ''}
 
 
 def ips_locales():
@@ -906,6 +965,67 @@ def hacer_manejador(cb):
                     return self._enviar(200, {'ok': True})
                 if ruta == '/api/chat':
                     return self._enviar(200, cb.platicar(d.get('texto'), 'local' if self._local() else 'red'))
+                if ruta.startswith('/api/ingles'):
+                    if not cb.ingles:
+                        return self._enviar(501, {'error': 'falta ingles_offline.py junto al cerebro'})
+                    texto = str(d.get('texto') or '')[:4000]
+                    if ruta == '/api/ingles':  # contesta como Capri, sin IA
+                        r = cb.ingles_sin_ia(texto)
+                        if d.get('guardar') and r['intencion'] != 'no_ingles':
+                            with cb.lock:
+                                cb._guardar_turno(texto, '[%s] %s' % (r['estado'], r['respuesta']))
+                        return self._enviar(200, r)
+                    if ruta == '/api/ingles/detectar':
+                        return self._enviar(200, cb.ingles.detectar(texto))
+                    if ruta == '/api/ingles/traducir':
+                        return self._enviar(200, cb.ingles.traducir(texto) if d.get('a') != 'en' else cb.ingles.al_ingles(texto))
+                    if ruta == '/api/ingles/corregir':
+                        return self._enviar(200, ingles_offline.corregir(texto))
+                    if ruta == '/api/ingles/aprende':
+                        if d.get('olvidar'):
+                            return self._enviar(200, {'ok': cb.ingles.dic.olvidar(str(d['olvidar']))})
+                        return self._enviar(200, cb.ingles.aprender(str(d.get('en') or ''), str(d.get('es') or '')))
+                    if ruta == '/api/ingles/palabras':
+                        return self._enviar(200, {'palabras': cb.ingles.dic.propias})
+                if ruta.startswith('/api/toefl'):
+                    t = cb.toefl
+                    if not t:
+                        return self._enviar(501, {'error': 'falta toefl_offline.py junto al cerebro'})
+                    sub = ruta[len('/api/toefl'):]
+                    if sub == '/examen':
+                        return self._enviar(200, dict(toefl_offline.EXAMEN, estrategias=toefl_offline.ESTRATEGIAS,
+                                                      plantillas=toefl_offline.PLANTILLAS, tipos=toefl_offline.TIPOS))
+                    if sub == '/nueva':
+                        return self._enviar(200, t.nueva(str(d.get('tipo')), d.get('id')))
+                    if sub == '/calificar':
+                        return self._enviar(200, t.calificar(str(d.get('tipo')), int(d.get('id') or 0), d.get('respuesta')))
+                    if sub == '/vocab':
+                        if d.get('palabra'):
+                            return self._enviar(200, t.vocab_responder(str(d['palabra']), bool(d.get('bien'))))
+                        return self._enviar(200, t.vocab_siguiente(max(1, min(30, int(d.get('n') or 10)))))
+                    if sub == '/progreso':
+                        return self._enviar(200, t.progreso())
+                    if sub == '/meta':
+                        return self._enviar(200, t.poner_meta(d.get('banda'), d.get('fecha')))
+                    if sub == '/plan':
+                        return self._enviar(200, t.plan())
+                    if sub == '/resolver':
+                        if not toefl_offline.quiz_toefl:
+                            return self._enviar(501, {'error': 'falta quiz_toefl.py junto al cerebro'})
+                        Q = toefl_offline.quiz_toefl
+                        q = Q.resolver(str(d.get('texto') or '')[:20000])
+                        if d.get('ia'):
+                            q = cb.quiz_con_ia(q)
+                        idx = Q.dudosas(q['preguntas'])
+                        return self._enviar(200, dict(q, dudas=idx, prompt_ia=Q.prompt_ia(q['preguntas'], idx)))
+                    if sub == '/fusionar':
+                        try:
+                            return self._enviar(200, toefl_offline.quiz_toefl.fusionar_ia(
+                                d.get('preguntas') or [], str(d.get('texto') or ''), str(d.get('fuente') or 'IA')[:40]))
+                        except Exception as ex:
+                            return self._enviar(400, {'error': str(ex)[:200]})
+                    if sub == '/pregunta':
+                        return self._enviar(200, t.responder('toefl ' + str(d.get('texto') or '')) or {})
                 if ruta == '/api/hablar_ya':
                     t = cb.latir(forzar=True)
                     return self._enviar(200, {'ok': bool(t), 'texto': t or ''})

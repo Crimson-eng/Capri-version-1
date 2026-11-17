@@ -1,5 +1,5 @@
 // HUD por secciones, al estilo del menú de Cyberpunk 2077: CAPRI · CIBERWARE · RELIC · MÉDICO · EXPEDIENTE · BIBLIOTECA · R.I.P · MUNDO · DIARIO.
-// RELIC (relic.js + relic3d.js), EXPEDIENTE (expediente.js), BIBLIOTECA (biblioteca.js), R.I.P (rip.js) y MUNDO (mundo.js) llenan su propia sección cuando se abre.
+// INGLÉS (toefl.js, 2.25), RELIC (relic.js + relic3d.js), EXPEDIENTE (expediente.js), BIBLIOTECA (biblioteca.js), R.I.P (rip.js) y MUNDO (mundo.js) llenan su propia sección cuando se abre.
 // CIBERWARE: las habilidades de Capri como implantes en un cuerpo holográfico (se activan desde ahí).
 // MÉDICO: cuerpo por sistemas para consultar o estudiar, y el interruptor del reservorio médico.
 // DIARIO: lo que Capri recuerda de ti, como lista de misiones, y las tarjetas de perfil.
@@ -156,18 +156,19 @@ const icon=k=>k==='mundo'?'<svg class="ci" viewBox="0 0 24 24"><path class="k" d
 
 // ---------- estructura ----------
 // 2.23: agrupadas (ella · salud · herramientas) y con ícono, todas a la vista; 1-9 siguen este orden
-const VIEWS=[['capri','CAPRI'],['relic','RELIC'],['diario','DIARIO'],['ciberware','CIBERWARE'],['medico','MÉDICO'],['expediente','EXPEDIENTE'],['rip','R.I.P'],['biblioteca','BIBLIOTECA'],['mundo','MUNDO']];
-const VGRP={capri:'ella',relic:'ella',diario:'ella',ciberware:'ella',medico:'salud',expediente:'salud',rip:'salud',biblioteca:'herr',mundo:'herr'};
+const VIEWS=[['capri','CAPRI'],['relic','RELIC'],['diario','DIARIO'],['ciberware','CIBERWARE'],['medico','MÉDICO'],['expediente','EXPEDIENTE'],['rip','R.I.P'],['biblioteca','BIBLIOTECA'],['ingles','INGLÉS'],['mundo','MUNDO']];
+const VGRP={capri:'ella',relic:'ella',diario:'ella',ciberware:'ella',medico:'salud',expediente:'salud',rip:'salud',biblioteca:'herr',ingles:'herr',mundo:'herr'};
 const VGN={ella:'ella',salud:'salud',herr:'herramientas'};
 const VIC={capri:'<path d="M12 2 L14 10 L22 12 L14 14 L12 22 L10 14 L2 12 L10 10 Z"/>',relic:'<path d="M7 9 C7 5 10 3 12 3 C14 3 17 5 17 9 C19 10 19 14 17 15 C16 18 14 19 12 19 C10 19 8 18 7 15 C5 14 5 10 7 9 Z M12 3 V19 M12 21 V19"/>',
  diario:'<path d="M5 3 H17 L19 5 V21 H5 Z M8 8 H16 M8 12 H16 M8 16 H13"/>',ciberware:'<path d="M12 3 A3 3 0 1 0 12.01 3 Z M7 10 H17 L15 21 H9 Z M7 10 L4 16 M17 10 L20 16"/>',
  medico:'<path d="M9 3 H15 V9 H21 V15 H15 V21 H9 V15 H3 V9 H9 Z"/>',expediente:'<path d="M4 4 H10 L12 6 H20 V20 H4 Z M8 11 H16 M8 15 H14"/>',
- rip:'<path d="M3 12 H7 L9 7 L13 17 L15 12 H21"/>',biblioteca:'<path d="M3 5 L12 3 L21 5 V19 L12 21 L3 19 Z M12 3 V21"/>',mundo:'<path d="M12 3 A9 9 0 1 0 12.01 3 Z M3 12 H21 M12 3 C8.5 6.5 8.5 17.5 12 21 M12 3 C15.5 6.5 15.5 17.5 12 21"/>'};
+ rip:'<path d="M3 12 H7 L9 7 L13 17 L15 12 H21"/>',biblioteca:'<path d="M3 5 L12 3 L21 5 V19 L12 21 L3 19 Z M12 3 V21"/>',mundo:'<path d="M12 3 A9 9 0 1 0 12.01 3 Z M3 12 H21 M12 3 C8.5 6.5 8.5 17.5 12 21 M12 3 C15.5 6.5 15.5 17.5 12 21"/>',
+ ingles:'<path d="M3 19 L8 5 L13 19 M5 14 H11 M15 9 H21 M18 6 V9 M15.5 19 C19 17 20 13 20 9"/>'};
 const vic=k=>`<svg class="vi" viewBox="0 0 24 24" aria-hidden="true">${VIC[k]||''}</svg>`;
-const SEC={ciberware:'vCiber',relic:'vRelic',medico:'vMed',expediente:'vExp',biblioteca:'vBib',rip:'vRip',mundo:'vMundo',diario:'vDiario'};
+const SEC={ciberware:'vCiber',relic:'vRelic',medico:'vMed',expediente:'vExp',biblioteca:'vBib',rip:'vRip',mundo:'vMundo',diario:'vDiario',ingles:'vIngles'};
 const nav=document.createElement('div');nav.className='hnav';
 nav.innerHTML=`<div class="st"><span><b id="hvEn">--</b> <small>Energía</small></span><span><b id="hvMo">--</b> <small>Ánimo</small></span></div>
-<div class="htabs"><button class="k" id="hPrev" title="Anterior (Q)">Q</button>${VIEWS.map(([k,n],i)=>`${i&&VGRP[k]!==VGRP[VIEWS[i-1][0]]?'<span class="gsep" aria-hidden="true"></span>':''}<button class="t g-${VGRP[k]}" data-v="${k}" title="${n} · ${VGN[VGRP[k]]} (tecla ${i+1})">${vic(k)}${n}</button>`).join('')}<button class="k" id="hNext" title="Siguiente (E)">E</button></div>
+<div class="htabs"><button class="k" id="hPrev" title="Anterior (Q)">Q</button>${VIEWS.map(([k,n],i)=>`${i&&VGRP[k]!==VGRP[VIEWS[i-1][0]]?'<span class="gsep" aria-hidden="true"></span>':''}<button class="t g-${VGRP[k]}" data-v="${k}" title="${n} · ${VGN[VGRP[k]]} (tecla ${(i+1)%10})">${vic(k)}${n}</button>`).join('')}<button class="k" id="hNext" title="Siguiente (E)">E</button></div>
 <div class="st r"><span><b id="hvRe">--</b><small>/100 Relic</small></span><span><small>Recuerdos</small> <b id="hvMem">0</b></span></div>`;
 document.querySelector('.menubar').after(nav);
 const desk=document.querySelector('.app .desk');
@@ -284,7 +285,7 @@ function renderD(){if(!vD.classList.contains('on'))return;M();const name=cfg.nam
   if(h){vD.querySelector('#dyAsk').onclick=()=>{go('capri',true);setTimeout(()=>send('¿Te acuerdas de esto? '+h.t),380);};
     vD.querySelector('#dyDel').onclick=()=>{if(!confirm('¿Que Capri olvide esto?\n'+h.t))return;mem.hechos=mem.hechos.filter(x=>x!==h);store.set('mem',mem);dsel=null;renderD();stats();};}}
 // secciones que llenan otros módulos: cada uno escucha «hud:view» y se arma la primera vez que lo abres
-for(const k of ['relic','expediente','biblioteca','rip','mundo'])mk(SEC[k],'');
+for(const k of ['relic','expediente','biblioteca','rip','ingles','mundo'])mk(SEC[k],'');
 vD.addEventListener('click',e=>{const c=e.target.closest('[data-c]');if(c){cat=c.dataset.c;renderD();return;}const q=e.target.closest('.qi[data-t]');if(q){dsel=mem.hechos[+q.dataset.t];renderD();}});
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
@@ -331,7 +332,7 @@ const step=d=>{const i=VIEWS.findIndex(x=>x[0]===cur);go(VIEWS[(i+d+VIEWS.length
 nav.querySelector('#hPrev').onclick=()=>step(-1);nav.querySelector('#hNext').onclick=()=>step(1);
 addEventListener('keydown',e=>{const t=e.target;if(t.matches?.('input,textarea,select,[contenteditable]')||e.ctrlKey||e.altKey||e.metaKey)return;if(document.querySelector('.modal.show:not(.acoplado)'))return;
   if(e.key==='q'||e.key==='Q')step(-1);else if(e.key==='e'||e.key==='E')step(1);else if(e.key==='Escape'&&cur!=='capri')go('capri');
-  else if(/^[1-9]$/.test(e.key)&&VIEWS[+e.key-1])go(VIEWS[+e.key-1][0]);});
+  else if(/^[0-9]$/.test(e.key)&&VIEWS[(+e.key+9)%10])go(VIEWS[(+e.key+9)%10][0]);});
 document.body.dataset.view='capri';nav.querySelector('.t').classList.add('on');
 new MutationObserver(()=>{renderC();}).observe(document.querySelector('.dock'),{attributes:true,subtree:true,attributeFilter:['class']});
 })();
