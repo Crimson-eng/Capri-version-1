@@ -119,6 +119,7 @@ function comandos(){const c=[];const add=(n,d,kw,run,ok=true)=>ok&&c.push({k:'c:
   add('Notas clínicas','registro de práctica','clinica notas',()=>window.openClinica?.(),!!window.openClinica);
   add('Expediente clínico','pacientes reales (NOM-004)','expediente paciente',()=>window.hudGo?.('expediente'));
   add('Profe de TOEFL','pestaña INGLÉS: practica y te califica, sin IA','toefl ingles english profe examen practicar vocabulario',()=>window.toeflIr?.(),!!window.toeflIr);
+  add('Resolver quiz de inglés','pega la pregunta con incisos: cuál es la correcta y por qué','quiz inciso respuesta correcta opcion multiple examen gramatica toefl',()=>window.toeflQuiz?.(),!!window.toeflQuiz);
   add('Voz de Capri','RELIC → Voz: motor, afinar, entrenar','voz rvc piper cantar',()=>window.relicAbrir?.(4),!!window.relicAbrir);
   add(ui.ligero?'Apagar modo ligero':'Modo ligero','menos efectos, más rápido','ligero rapido lento rendimiento efectos',()=>ligero(!ui.ligero));
   add('Esconder a Capri','como Ctrl+Alt+H','sigilo esconder ocultar compartir',()=>$('sigiloChip')?.click(),!!$('sigiloChip')&&!!window.capriDesk);

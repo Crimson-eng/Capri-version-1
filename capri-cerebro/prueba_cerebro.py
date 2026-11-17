@@ -282,6 +282,15 @@ class Pruebas(unittest.TestCase):
         self.assertEqual(r['intencion'], 'toefl')
         self.assertIn('Writing', r['respuesta'])
 
+    def test_quiz_sin_ia(self):
+        q = 'She ___ to school every day.\na) go\nb) goes\nc) going\nd) gone'
+        r = json.loads(self.pide('/api/toefl/resolver', {'texto': q})[2])
+        self.assertEqual(r['preguntas'][0]['correcta'], 'b')
+        self.mem.e['cfg'].update(key='')
+        r = json.loads(self.pide('/api/ingles', {'texto': 'quiz: ' + q})[2])
+        self.assertEqual(r['intencion'], 'toefl')
+        self.assertIn('✅ b) goes', r['respuesta'])
+
     def test_cfg_desde_la_pagina(self):
         c, h, b = self.pide('/api/cfg', {'cada_min': [120, 10], 'voz': True, 'max_dia': 99})
         r = json.loads(b)

@@ -6,6 +6,8 @@
 //    Listen and Repeat, Interview, dictado) con tiempo, calificación y explicación.
 //  · Vocabulario: 120 palabras académicas con repaso espaciado.  · Examen: formato, puntaje, estrategias y plantillas.
 //  · Traductor: inglés↔español y corrector sin IA.  · Plan: meta y fecha del examen → plan por semanas.
+//  · Resolver quiz (2.26): pegas preguntas de opción múltiple de tus clases y te dice el inciso correcto, por qué,
+//    y por qué cada uno de los otros está mal (quiz_toefl.py, ~120 reglas de gramática).
 // Si el cerebro Python no está prendido, la pestaña lo dice y ofrece el modo profe con Gemini (ingles.js).
 (()=>{
 const T=Object.assign({mod:'inicio'},store.get('toefl',{}));const save=()=>store.set('toefl',T);
@@ -14,7 +16,7 @@ const api=(r,b,ms=8000)=>window.cerebroPost?window.cerebroPost(r,b||{},ms):Promi
 const vivo=()=>!!window.cerebroPyInfo?.().vivo;
 const NOM={completar:'Complete the Words',ordenar:'Build a Sentence',lectura:'Lectura (diaria / académica)',correo:'Write an Email',discusion:'Academic Discussion',repetir:'Listen and Repeat',entrevista:'Take an Interview',dictado:'Dictado (listening)'};
 const SECN={reading:'Reading',listening:'Listening',writing:'Writing',speaking:'Speaking'};
-const MODS=[['inicio','Inicio','tu nivel y el profe'],['practicar','Practicar','tareas del examen'],['vocab','Vocabulario','palabras académicas'],['examen','El examen','formato y estrategias'],['traductor','Traductor','y corrector, sin IA'],['plan','Plan','meta y fecha']];
+const MODS=[['inicio','Inicio','tu nivel y el profe'],['quiz','Resolver quiz','¿cuál inciso y por qué?'],['practicar','Practicar','tareas del examen'],['vocab','Vocabulario','palabras académicas'],['examen','El examen','formato y estrategias'],['traductor','Traductor','y corrector, sin IA'],['plan','Plan','meta y fecha']];
 
 const css=document.createElement('style');css.textContent=`
 #vIngles{padding:18px 22px}.tf{display:grid;grid-template-columns:200px 1fr;gap:20px;min-height:100%;font:13px/1.5 var(--mono);color:#ffd9dc}
@@ -109,7 +111,40 @@ async function vPlan(){const p=await api('/api/toefl/plan');
   return `<div class="bx"><h3>Tu meta</h3><div class="g2"><label>Banda objetivo (1–6)<input type="number" id="tfMb" min="1" max="6" step="0.5" value="${p.meta.banda||''}"></label><label>Fecha del examen<input type="date" id="tfMf" value="${esc(p.meta.fecha||'')}"></label></div>
    <button class="btn2 c" data-a="meta">Guardar</button> <span class="mut">${p.dias_al_examen!=null?p.dias_al_examen+' días al examen':'sin fecha: plan de 4 semanas'} · nivel ${p.nivel??'sin medir'}</span></div>
    ${p.semanas.map(s=>`<div class="bx"><h3>Semana ${s.semana} · foco ${esc(SECN[s.foco]||s.foco)}</h3><ul>${s.diario.map(d=>`<li>${esc(d)}</li>`).join('')}</ul><span class="mut">Fin de semana: ${esc(s.fin_de_semana)}</span></div>`).join('')}`;}
-const VISTA={inicio:vInicio,practicar:vPracticar,vocab:vVocab,examen:vExamen,traductor:vTraductor,plan:vPlan};
+const QZ_EJ=`She ___ to school every day.
+a) go
+b) goes
+c) going
+d) gone
+
+If I ___ rich, I would travel around the world.
+a) am  b) were  c) will be  d) be
+
+Find the error: The students (A) was very happy (B) because they (C) passed the exam (D) easily.`;
+function vQuiz(){return `<div class="bx"><h3>Resolver quiz</h3>
+  <p class="mut">Pega una o varias preguntas con sus incisos (a, b, c, d) tal como vienen en tu quiz. Te digo cuál es la correcta, por qué, y por qué las otras no.</p>
+  <textarea id="tfQz" placeholder="She ___ to school every day.&#10;a) go&#10;b) goes&#10;c) going&#10;d) gone" style="min-height:150px">${esc(T.qz||'')}</textarea>
+  <button class="btn2 c" data-a="quiz">Resolver</button><button class="btn2" data-a="qzej">Ejemplo</button><button class="btn2" data-a="qzlimpiar">Limpiar</button></div>
+  <div id="tfQzR"></div>
+  <div class="bx"><h3>Qué entiende</h3><ul>
+   <li><b>Completar el hueco</b> (___): tiempos, verbo + -ing o to, modales, condicionales, comparativos, artículos, preposiciones, pronombres, who/which/whose, much/many…</li>
+   <li><b>¿Cuál oración es correcta?</b> con oraciones completas como incisos.</li>
+   <li><b>Encuentra el error</b> con partes marcadas (A) (B) (C) (D).</li>
+   <li><b>Sinónimos</b> («closest in meaning to…») de su lista de vocabulario académico.</li>
+   <li><b>Lectura</b>: si pegas el texto, solo da una pista por coincidencia de palabras (confianza baja).</li></ul>
+   <p class="mut">Son ~120 reglas de gramática, no una IA: si la respuesta depende del sentido o del contexto te dice «no estoy segura» en vez de inventar. Cuando diga confianza media o baja, compruébalo con tu maestro o con Gemini. En el chat: <b>quiz: &lt;pregunta&gt;</b>.</p></div>`;}
+function pintaQuiz(r){const out=$t('tfQzR');if(!out)return;
+  if(!r.preguntas?.length){out.innerHTML=`<div class="bx"><pre>${esc(r.respuesta)}</pre></div>`;return;}
+  const CONF={alta:'<span class="ok">confianza alta</span>',media:'<span class="cy">confianza media</span>',baja:'<span class="no">confianza baja</span>'};
+  out.innerHTML=r.preguntas.map((q,n)=>`<div class="bx qz"><div class="mut">${r.preguntas.length>1?(n+1)+' · ':''}${esc(q.tipo)} · ${CONF[q.confianza]||''}</div>
+   <p><b>${esc(q.pregunta)}</b></p>
+   ${q.correcta?`<p class="ok">✅ ${esc(q.correcta)}) ${esc(q.opciones.find(o=>o.letra===q.correcta)?.texto)}</p><p style="white-space:pre-wrap">${esc(q.explicacion)}</p>`
+     :`<p class="cy">🤔 ${esc(q.explicacion||('No estoy segura: con mis reglas quedan '+(q.empate||[]).map(x=>x+')').join(', ')+'. Puede depender del sentido.'))}</p>`}
+   <ul>${q.opciones.filter(o=>o.letra!==q.correcta).map(o=>{const p=o.problemas?.[0];
+     const por=q.tipo==='encontrar el error'&&q.correcta?'esta parte está bien escrita':p?p.mal:(q.correcta&&!/vocabulario|lectura/.test(q.tipo)?(o.forma||'no encaja aquí'):(o.coincide!=null?o.coincide+'% de sus palabras están en el texto':''));
+     const ok=!p&&!q.correcta;
+     return `<li>${ok?'·':'<span class="no">✗</span>'} <b>${esc(o.letra)})</b> ${esc(o.texto)}${por?' — '+esc(por):''}${p&&p.regla?`<br><span class="mut">Regla: ${esc(p.regla)}</span>`:''}</li>`;}).join('')}</ul></div>`).join('');}
+const VISTA={inicio:vInicio,quiz:vQuiz,practicar:vPracticar,vocab:vVocab,examen:vExamen,traductor:vTraductor,plan:vPlan};
 
 let pint=0;
 async function render(){if(!sec)return;const n=++pint;let html;
@@ -159,6 +194,10 @@ async function accion(a,el){
     const d=await api('/api/ingles/detectar',{texto:t});const r=await api('/api/ingles/traducir',{texto:t,a:d.idioma==='es'?'en':'es'});
     out.innerHTML=`<pre>${esc(r.texto)}</pre><span class="mut">${d.idioma==='en'?(d.puro?'inglés puro':'inglés con algo de español: '+esc(d.es.join(', '))):d.idioma==='es'?'español → inglés palabra por palabra':esc(d.idioma)}${r.desconocidas?.length?' · no conozco: '+esc(r.desconocidas.join(', ')):''}</span>`;return;}
   if(a==='trdecir')return decir($t('tfTr').value);
+  if(a==='quiz'){const t=$t('tfQz').value.trim();T.qz=t;save();if(!t)return;$t('tfQzR').innerHTML='<p class="mut">revisando…</p>';
+    const r=await api('/api/toefl/resolver',{texto:t},10000);pintaQuiz(r);log('quiz: '+(r.preguntas||[]).length+' pregunta(s)','g');return;}
+  if(a==='qzej'){$t('tfQz').value=QZ_EJ;return accion('quiz');}
+  if(a==='qzlimpiar'){$t('tfQz').value='';T.qz='';save();$t('tfQzR').innerHTML='';return;}
   if(a==='meta'){await api('/api/toefl/meta',{banda:+$t('tfMb').value||null,fecha:$t('tfMf').value||null});return render();}}
 
 function montar(el){if(sec===el)return;sec=el;
@@ -172,10 +211,16 @@ function montar(el){if(sec===el)return;sec=el;
       $t('tfAskR').innerHTML=`<pre>${esc(r.respuesta||'Pregúntame del examen: secciones, puntaje, writing, speaking, plantillas, mi nivel, plan.')}</pre>`;}
     else if(e.target.id==='tfTxt'&&e.target.tagName==='INPUT')calificar();});}
 addEventListener('hud:view',e=>{const {v,el}=e.detail||{};if(v!=='ingles'||!el)return;montar(el);render();});
+// el chat es de una sola línea: al pegar un quiz con saltos de línea, los cambio por espacios para no pegar «day.a) go»
+(()=>{const q=document.getElementById('q');if(!q)return;q.addEventListener('paste',e=>{const t=e.clipboardData?.getData('text')||'';if(!/\n/.test(t))return;
+  e.preventDefault();const plano=t.replace(/\s*\r?\n\s*/g,' ').trim(),a=q.selectionStart??q.value.length,b=q.selectionEnd??a;
+  q.value=q.value.slice(0,a)+plano+q.value.slice(b);q.selectionStart=q.selectionEnd=a+plano.length;q.dispatchEvent(new Event('input'));});})();
+window.toeflQuiz=async t=>{if(window.hudView?.()!=='ingles')await window.hudGo?.('ingles');T.mod='quiz';T.qz=t||T.qz;save();await render();if(t)accion('quiz').catch(()=>{});};
 // desde el chat: «practica toefl», «toefl email»… (cerebropy.js manda aquí las acciones del profe)
 window.toeflIr=async(tipo)=>{if(window.hudView?.()!=='ingles')await window.hudGo?.('ingles');if(tipo)setTimeout(()=>nueva(tipo).catch(()=>{}),250);else{T.mod='inicio';save();render();}};
 const _send=send;
 send=async v=>{const k=(v||'').trim().toLowerCase();
   if(/^(toefl|profe toefl|pesta[nñ]a ingl[eé]s)$/.test(k)&&!busy){line('u',v);line('c','CAPRI');line('t','te abro mi salón de TOEFL~');return window.toeflIr();}
-  await _send(v);if(k==='help')line('t','  toefl — pestaña INGLÉS: profe de TOEFL sin IA (prácticas, calificación, vocabulario, plan)');};
+  if(/^(resolver quiz|quiz)$/.test(k)&&!busy){line('u',v);line('c','CAPRI');line('t','pégame la pregunta con sus incisos y te digo cuál es y por qué~');return window.toeflQuiz();}
+  await _send(v);if(k==='help'){line('t','  toefl — pestaña INGLÉS: profe de TOEFL sin IA (prácticas, calificación, vocabulario, plan)');line('t','  quiz: <pregunta con incisos> — te digo el inciso correcto y por qué (sin IA)');}};
 })();

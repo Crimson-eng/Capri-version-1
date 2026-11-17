@@ -30,11 +30,15 @@ try:
 except ImportError:  # pragma: no cover
     from . import toefl_banco as B  # type: ignore
 try:
+    import quiz_toefl
+except ImportError:  # pragma: no cover
+    quiz_toefl = None
+try:
     import ingles_offline as IO
 except ImportError:  # pragma: no cover
     IO = None
 
-VERSION = '1.0.0'
+VERSION = '1.1.0'
 
 # ------------------------------------------------------------------ el examen
 EXAMEN = {
@@ -489,6 +493,9 @@ class Toefl:
     # -- preguntas sobre el examen (desde el chat)
     def responder(self, texto):
         """Si es una pregunta de TOEFL o una orden de práctica, regresa {'respuesta', 'accion'}; si no, None."""
+        if quiz_toefl and quiz_toefl.es_quiz(texto):
+            q = quiz_toefl.resolver(texto)
+            return {'respuesta': q['respuesta'], 'accion': '', 'quiz': q['preguntas']}
         low = ' ' + (texto or '').lower().strip() + ' '
         if not re.search(r'toefl|t\.o\.e\.f\.l|tofel|toelf|tolf|academic discussion|build a sentence|complete the words|'
                          r'listen and repeat|take an interview|write an email|mi nivel|my level|plan de estudio|study plan|'

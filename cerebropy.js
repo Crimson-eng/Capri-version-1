@@ -48,12 +48,13 @@ window.cerebroPySync=()=>sync();
 // ---------- 2.24: inglés sin IA ----------
 // Si no hay ninguna IA prendida (ni Gemini, ni tu GPU con Ollama, ni Claude) o no hay internet y no hay GPU, lo que
 // escribas en inglés lo resuelve el cerebro Python con reglas y su diccionario local (ingles_offline.py).
-// «en: <texto>» lo manda ahí siempre, aunque la IA esté prendida.
+// «en: <texto>» lo manda ahí siempre, aunque la IA esté prendida. «quiz: <pregunta con incisos>» la resuelve el profe de reglas.
 function sinIA(){const ci=window.cerebroInfo?.()||{},red=navigator.onLine!==false;
   const gem=!!(cfg.key&&cfg.model)&&red,loc=!!(ci.ok&&ci.modelo&&ci.modo!=='gemini'),cla=!!(ci.claude&&ci.claudeKey)&&red;
   return !gem&&!loc&&!cla;}
 window.capriSinIA=sinIA;
 const EN_CMD=/^(?:en|ingl[eé]s sin ia|english)\s*:\s*([\s\S]+)$/i;
+const QUIZ_CMD=/^(?:quiz|resuelve)\s*:\s*([\s\S]+)$/i;
 async function inglesSinIA(t,txt,forzado){
   let r;try{r=await post('/api/ingles',{texto:txt},8000);}catch(e){if(forzado){line('u',t);line('c','CAPRI');line('t','…no encuentro mi cerebro Python, y ahí vive mi inglés sin IA. Prende capri-cerebro y lo vuelvo a intentar.');return true;}return false;}
   if(!forzado&&r.intencion!=='toefl'&&(r.intencion==='no_ingles'||r.idioma==='es'||r.idioma==='?'))return false;
@@ -67,7 +68,9 @@ async function inglesSinIA(t,txt,forzado){
 // ---------- comandos en el chat ----------
 const _send=send;
 send=async v=>{const t=(v||'').trim(),k=t.toLowerCase();
-  const mEn=!busy&&t.match(EN_CMD);
+  const mQz=!busy&&t.match(QUIZ_CMD);
+  if(mQz&&await inglesSinIA(t,'quiz: '+mQz[1].trim(),true))return;
+  const mEn=!busy&&!mQz&&t.match(EN_CMD);
   if(mEn&&await inglesSinIA(t,mEn[1].trim(),true))return;
   if(!busy&&t&&vivo&&!mEn&&!/^(cerebro|help|limpiar|recuerdos|olvida |ajustes|estudio|m[eé]dico|sal|fragmentos|despierta )/i.test(k)&&sinIA()
      &&await inglesSinIA(t,t,false))return;

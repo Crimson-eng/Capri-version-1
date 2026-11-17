@@ -1,4 +1,4 @@
-# Capri 2.24–2.25 — Inglés sin IA y profe de TOEFL (cerebro Python)
+# Capri 2.24–2.26 — Inglés sin IA, profe de TOEFL y resolver quizzes (cerebro Python)
 
 Capri entiende y contesta **inglés aunque no tenga ninguna IA prendida**: sin Gemini, sin Ollama en tu GPU, sin Claude
 y sin internet. Lo resuelve su cerebro Python (`capri-cerebro/`) con reglas y un diccionario local.
@@ -122,6 +122,58 @@ lecturas, correos, discusiones, entrevista, vocabulario; para crecerlo se agrega
 **API** (POST, `X-Capri: 1`): `/api/toefl/examen`, `/nueva {tipo, id?}`, `/calificar {tipo, id, respuesta}`,
 `/vocab {n}` o `{palabra, bien}`, `/progreso`, `/meta {banda, fecha}`, `/plan`, `/pregunta {texto}`.
 Tipos: completar, ordenar, lectura, correo, discusion, repetir, entrevista, dictado.
+
+## 2.26 — Resolver quizzes: el inciso correcto y por qué (sin IA)
+
+Kiga pidió que después de sus clases y quizzes de inglés pudiera pegarle una pregunta a Capri y que le dijera **qué inciso
+es el correcto, por qué, y por qué los demás están mal**. Quedó así:
+
+**Dónde:** pestaña INGLÉS → **Resolver quiz** (o Ctrl+K → «quiz»). En el chat: `quiz: <pregunta con incisos>` (eso usa las
+reglas aunque Gemini esté prendida). Sin ninguna IA, si pegas una pregunta con incisos en el chat la contesta sola. Al pegar
+en el chat varias líneas, Capri las junta en una para que no se pierdan los incisos.
+
+```
+She ___ to school every day.
+a) go  b) goes  c) going  d) gone
+
+✅ b) goes
+Por qué: «goes»: presente con he/she/it de «go», y es la única que no rompe ninguna regla.
+Regla: Presente simple: he/she/it + verbo con -s (she goes, he studies, it has).
+✗ a) go — «she go»: en presente con she el verbo lleva -s («she goes»)
+✗ c) going — «she going»: la forma -ing sola no es verbo, le falta am/is/are (o was/were)
+✗ d) gone — «she gone»: «gone» es participio; solo no funciona, necesita have/has (o usa el pasado «went»)
+```
+
+**Qué tipos de pregunta entiende**
+
+| Tipo | Ejemplo | Qué tan bien |
+|---|---|---|
+| Completar el hueco (`___`, `( )`, `…`) | `If I ___ rich, I would travel.` | Bien en gramática: tiempos, condicionales 1/2/3 y wish, verbo + -ing o to, modales, pasiva, comparativo/superlativo, artículos a/an, much/many, preposiciones fijas (good at, interested in, arrive at), who/which/whose, preguntas indirectas, although/despite, so/such, too/enough, make/do, say/tell… |
+| ¿Cuál oración es correcta? | 4 oraciones completas | Bien si el error es de gramática |
+| Encuentra el error | `He (A) can (B) speaks English…` con o sin los incisos aparte | Bien si la parte mala rompe una regla que conoce |
+| Sinónimos | `closest in meaning to "rapid"` | Solo palabras de su lista (~110 grupos de vocabulario académico) |
+| Lectura | pegas el texto + la pregunta | **Solo pista** (compara palabras, no entiende el sentido): confianza baja |
+
+Varias preguntas a la vez: numéralas (`1.`, `2)`…). Los incisos pueden ir en renglones (`a)`, `A.`, `(a)`) o en la misma línea.
+
+**Cómo decide (sin IA):** pone cada opción en el hueco y revisa la oración completa con ~120 reglas. Se queda solo con los
+errores que distinguen a las opciones (si algo está mal en todas, no cuenta). La opción que no rompe ninguna regla es la
+correcta; cada regla trae su explicación en español, y de ahí salen el «por qué» de la buena y el «✗» de cada mala.
+
+**Confianza**
+- **alta**: todas las demás rompen una regla clara.
+- **media**: alguna mala solo rompe una regla «suave» (lo que se prefiere en examen, p. ej. already + present perfect).
+- **baja / no estoy segura**: dos o más opciones quedan bien con sus reglas (p. ej. `works ___ a hospital`: in y at sirven) o la
+  pregunta depende del sentido. Ahí te dice cuáles quedan y no inventa. Con artículos (a/an vs the) te explica la diferencia.
+
+**Límites honestos:** no entiende el significado. Preguntas de comprensión, de qué palabra «suena mejor» por sentido, de
+tono o de contexto de una plática, necesitan IA o a tu maestro. Se probó con 40 preguntas típicas (39 elige bien, la otra la
+marca como empate a/an–the) y con 70 oraciones correctas sin inventarles errores (`prueba_quiz.py`), pero tu quiz puede traer
+una regla que no tiene: si ves que se equivoca, pásale la pregunta a Claude en un hilo y se agrega la regla.
+
+**Archivos:** `capri-cerebro/quiz_toefl.py` (lector del quiz + reglas + explicaciones), `capri-cerebro/prueba_quiz.py`.
+**API:** `POST /api/toefl/resolver {texto}` → `{preguntas: [{pregunta, tipo, correcta, confianza, explicacion, empate?,
+opciones: [{letra, texto, frase, problemas: [{mal, regla}]}]}], respuesta}`. También lo usa `/api/ingles` cuando el texto es un quiz.
 
 ## Siguiente paso posible
 

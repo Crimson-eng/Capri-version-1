@@ -39,7 +39,7 @@ try:  # 2.25: profe de TOEFL sin IA (módulo aparte)
 except Exception:  # pragma: no cover
     toefl_offline = None
 
-VERSION = '1.2.0'
+VERSION = '1.3.0'
 PUERTO = 47824  # la app de escritorio usa 47823; el cerebro vive justo al lado
 ORIGENES = {  # páginas de Capri que pueden hablar con el cerebro desde el navegador
     'http://127.0.0.1:47823', 'http://localhost:47823', 'https://crimson-eng.github.io',
@@ -790,7 +790,8 @@ class Cerebro:
                 'proximo': self.proximo, 'hoy': self.e['latido'].get('n', 0) if self.e['latido'].get('hoy') == dt.date.today().isoformat() else 0,
                 'recuerdos': len(self.e['mem']['hechos']), 'persona': bool(self.e.get('persona')), 'cifrado': self.mem.cifrar,
                 'inicio': inicio_activo(), 'datos': self.mem.carpeta, 'puerto': self.puerto, 'pensando': self.pensando,
-                'ingles': ingles_offline.VERSION if self.ingles else '', 'toefl': toefl_offline.VERSION if self.toefl else ''}
+                'ingles': ingles_offline.VERSION if self.ingles else '', 'toefl': toefl_offline.VERSION if self.toefl else '',
+                'quiz': toefl_offline.quiz_toefl.VERSION if self.toefl and toefl_offline.quiz_toefl else ''}
 
 
 def ips_locales():
@@ -984,6 +985,10 @@ def hacer_manejador(cb):
                         return self._enviar(200, t.poner_meta(d.get('banda'), d.get('fecha')))
                     if sub == '/plan':
                         return self._enviar(200, t.plan())
+                    if sub == '/resolver':
+                        if not toefl_offline.quiz_toefl:
+                            return self._enviar(501, {'error': 'falta quiz_toefl.py junto al cerebro'})
+                        return self._enviar(200, toefl_offline.quiz_toefl.resolver(str(d.get('texto') or '')[:20000]))
                     if sub == '/pregunta':
                         return self._enviar(200, t.responder('toefl ' + str(d.get('texto') or '')) or {})
                 if ruta == '/api/hablar_ya':
