@@ -42,6 +42,8 @@ addEventListener('pagehide',()=>{if(vivo)try{fetch(S.url+'/api/sync',{method:'PO
 setTimeout(sync,4000); // después del arranque, para no frenar que Capri abra rápido
 
 window.cerebroPyInfo=()=>({vivo,url:S.url,key:S.key,on:S.on});
+window.cerebroPost=(r,b,ms)=>post(r,b,ms); // 2.25: la pestaña INGLÉS (toefl.js) le habla al cerebro
+window.cerebroPySync=()=>sync();
 
 // ---------- 2.24: inglés sin IA ----------
 // Si no hay ninguna IA prendida (ni Gemini, ni tu GPU con Ollama, ni Claude) o no hay internet y no hay GPU, lo que
@@ -54,11 +56,12 @@ window.capriSinIA=sinIA;
 const EN_CMD=/^(?:en|ingl[eé]s sin ia|english)\s*:\s*([\s\S]+)$/i;
 async function inglesSinIA(t,txt,forzado){
   let r;try{r=await post('/api/ingles',{texto:txt},8000);}catch(e){if(forzado){line('u',t);line('c','CAPRI');line('t','…no encuentro mi cerebro Python, y ahí vive mi inglés sin IA. Prende capri-cerebro y lo vuelvo a intentar.');return true;}return false;}
-  if(!forzado&&(r.intencion==='no_ingles'||r.idioma==='es'||r.idioma==='?'))return false;
+  if(!forzado&&r.intencion!=='toefl'&&(r.intencion==='no_ingles'||r.idioma==='es'||r.idioma==='?'))return false;
   bump();line('u',t);line('c','CAPRI · SIN IA');line('t',r.respuesta);setState(r.estado||'sonrisa_traviesa');
   try{speakChunk(r.respuesta.replace(/[✎🇪🇸]/gu,''));}catch(e){}
   history.push({role:'user',text:t});history.push({role:'model',text:'['+(r.estado||'sonrisa_traviesa')+'] '+r.respuesta});store.set('history',history.slice(-60));
   if(r.correcciones?.length)dispatchEvent(new CustomEvent('capri:ingles-correccion',{detail:r.correcciones}));
+  if(r.accion){const [a,tipo]=r.accion.split(':');setTimeout(()=>window.toeflIr?.(a==='practicar'?tipo:''),600);}
   log('inglés sin IA: '+r.intencion+(r.puro?' (inglés puro)':' ('+r.idioma+')'),'g');return true;}
 
 // ---------- comandos en el chat ----------

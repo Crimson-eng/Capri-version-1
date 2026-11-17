@@ -34,8 +34,12 @@ try:  # 2.24: inglés sin IA (reglas + diccionario local). Si falta el archivo, 
     import ingles_offline
 except Exception:  # pragma: no cover
     ingles_offline = None
+try:  # 2.25: profe de TOEFL sin IA (módulo aparte)
+    import toefl_offline
+except Exception:  # pragma: no cover
+    toefl_offline = None
 
-VERSION = '1.1.0'
+VERSION = '1.2.0'
 PUERTO = 47824  # la app de escritorio usa 47823; el cerebro vive justo al lado
 ORIGENES = {  # páginas de Capri que pueden hablar con el cerebro desde el navegador
     'http://127.0.0.1:47823', 'http://localhost:47823', 'https://crimson-eng.github.io',
@@ -610,6 +614,7 @@ class Cerebro:
         self.proximo = 0
         self.pensando = False
         self.ingles = ingles_offline.Ingles(mem.carpeta) if ingles_offline else None
+        self.toefl = toefl_offline.Toefl(mem.carpeta) if toefl_offline else None
         self._programar(primero=True)
 
     @property
@@ -656,6 +661,13 @@ class Cerebro:
     def ingles_sin_ia(self, texto):
         if not self.ingles:
             return None
+        if self.toefl:
+            t = self.toefl.responder(texto)
+            if t:
+                d = ingles_offline.detectar(texto)
+                return {'idioma': d['idioma'], 'puro': d['puro'], 'confianza': d['confianza'], 'espanol': d['es'],
+                        'intencion': 'toefl', 'respuesta': t['respuesta'], 'respuesta_en': '', 'traduccion': '',
+                        'correcciones': [], 'desconocidas': [], 'estado': 'presumida', 'accion': t['accion']}
         return self.ingles.responder(texto, self.cfg.get('nombre') or 'Kiga')
 
     # ---- sincronizar con la app
@@ -778,7 +790,7 @@ class Cerebro:
                 'proximo': self.proximo, 'hoy': self.e['latido'].get('n', 0) if self.e['latido'].get('hoy') == dt.date.today().isoformat() else 0,
                 'recuerdos': len(self.e['mem']['hechos']), 'persona': bool(self.e.get('persona')), 'cifrado': self.mem.cifrar,
                 'inicio': inicio_activo(), 'datos': self.mem.carpeta, 'puerto': self.puerto, 'pensando': self.pensando,
-                'ingles': ingles_offline.VERSION if self.ingles else ''}
+                'ingles': ingles_offline.VERSION if self.ingles else '', 'toefl': toefl_offline.VERSION if self.toefl else ''}
 
 
 def ips_locales():
@@ -950,6 +962,30 @@ def hacer_manejador(cb):
                         return self._enviar(200, cb.ingles.aprender(str(d.get('en') or ''), str(d.get('es') or '')))
                     if ruta == '/api/ingles/palabras':
                         return self._enviar(200, {'palabras': cb.ingles.dic.propias})
+                if ruta.startswith('/api/toefl'):
+                    t = cb.toefl
+                    if not t:
+                        return self._enviar(501, {'error': 'falta toefl_offline.py junto al cerebro'})
+                    sub = ruta[len('/api/toefl'):]
+                    if sub == '/examen':
+                        return self._enviar(200, dict(toefl_offline.EXAMEN, estrategias=toefl_offline.ESTRATEGIAS,
+                                                      plantillas=toefl_offline.PLANTILLAS, tipos=toefl_offline.TIPOS))
+                    if sub == '/nueva':
+                        return self._enviar(200, t.nueva(str(d.get('tipo')), d.get('id')))
+                    if sub == '/calificar':
+                        return self._enviar(200, t.calificar(str(d.get('tipo')), int(d.get('id') or 0), d.get('respuesta')))
+                    if sub == '/vocab':
+                        if d.get('palabra'):
+                            return self._enviar(200, t.vocab_responder(str(d['palabra']), bool(d.get('bien'))))
+                        return self._enviar(200, t.vocab_siguiente(max(1, min(30, int(d.get('n') or 10)))))
+                    if sub == '/progreso':
+                        return self._enviar(200, t.progreso())
+                    if sub == '/meta':
+                        return self._enviar(200, t.poner_meta(d.get('banda'), d.get('fecha')))
+                    if sub == '/plan':
+                        return self._enviar(200, t.plan())
+                    if sub == '/pregunta':
+                        return self._enviar(200, t.responder('toefl ' + str(d.get('texto') or '')) or {})
                 if ruta == '/api/hablar_ya':
                     t = cb.latir(forzar=True)
                     return self._enviar(200, {'ok': bool(t), 'texto': t or ''})

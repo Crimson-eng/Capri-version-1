@@ -262,6 +262,26 @@ class Pruebas(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(self.dir, 'ingles_palabras.json')))
         self.assertEqual(self.pide('/api/ingles', {'texto': 'hi'}, cab={'X-Capri': ''})[0], 403)
 
+    # ---------- profe de TOEFL sin IA (2.25)
+    def test_api_toefl(self):
+        j = lambda r, b=None: json.loads(self.pide(r, b or {})[2])
+        self.assertIn('secciones', j('/api/toefl/examen'))
+        it = j('/api/toefl/nueva', {'tipo': 'ordenar', 'id': 0})
+        r = j('/api/toefl/calificar', {'tipo': 'ordenar', 'id': it['id'], 'respuesta': 'Could you tell me where the library is?'})
+        self.assertTrue(r['bien'])
+        self.assertEqual(j('/api/toefl/progreso')['secciones']['writing']['intentos'], 1)
+        self.assertTrue(os.path.exists(os.path.join(self.dir, 'toefl_progreso.json')))
+        self.assertEqual(len(j('/api/toefl/vocab', {'n': 3})['tarjetas']), 3)
+        self.assertEqual(j('/api/toefl/meta', {'banda': 4.5})['banda'], 4.5)
+        self.assertIn('semanas', j('/api/toefl/plan'))
+        self.assertEqual(self.pide('/api/toefl/nueva', {'tipo': 'nada'})[0], 500)
+
+    def test_toefl_en_el_chat_sin_ia(self):
+        self.mem.e['cfg'].update(key='')
+        r = json.loads(self.pide('/api/ingles', {'texto': 'cómo es el toefl'})[2])
+        self.assertEqual(r['intencion'], 'toefl')
+        self.assertIn('Writing', r['respuesta'])
+
     def test_cfg_desde_la_pagina(self):
         c, h, b = self.pide('/api/cfg', {'cada_min': [120, 10], 'voz': True, 'max_dia': 99})
         r = json.loads(b)
