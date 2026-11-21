@@ -213,8 +213,17 @@ body.minimode #mini{display:flex}
 .mchip .bob{position:relative;animation:bob 2.6s ease-in-out infinite}
 .mchip .bob::after{content:"";position:absolute;left:50%;bottom:-12px;width:34px;height:6px;margin-left:-17px;border-radius:50%;background:radial-gradient(color-mix(in srgb,var(--fc) 45%,transparent),transparent 70%);animation:sh 2.6s ease-in-out infinite}
 @keyframes bob{50%{transform:translateY(-7px)}}@keyframes sh{50%{transform:scale(.7);opacity:.6}}
-.mchip svg{display:block;width:58px;height:58px;filter:drop-shadow(0 0 10px var(--fc)) drop-shadow(0 0 2px #000);animation:spin 7s linear infinite;transition:filter .3s}
-#mini[data-mode=THINKING] .mchip svg{animation-duration:1.4s}#mini[data-mode=LISTENING] .mchip svg{animation-duration:3s}#mini[data-mode=TALKING] .mchip svg{animation-duration:2s}
+/* 2.27: mini Capri discreta = el ojo en su rombo con fragmentos sueltos (arte de Kiga) */
+.mchip svg{display:block;width:92px;height:82px;overflow:visible;filter:drop-shadow(0 0 7px color-mix(in srgb,var(--fc) 70%,transparent)) drop-shadow(0 0 2px #000);transition:filter .3s}
+.cmini .mo,.cmini .mc{transform-box:view-box;transform-origin:770px 760px}
+.cmini .mo{animation:mdrift 4.8s ease-in-out infinite}.cmini .mc{animation:mcore 2.4s ease-in-out infinite}
+.cmini .fr{transform-box:view-box;animation:mfr 3.4s ease-in-out infinite}
+#mini[data-mode=LISTENING] .cmini .mo{animation:mturn 8s linear infinite}#mini[data-mode=LISTENING] .cmini .mc{animation-duration:1.1s}
+#mini[data-mode=THINKING] .cmini .mo{animation:mturn 3.4s linear infinite reverse}#mini[data-mode=THINKING] .cmini .mc{animation-duration:.7s}
+#mini[data-mode=TALKING] .cmini .mc{animation-duration:.9s}#mini[data-mode=TALKING] .cmini .fr{animation-duration:1.2s}
+@keyframes mdrift{50%{transform:rotate(5deg)}0%,100%{transform:rotate(-5deg)}}@keyframes mturn{to{transform:rotate(360deg)}}
+@keyframes mcore{50%{transform:scale(1.05);opacity:.9}}@keyframes mfr{50%{transform:translate(var(--dx),var(--dy))}}
+@media(prefers-reduced-motion:reduce){.cmini .mo,.cmini .mc,.cmini .fr{animation:none!important}}
 .mchip:hover svg{filter:drop-shadow(0 0 16px var(--fc)) drop-shadow(0 0 2px #000)}
 .mchip .crow{display:flex;align-items:center;gap:6px}
 .ctag{font:700 10px/1 var(--mono);letter-spacing:.12em;color:var(--fc);background:rgba(0,0,0,.72);border:1px solid var(--fc);padding:4px 7px;white-space:nowrap;transition:color .3s,border-color .3s}
@@ -253,8 +262,8 @@ body.pip #mini .sb{flex:1;min-height:0}body.pip #miniTxt{max-height:none;flex:1}
 .doc button{background:none;border:0;color:var(--red);cursor:pointer;font-size:15px}
 .drop{border:2px dashed var(--pur);padding:18px;text-align:center;color:var(--mut);cursor:pointer;font-family:var(--mono)}
 .drop:hover,.drop.over{border-color:var(--grn);color:var(--grn)}
-/* ---------- Capri mascota (pixel) ---------- */
-.pet{position:absolute;right:46px;bottom:calc(100% - 4px);z-index:6;height:118px;cursor:pointer;user-select:none;-webkit-user-drag:none;image-rendering:pixelated;
+/* ---------- Capri mascota (2.27: poses nuevas de Kiga) ---------- */
+.pet{position:absolute;right:46px;bottom:calc(100% - 4px);z-index:6;height:118px;cursor:pointer;user-select:none;-webkit-user-drag:none;image-rendering:auto;
  filter:drop-shadow(3px 3px 0 #000);transform-origin:50% 100%;transition:filter .2s}
 .pet:hover{filter:drop-shadow(3px 3px 0 #000) drop-shadow(0 0 10px rgba(255,42,77,.6))}
 .pet.asomada{height:88px;bottom:calc(100% - 30px)}
@@ -267,8 +276,8 @@ body.pip #mini .sb{flex:1;min-height:0}body.pip #miniTxt{max-height:none;flex:1}
  opacity:0;transform:translateY(6px);transition:opacity .2s,transform .2s;pointer-events:none}
 .petsay.show{opacity:1;transform:none}
 .petsay::after{content:"";position:absolute;right:-11px;top:50%;margin-top:-7px;border:7px solid transparent;border-right:0;border-left-color:#000;border-left-width:9px}
-#miniPet{position:absolute;z-index:4;width:auto;right:auto;left:190px;bottom:calc(100% + 2px);height:84px;image-rendering:pixelated;filter:drop-shadow(2px 2px 0 #000);pointer-events:none}
-.sprite img.px{image-rendering:pixelated;filter:drop-shadow(3px 3px 0 #000)}
+#miniPet{position:absolute;z-index:4;width:auto;right:auto;left:190px;bottom:calc(100% + 2px);height:84px;image-rendering:auto;filter:drop-shadow(2px 2px 0 #000);pointer-events:none}
+.sprite img.px{image-rendering:auto;filter:drop-shadow(3px 3px 0 #000)}
 @media (min-width:1400px){.side.hide{margin-right:0}}
 @media (max-width:1100px){.side{position:fixed;right:0;top:38px;bottom:0;z-index:50;background:rgba(7,7,10,.97);padding-left:18px;border-left:2px solid #000}
  .desk{padding:24px 18px 14px;gap:22px}}
@@ -323,7 +332,7 @@ body.pip #mini .sb{flex:1;min-height:0}body.pip #miniTxt{max-height:none;flex:1}
 .bt-an b{font:500 64px/1 var(--sans);color:var(--hud);letter-spacing:-.02em;padding:6px 14px;border:1px solid var(--hudd);clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px)}
 .bt-an .hx{color:rgba(255,59,85,.55);letter-spacing:.08em;white-space:pre}
 .bt-pet{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;opacity:0;pointer-events:none;transition:opacity .2s}
-.bt-pet img{height:min(170px,26vh);image-rendering:pixelated;filter:drop-shadow(4px 4px 0 #000) drop-shadow(0 0 22px rgba(255,59,85,.6));animation:btg .9s steps(2) 1}
+.bt-pet img{height:min(170px,26vh);image-rendering:auto;filter:drop-shadow(4px 4px 0 #000) drop-shadow(0 0 22px rgba(255,59,85,.6));animation:btg .9s steps(2) 1}
 .bt-pet b{font:400 clamp(18px,5vw,26px)/1 var(--pix);color:#fff;letter-spacing:.06em;text-shadow:3px 3px 0 var(--hud)}
 .bt-pet span{font:13px/1 var(--mono);color:var(--hud);letter-spacing:.14em}
 @keyframes btg{0%{transform:translate(-6px,0) skewX(8deg);filter:hue-rotate(90deg)}30%{transform:translate(5px,-3px)}60%{transform:translate(-2px,2px) skewX(-6deg)}100%{transform:none}}
@@ -468,7 +477,7 @@ body[data-core=THINKING] .thk{display:flex}
  </div></div>
 </div>
 <div id="mini" class="collapsed" data-mode="DORMANT">
- <div class="mchip" id="chip" title="Capri: tócala para hablar, arrástrala para moverla"><div class="say" id="chipSay"></div><div class="bob"><svg viewBox="-50 -50 100 100"><polygon points="0,-48 9,-9 48,0 9,9 0,48 -9,9 -48,0 -9,-9" fill="#ff1f55"/><polygon points="0,-30 6,-6 30,0 6,6 0,30 -6,6 -30,0 -6,-6" fill="#2dff8f" transform="rotate(45)"/><circle r="9" fill="#08050d"/><circle r="5" fill="#22e5f0"/></svg></div>
+ <div class="mchip" id="chip" title="Capri: tócala para hablar, arrástrala para moverla"><div class="say" id="chipSay"></div><div class="bob"><svg class="cmini" viewBox="180 260 1250 1110" aria-label="Capri"><g class="mo"><image class="fr" style="--dx:2px;--dy:-26px;animation-delay:-0.00s" href="assets/mini/green_up.png" x="642" y="276" width="307" height="260"/><image class="fr" style="--dx:21px;--dy:-15px;animation-delay:-0.37s" href="assets/mini/pink_upper_right.png" x="838" y="387" width="391" height="380"/><image class="fr" style="--dx:-19px;--dy:-18px;animation-delay:-0.74s" href="assets/mini/pink_upper_left.png" x="364" y="396" width="317" height="260"/><image class="fr" style="--dx:-26px;--dy:-0px;animation-delay:-1.11s" href="assets/mini/pink_left.png" x="198" y="658" width="409" height="216"/><image class="fr" style="--dx:22px;--dy:14px;animation-delay:-1.48s" href="assets/mini/green_right.png" x="912" y="756" width="501" height="531"/><image class="fr" style="--dx:-18px;--dy:19px;animation-delay:-1.85s" href="assets/mini/green_lower_left.png" x="224" y="856" width="469" height="464"/><image class="fr" style="--dx:10px;--dy:24px;animation-delay:-2.22s" href="assets/mini/pink_ribbon.png" x="678" y="924" width="497" height="434"/></g><g class="mc"><image href="assets/mini/core.png" x="624" y="571" width="292" height="378"/></g></svg></div>
   <div class="crow"><span class="ctag" id="chipTag">CAPRI // DORMANT</span><span class="eq"><i></i><i></i><i></i><i></i><i></i></span><span class="dots"></span></div></div>
  <div class="sb"><div class="in">
   <div class="mhead"><span>// capri.exe — mini</span><button id="mExpand" title="Abrir Capri completa"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M14 3 H21 V10 M21 3 L12 12 M10 5 H3 V21 H19 V14"/></svg></button><button id="mHide" title="Ocultar globo"><svg class="ci" viewBox="0 0 24 24" aria-hidden="true"><path class="k" d="M4 16 H20"/><path class="a" d="M4 19 H12 V21 H4 Z"/></svg></button></div>

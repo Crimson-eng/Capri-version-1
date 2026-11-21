@@ -79,13 +79,16 @@ let win = null, tray = null, trayMenu = null, mode = 'desk', offline = false, re
 let watch = null, lastWins = null;
 
 // lo que se elige en su menú: tamaño, si ronda sola, si se sienta en ventanas, si las posee, si está guardada
-const PREFS = { size: 'm', wander: true, sit: true, possess: true, stowed: false,
+const PREFS = { size: 'm', wander: true, sit: true, possess: true, stowed: true,
   // 2.22 sigilo: invisible al compartir pantalla, y callada cuando presentas o estás en llamada
   sigilo: true, silencioPresenta: true, silencioLlamada: true, callarVoz: true, silencioManual: false };
 const prefsFile = () => path.join(app.getPath('userData'), 'escritorio.json');
 let prefs = null;
 function loadPrefs() {
   if (!prefs) { try { prefs = { ...PREFS, ...JSON.parse(fs.readFileSync(prefsFile(), 'utf8')) }; } catch { prefs = { ...PREFS }; } }
+  // 2.27: minimizada, Capri es discreta (solo el ojo con sus fragmentos). Una vez, aunque antes la tuvieras afuera;
+  // la Capri grande sale con «Sacar a Capri» o Ctrl+Alt+C.
+  if (!prefs.discreta227) { prefs.discreta227 = true; prefs.stowed = true; try { fs.writeFileSync(prefsFile(), JSON.stringify(prefs, null, 2)); } catch {} }
   return prefs;
 }
 function setPrefs(patch) {
@@ -399,7 +402,7 @@ function rebuildMenu() {
     { label: 'Mirar el satélite', click: () => cmd('satellite') },
     { label: 'Celebrar', click: () => cmd('victory') },
     { label: 'Sentarse en una ventana', enabled: process.platform === 'win32', click: () => cmd('sit') },
-    { label: p.stowed ? 'Sacar a Capri' : 'Guardar en su biochip', accelerator: 'Ctrl+Alt+C', click: toggleStow },
+    { label: p.stowed ? 'Sacar a Capri grande' : 'Guardar a Capri (solo el ojo, discreta)', accelerator: 'Ctrl+Alt+C', click: toggleStow },
     { label: 'Tamaño', submenu: [['Chica', 's'], ['Mediana', 'm'], ['Grande', 'l']].map(([label, size]) => ({
       label, type: 'radio', checked: p.size === size, click: () => setPrefs({ size }) })) },
     { label: 'Que ronde sola', type: 'checkbox', checked: p.wander, click: (it) => setPrefs({ wander: it.checked }) },

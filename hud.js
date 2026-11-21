@@ -76,7 +76,7 @@ body:not([data-view=capri]) .app .desk>:not(.hview),body:not([data-view=capri]) 
 .dy{display:grid;grid-template-columns:1fr 1fr;gap:20px}
 .idc{border:1px solid var(--hr);padding:12px;display:flex;gap:14px;position:relative;background:rgba(20,6,9,.7);clip-path:polygon(0 0,100% 0,100% calc(100% - 18px),calc(100% - 18px) 100%,0 100%)}
 .idc .ph{width:112px;height:128px;flex:0 0 auto;border:1px solid var(--hr);display:grid;place-items:center;background:#12060a;overflow:hidden;position:relative}
-.idc .ph img{width:100%;height:100%;object-fit:contain;image-rendering:pixelated}.idc .ph .ini{font:600 46px var(--sans);color:var(--hr)}
+.idc .ph img{width:100%;height:100%;object-fit:contain;image-rendering:auto}.idc .ph .ini{font:600 46px var(--sans);color:var(--hr)}
 .idc .ph::after{content:'ANALYZE';position:absolute;bottom:3px;left:0;right:0;text-align:center;font:8px var(--mono);letter-spacing:.3em;color:var(--hr)}
 .idc .tt{background:var(--hr);color:#14070a;font:700 15px var(--sans);letter-spacing:.06em;padding:4px 8px;margin-bottom:8px}
 .idc dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font:11px var(--mono)}.idc dt{color:#c96a73;text-transform:uppercase}.idc dd{margin:0;color:#ffe4e6}
