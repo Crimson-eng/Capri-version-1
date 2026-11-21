@@ -12,7 +12,8 @@ const POSES=['apoyada','asomada','bostezo','confundida','cursor','enamorada','la
 const FLOOR_IDLE=['apoyada','meditar','enamorada','laptop','pelota','sentada_mira','sentada_pierna'];
 const SEAT_IDLE=['sentada_pierna','sentada_mira','bostezo'];
 // cuánto de la imagen queda bajo la orilla donde se apoya (piernas colgando, la repisa de "asomada")
-const SINK={sentada_pierna:.1,sentada_mira:.1,bostezo:.04,asomada:.22,meditar:-.06};
+// 2.27: poses nuevas (de pie o flotando), ya no se hunden en el piso
+const SINK={sentada_pierna:-.04,bostezo:-.04,meditar:-.06};
 const SIZE={s:.55,m:.75,l:1};
 const TAG={DORMANT:'ONLINE',LISTENING:'ESCUCHANDO',THINKING:'PENSANDO',TALKING:'HABLANDO'};
 const SAY={
@@ -39,7 +40,7 @@ const css=document.createElement('style');css.textContent=`
 body.desk #dpet{display:block}body.desk.dstow #dpet{display:none}
 body.desk.dpet #mini.star{display:none}body.desk.dpet.dstow #mini.star{display:flex}
 #dpet .dfig{position:relative;transform-origin:50% 100%}
-#dpet img{display:block;width:100%;height:100%;image-rendering:pixelated;-webkit-user-drag:none;user-select:none;
+#dpet img{display:block;width:100%;height:100%;image-rendering:auto;-webkit-user-drag:none;user-select:none;
  filter:drop-shadow(3px 3px 0 #000) drop-shadow(0 0 10px rgba(255,31,85,.45));transition:filter .3s}
 #dpet.zz img{filter:drop-shadow(3px 3px 0 #000) saturate(.55) brightness(.8)}
 #dpet.zz .dfig{animation:dbr 3.6s ease-in-out infinite}@keyframes dbr{50%{transform:scaleY(.97)}}
@@ -62,7 +63,7 @@ body[data-core=LISTENING] #dpet{--fc:var(--cyan)}body[data-core=THINKING] #dpet{
 .dfx .dpos u{position:absolute;text-decoration:none;font:700 26px/1 var(--mono);color:#2dff8f;text-shadow:0 0 10px #2dff8f}
 @keyframes dpz{50%{border-color:#2dff8f;transform:translateX(2px)}}
 .dfx svg{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible}
-.dfx .ghost{position:absolute;image-rendering:pixelated;opacity:.7}
+.dfx .ghost{position:absolute;image-rendering:auto;opacity:.7}
 .dfx .dshard{position:absolute;transform:rotate(45deg)}
 .dfx .dbar{position:absolute;height:5px;opacity:0}
 .dfx .dbeam{position:absolute;top:0;width:28px;height:100%;background:linear-gradient(90deg,#7b3dff 0 18%,#ff1f55 18% 38%,#fff 38% 62%,#ff1f55 62% 82%,#7b3dff 82%);box-shadow:0 0 30px #ff1f55}

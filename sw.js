@@ -1,6 +1,6 @@
 // Guarda la app en el dispositivo para que abra rápido y funcione sin internet (menos el cerebro).
 // Sube VERSION cada vez que cambies archivos para que los celulares descarguen lo nuevo.
-const VERSION='capri-v46';
+const VERSION='capri-v47';
 const SHELL=[
   './',
   './index.html',
@@ -65,6 +65,14 @@ const SHELL=[
   "./assets/pet/sentada_mira.png",
   "./assets/pet/sentada_pierna.png",
   "./assets/pet/voltereta.png",
+  "./assets/mini/core.png",
+  "./assets/mini/green_up.png",
+  "./assets/mini/pink_upper_right.png",
+  "./assets/mini/pink_upper_left.png",
+  "./assets/mini/pink_left.png",
+  "./assets/mini/green_right.png",
+  "./assets/mini/green_lower_left.png",
+  "./assets/mini/pink_ribbon.png",
   "./assets/emocionada.webp",
   "./assets/enojada.webp",
   "./assets/escuchando.webp",
