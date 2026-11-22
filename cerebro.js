@@ -57,6 +57,7 @@ const PESADO=/\b(explica|expl[ií]came|analiza|resume|resumen|c[oó]digo|program
 const SALUD=/s[ií]ntoma|dolor|enfermedad|diagn[oó]s|tratamiento|medicamento|f[aá]rmaco|dosis|cirug|anatom|fisiolog|patolog|cl[ií]nic|paciente|hospital/i;
 function rutaLocal(parts){if(!listo()||cer.modo==='gemini')return false;
   if(parts.some(p=>p.inlineData))return false;                 // oír, ver la pantalla o leer PDFs: solo Gemini
+  if(cer.modo!=='local'&&Date.now()<gpuLentaHasta&&hayOtro())return false;   // 2.27.1: tu GPU anduvo lenta hace poco: contesta otro mientras
   if(cer.modo==='local'||!cfg.key||!cfg.model)return true;
   if(window.lecturaPesada?.()>8000)return false;                // «resúmeme todo el documento»: no cabe en el contexto de la GPU
   if(modoAct==='idle')return true;                               // lo que dice sola: gratis en tu GPU
@@ -71,24 +72,49 @@ function sysPrompt(){const name=cfg.name||'Kiga';
   const now=new Date().toLocaleString('es-MX',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'});
   s=s.replace('Ahora es '+now+'.','');
   return [s,`Ahora es ${now}${now.endsWith('.')?'':'.'}\nEmpieza SIEMPRE con tu estado entre corchetes, ej. [presumida]. Contesta en español, corto y natural.`];}
-async function local(parts,onText){
+// 2.27.1 — por qué Capri se quedaba «pensando» con Ollama prendido:
+// a) desde 2.6 el turbo baja el contexto (hasta 2048) para que el modelo quepa en 4 GB, pero su personalidad + memoria
+//    ya pasan de 3 500 tokens: Ollama recortaba el principio (¡su personalidad!) y leía todo de nuevo en cada mensaje.
+//    Ahora se mide antes: se quitan mensajes viejos de la plática y, si aun así no cabe, contesta otro cerebro.
+// b) si la GPU no suelta la primera palabra a tiempo (ocupada, lenta o atorada), se corta y contesta Gemini/Claude,
+//    y por 10 min la plática va directo a ellos. Antes solo cambiaba de cerebro si Ollama daba error, nunca por lento.
+const tok=s=>Math.ceil(String(s||'').length/3);            // aprox. conservadora para español con gemma/llama
+const GPU_ESPERA={caliente:20e3,fria:45e3},GPU_PAUSA=10*60e3,RESERVA=700;   // RESERVA: lugar para lo que contesta
+let gpuLentaHasta=0;
+const hayNube=()=>!!(cfg.key&&cfg.model)&&navigator.onLine!==false;
+const hayOtro=()=>hayNube()||(claudeOk()&&!window.cerebroSinGasto);
+async function local(parts,onText,opc={}){
   window.fragTope=2500;let sp;try{sp=sysPrompt();}finally{window.fragTope=0;}   // en la GPU el contexto es chico: del constructo que se asoma va lo esencial
-  const msgs=[{role:'system',content:sp.join('\n\n')}];
-  for(const h of history.slice(-12))msgs.push({role:h.role==='model'?'assistant':'user',content:h.text});
-  msgs.push({role:'user',content:parts.filter(p=>p.text).map(p=>p.text).join('\n')});
+  const ctx=ctxDe(),sys=sp.join('\n\n'),preg=parts.filter(p=>p.text).map(p=>p.text).join('\n'),otro=opc.otro??hayOtro();
+  let hist=history.slice(-12);const total=()=>tok(sys)+tok(preg)+hist.reduce((a,h)=>a+tok(h.text)+4,0)+RESERVA;
+  while(hist.length>2&&total()>ctx)hist=hist.slice(1);
+  let sysUsa=sys;
+  if(total()>ctx){if(otro)throw new Error('NOCABE');   // no cabe en tu GPU: mejor que conteste Gemini/Claude completo
+    hist=[];const lugar=Math.max(1200,(ctx-tok(preg)-RESERVA)*3);sysUsa=sys.slice(0,lugar-sp[1].length-40)+'\n…\n'+sp[1];}   // sin otro cerebro: lo esencial de ella
+  const msgs=[{role:'system',content:sysUsa}];
+  for(const h of hist)msgs.push({role:h.role==='model'?'assistant':'user',content:h.text});
+  msgs.push({role:'user',content:preg});
   const m2=[];for(const m of msgs){const l=m2[m2.length-1];if(l&&l.role===m.role&&m.role!=='system')l.content+='\n'+m.content;else m2.push({...m});}
-  const body={model:cer.modelo,messages:m2,stream:true,keep_alive:VIVO,options:{temperature:1,num_ctx:ctxDe()}};
+  const body={model:cer.modelo,messages:m2,stream:true,keep_alive:VIVO,options:{temperature:1,num_ctx:ctx}};
   if(/qwen3|deepseek-r1/i.test(cer.modelo))body.think=false;
-  const r=await fetch(OLL+'/api/chat',{method:'POST',body:JSON.stringify(body),signal:window.capriSenal?.()});   // se corta si cancelas o se traba
-  if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error('GPU: '+(j.error||'Error '+r.status));}
-  const reader=r.body.getReader(),dec=new TextDecoder();let buf='',raw='',sent=0;
-  while(true){const {value,done}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
-    while((i=buf.indexOf('\n'))>=0){const ln=buf.slice(0,i).trim();buf=buf.slice(i+1);if(!ln)continue;
-      try{const j=JSON.parse(ln);if(j.error)throw new Error('GPU: '+j.error);raw+=j.message?.content||'';
-        const vis=raw.replace(/<think>[\s\S]*?(<\/think>|$)/g,'');if(vis.length>sent){onText(vis.slice(sent));sent=vis.length;}}
-      catch(e){if(/^GPU/.test(e.message))throw e;}}}
-  const full=raw.replace(/<think>[\s\S]*?(<\/think>|$)/g,'');if(!full.trim())throw new Error('EMPTY');
-  marca('GPU · '+cer.modelo);return full;}
+  // tope para la primera palabra (solo si hay otro cerebro que pueda contestar)
+  const ac=new AbortController(),sg=[ac.signal];const ext=window.capriSenal?.();if(ext)sg.push(ext);
+  const espera=otro?(Date.now()-caliente<100*60e3?GPU_ESPERA.caliente:GPU_ESPERA.fria):0;
+  const tLenta=espera?setTimeout(()=>ac.abort(new Error('LENTA')),espera):0;
+  try{
+    const r=await fetch(OLL+'/api/chat',{method:'POST',body:JSON.stringify(body),signal:sg.length>1?AbortSignal.any(sg):sg[0]});   // se corta si cancelas o se traba
+    if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error('GPU: '+(j.error||'Error '+r.status));}
+    const reader=r.body.getReader(),dec=new TextDecoder();let buf='',raw='',sent=0;
+    while(true){const {value,done}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
+      while((i=buf.indexOf('\n'))>=0){const ln=buf.slice(0,i).trim();buf=buf.slice(i+1);if(!ln)continue;
+        try{const j=JSON.parse(ln);if(j.error)throw new Error('GPU: '+j.error);raw+=j.message?.content||'';
+          const vis=raw.replace(/<think>[\s\S]*?(<\/think>|$)/g,'');if(vis.trim()&&tLenta){clearTimeout(tLenta);}
+          if(vis.length>sent){onText(vis.slice(sent));sent=vis.length;}}
+        catch(e){if(/^GPU/.test(e.message))throw e;}}}
+    const full=raw.replace(/<think>[\s\S]*?(<\/think>|$)/g,'');if(!full.trim())throw new Error('EMPTY');
+    marca('GPU · '+cer.modelo);return full;}
+  catch(e){if(ac.signal.aborted&&!ext?.aborted){gpuLentaHasta=Date.now()+GPU_PAUSA;throw new Error('LENTA');}throw e;}
+  finally{clearTimeout(tLenta);}}
 function marca(quien){ultimo=quien;const el=$('mdl');if(el)el.textContent=quien==='nube'?(cfg.model||'—'):quien;log('cerebro: '+(quien==='nube'?'Gemini':quien),'g');pinta();}
 
 // ---------- pensar con Claude ----------
@@ -127,7 +153,10 @@ let preRec=null;
 ask=async(parts,onText)=>{
   const rec=await (preRec||recordar(parts)).catch(()=>'');preRec=null;const p2=rec?[{text:rec},...parts]:parts;
   if(rutaClaude(parts)){let dijo=false;try{return await claudeBrain(p2,x=>{dijo=true;onText(x);});}catch(e){if(dijo||esCorte(e))throw e;claudeFallo(e);}}
-  if(rutaLocal(parts)){let dijo=false;try{return await local(p2,x=>{dijo=true;onText(x);});}catch(e){if(esCorte(e))throw e;log(String(e.message).slice(0,60),'w');if(dijo||!cfg.key||!cfg.model)throw e;}}
+  if(rutaLocal(parts)){let dijo=false;try{return await local(p2,x=>{dijo=true;onText(x);});}catch(e){if(esCorte(e))throw e;log(String(e.message).slice(0,60),'w');if(dijo||!hayOtro())throw e;
+      if(e.message==='LENTA')line('s','(Tu GPU tardó demasiado en contestar; te contesto con '+(hayNube()?'Gemini':'Claude')+'. Por 10 min la plática va directo ahí.)');
+      else if(e.message==='NOCABE')log('🧠 la plática no cabe en el contexto de tu GPU: contesta '+(hayNube()?'Gemini':'Claude'),'y');
+      if(!hayNube()){try{return await claudeBrain(p2,onText);}catch(e2){if(esCorte(e2))throw e2;claudeFallo(e2);throw e;}}}}
   let algo=false;
   try{const t=await _ask(p2,x=>{algo=true;onText(x);});marca('nube');return t;}
   catch(e){if(esCorte(e))throw e;const caido=e.status===429||e.status>=500||e.message==='NOKEY'||e instanceof TypeError;
@@ -135,10 +164,10 @@ ask=async(parts,onText)=>{
       line('s','(Gemini no respondió; te contesto con Claude.)');try{return await claudeBrain(p2,onText);}catch(e2){claudeFallo(e2);}}
     if(algo||!caido||!listo()||cer.modo==='gemini'||parts.some(p=>p.inlineData))throw e;
     line('s','(Gemini no respondió'+(e.status===429?' (sin cupo)':e instanceof TypeError?' (sin internet)':'')+'; te contesto con el cerebro de tu GPU.)');
-    return local(p2,onText);}};
+    return local(p2,onText,{otro:false});}};
 const _respond=respond;
 // la búsqueda en recuerdos arranca ya, en paralelo con las fuentes médicas y la biblioteca, en vez de esperar a que terminen
-respond=async(userText,extra,mode)=>{modoAct=mode||'user';preRec=recordar([{text:userText}]);try{return await _respond(userText,extra,mode);}finally{modoAct='user';preRec=null;guardaPlatica();}};
+respond=async(userText,extra,mode)=>{modoAct=mode||'user';if(mode!=='idle'&&mode!=='watch')pararFondo();preRec=recordar([{text:userText}]);try{return await _respond(userText,extra,mode);}finally{modoAct='user';preRec=null;guardaPlatica();}};
 
 // ---------- memoria buscable ----------
 let mems=[],db=null;
@@ -225,12 +254,17 @@ function primeraDelDia(){const hoy=diaDe(Date.now());if(primeraDada===hoy)return
   return `(Lo último de su vida que tienes en tus hilos, del ${new Date(r.dia+'T12:00').toLocaleDateString('es-MX',{weekday:'long',day:'numeric',month:'long'})}: ${r.resumen}. Si viene al caso, pregúntale cómo siguió.)`;}
 // resumen de cada día ya terminado: con tu GPU si está (gratis y privado); si no, Gemini. Uno a la vez, cuando no estás usando a Capri.
 let resumiendo=false;
+// 2.27.1: Ollama atiende de uno en uno. Si estaba resumiendo un día o destilando recuerdos y le hablas, tu pregunta se formaba
+// detrás (con una GPU de 4 GB, hasta un minuto). Ahora esos trabajos de fondo se cortan en cuanto le escribes o le hablas.
+const fondos=new Set();
+const senalFondo=()=>{const c=new AbortController();fondos.add(c);setTimeout(()=>fondos.delete(c),180e3);return AbortSignal.any([c.signal,AbortSignal.timeout(180e3)]);};
+function pararFondo(){let n=0;for(const c of fondos)if(!c.signal.aborted){c.abort();n++;}fondos.clear();if(n)log('🧠 dejé lo que hacía en tu GPU para contestarte','g');}
 async function resumeDia(dia,forzar){if(resumiendo)return false;const ms=mems.filter(m=>m.dia===dia);if(!ms.length)return false;
   const ya=dias.find(x=>x.dia===dia);if(ya&&!forzar&&ya.n===ms.length)return false;resumiendo=true;
   const name=cfg.name||'Kiga',txt=ms.map(m=>m.t.replace(/\n/g,' / ').slice(0,500)).join('\n').slice(-12000);
   const sys=`Resume en 3 a 6 frases cortas, en tercera persona, el día de ${name} según sus pláticas con Capri: qué hizo, cómo se sintió, con quién estuvo, qué le preocupaba y qué quedó pendiente. Incluye detalles concretos (nombres, lugares, horas). Nada inventado. Solo el resumen, sin título.`;
   try{let r='';
-    if(listo()){const j=await (await fetch(OLL+'/api/chat',{method:'POST',body:JSON.stringify({model:cer.modelo,stream:false,keep_alive:VIVO,...(/qwen3|deepseek-r1/i.test(cer.modelo)?{think:false}:{}),options:{temperature:.2,num_predict:260,num_ctx:ctxDe()},messages:[{role:'system',content:sys},{role:'user',content:txt.slice(-ctxDe()*2.5)}]})})).json();
+    if(listo()){const j=await (await fetch(OLL+'/api/chat',{method:'POST',signal:senalFondo(),body:JSON.stringify({model:cer.modelo,stream:false,keep_alive:VIVO,...(/qwen3|deepseek-r1/i.test(cer.modelo)?{think:false}:{}),options:{temperature:.2,num_predict:260,num_ctx:ctxDe()},messages:[{role:'system',content:sys},{role:'user',content:txt.slice(-ctxDe()*2.5)}]})})).json();
       r=(j.message?.content||'').replace(/<think>[\s\S]*?<\/think>/g,'').trim();}
     else if(cfg.key&&cfg.model&&typeof gemUna==='function')r=(await gemUna([{text:sys+'\n\nPLÁTICAS:\n'+txt}],{temperature:.2,maxOutputTokens:400})).text;
     if(!r)return false;const d={dia,resumen:r.replace(/\s+/g,' ').trim(),n:ms.length,ts:Date.now()};
@@ -246,7 +280,7 @@ window.hilosCambiar=async(id,h)=>{const m=mems.find(x=>x.id===id);if(!m)return;m
 // cada 6 pláticas, la GPU relee lo último y saca datos nuevos y duraderos de ti para su memoria de siempre
 async function destila(){if(!listo()||busy||!cer.aprende||nuevas<6)return;nuevas=0;const name=cfg.name||'Kiga';
   const ult=mems.slice(-6).map(m=>m.t).join('\n---\n'),ya=(M().hechos||[]).map(h=>'- '+h.t).join('\n');
-  try{const r=await fetch(OLL+'/api/chat',{method:'POST',body:JSON.stringify({model:cer.modelo,stream:false,keep_alive:VIVO,...(/qwen3|deepseek-r1/i.test(cer.modelo)?{think:false}:{}),
+  try{const r=await fetch(OLL+'/api/chat',{method:'POST',signal:senalFondo(),body:JSON.stringify({model:cer.modelo,stream:false,keep_alive:VIVO,...(/qwen3|deepseek-r1/i.test(cer.modelo)?{think:false}:{}),
       options:{temperature:.2,num_predict:220,num_ctx:ctxDe()},messages:[{role:'system',content:`Extraes datos duraderos sobre ${name} de sus pláticas con Capri. Responde SOLO con líneas así: <<recuerda: categoria | dato corto en tercera persona>>. Categorías: nombre, gusto, persona, vivencia, dia, escuela, otro. Máximo 3 líneas. Nada que ya esté en la lista, nada inventado, nada sobre Capri. Si no hay nada nuevo responde NADA.`},
       {role:'user',content:`Ya se sabe:\n${ya||'(nada)'}\n\nPláticas recientes:\n${ult}`}]})});
     const j=await r.json();const out=(j.message?.content||'').replace(/<think>[\s\S]*?<\/think>/g,'');const n=(out.match(/<<\s*recuerda/gi)||[]).length;

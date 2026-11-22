@@ -1005,7 +1005,7 @@ addEventListener('keydown',e=>{if(e.key==='Escape'&&pensar&&!document.querySelec
 const TAGRE=new RegExp('\\[('+TAGS.join('|')+')\\]\\s*','gi');
 function clean(s){return s.replace(/<<[^>]*(>>|$)/g,'').replace(/<$/,'').replace(TAGRE,'').replace(/\*\*?/g,'').replace(/^#+\s*/gm,'');}
 async function respond(userText,extra,mode){ // mode: user | watch | idle | voice
-  busy=true;setState('pensando');core('THINKING');const t0=performance.now();let t1=0;bump();const P=pensarIni();
+  busy=true;respMode=mode||'user';setState('pensando');core('THINKING');const t0=performance.now();let t1=0;bump();const P=pensarIni();
   const parts=[];if(extra)parts.push(extra);parts.push({text:userText});
   let raw='',shown='',stateSet=false,heard=null,el=null,cur=null,speakBuf='',off=0,supp=false;
   fragNow=fragPick(mode);if(fragNow)dispatchEvent(new CustomEvent('capri:fragmento',{detail:fragNow.name}));const who=fragNow?'??? // '+fragNow.name.toUpperCase():(window.crimsonWho?.()||'CAPRI');let label=who;if(fragNow){store.set('fragLast',Date.now());log('ALERTA: fragmento '+fragNow.name+' fuera de control','w');}
@@ -1035,12 +1035,14 @@ async function respond(userText,extra,mode){ // mode: user | watch | idle | voic
     if(body&&mode==='user')window.medAfter?.();
     medida({pri:Math.round(t1),total:Math.round(performance.now()-t0),chars:body.length,mode});
   }catch(e){if(cur)cur.remove();if(speakBuf.trim()&&!esCorte(e))speakChunk(speakBuf);showError(e);medida({total:Math.round(performance.now()-t0),mode,falla:esCorte(e)?'corte':'error'});}
-  pensarFin(P);fragNow=null;busy=false;bump();setTimeout(hideBubble,5000);afterTalk();}
+  pensarFin(P);fragNow=null;busy=false;respMode=null;bump();setTimeout(hideBubble,5000);afterTalk();despuesDePensar();}
 // 2.12: cada respuesta deja su medida (1ª palabra, total, quién contestó) para RELIC → Aprendizaje y velocidad
 function medida(m){const ci=window.cerebroInfo?.();m.ts=Date.now();m.cer=ci?.ultimo||'nube';if(m.cer==='nube')m.cer=cfg.model||'Gemini';
   const L=store.get('relicMet',[]);L.push(m);store.set('relicMet',L.slice(-200));dispatchEvent(new CustomEvent('capri:medida',{detail:m}));}
 function afterTalk(){const w=setInterval(()=>{if(isSpeaking())return;clearInterval(w);core('DORMANT');if(cfg.hands&&!recording&&!busy)setTimeout(()=>{if(cfg.hands&&!recording&&!busy)startRec(true)},400);},300);}
+let respMode=null;
 function showError(e){
+  if(e?.name==='AbortError'&&e.message==='CEDE'){setState('observando');log('dejé lo que decía para contestarte','g');return;}
   if(e?.name==='AbortError'&&e.message==='CANCEL'){setState('observando');line('s','(Cancelado. Ya puedes escribirme otra cosa.)');log('respuesta cancelada','y');return;}
   setState('glitch_fuerte');let m;
   if(esCorte(e)){const q=window.cerebroInfo?.().ultimo;m='Me trabé pensando y corté para no quedarme congelada: '+(e.message==='TIMEOUT'?'pasó mucho rato sin que el cerebro respondiera':'el cerebro no respondió a tiempo')+'. '+
@@ -1137,7 +1139,13 @@ function changed(sig){if(!lastSig)return true;let s=0;for(let i=0;i<sig.length;i
 async function autoLook(){if(!watching)return;if(!busy&&!recording&&!q.value){const g=grab();if(g&&changed(g.sig)){lastSig=g.sig;await respond(WATCH_PROMPT(cfg.name||'Kiga'),{inlineData:{mimeType:'image/jpeg',data:g.b64}},'watch');}else log('pantalla sin cambios','g');}schedule();}
 
 // ================= CHAT =================
-async function send(v){v=v.trim();if(!v||busy)return;askNotif();window.speechSynthesis?.cancel();bump();line('u',v);const k=v.toLowerCase();
+// 2.27.1: antes, si le escribías mientras ella pensaba (su saludo, algo que decía sola o una respuesta lenta) tu mensaje se perdía
+// sin aviso. Ahora se queda formado; y si lo que estaba haciendo era hablar sola o mirar la pantalla, lo deja para contestarte.
+let pendiente=null;
+function despuesDePensar(){if(!pendiente||busy)return;const v=pendiente;pendiente=null;setTimeout(()=>send(v),0);}
+async function send(v){v=v.trim();if(!v)return;
+  if(busy){pendiente=v;line('s','(Te leí: «'+v.slice(0,80)+(v.length>80?'…':'')+'». En cuanto termine lo que estoy pensando te contesto.)');
+    if(respMode==='idle'||respMode==='watch')pensarCorta('CEDE');return;}askNotif();window.speechSynthesis?.cancel();bump();line('u',v);const k=v.toLowerCase();
   if(k==='help'){line('c','CAPRI');line('t',"Háblame normal o por voz (🎤 / Ctrl+Espacio), choom~\n  ¿qué ves? — miro tu pantalla (activa 👁 primero)\n  estudio — abro tu biblioteca\n  médico — abro tu reservorio médico\n  sal — me salgo a pasear por la pantalla\n  recuerdos — lo que sé de ti\n  olvida <algo> — borro ese recuerdo\n  fragmentos — los ecos de mi mosaico\n  limpiar — borro mi memoria del chat\n  ajustes — configuración");setState('presumida');return;}
   if(k==='limpiar'){history=[];store.set('history',[]);term.innerHTML='';line('s','(Memoria borrada.)');setState('glitch_fuerte');return;}
   if(k==='recuerdos'){M();line('c','CAPRI');const a=animoNow();line('t',(mem.hechos.length?'Esto es lo que la hermosa yo sabe de ti~\n'+mem.hechos.map(h=>'  · ['+(MEMCATS[h.c]||h.c)+'] '+h.t).join('\n'):'…todavía no sé casi nada de ti. Cuéntame cosas, choom.')+'\n  ánimo: '+(a?a.n+' '+Math.round(a.i)+'/10'+(a.why?' ('+a.why+')':''):'normal'));setState('presumida');return;}
