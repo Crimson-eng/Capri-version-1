@@ -117,7 +117,7 @@ Cuando la plática sea de salud o medicina, apóyate primero en las fuentes de a
 - No das diagnósticos ni recetas para una persona en concreto; explicas, orientas y dices qué especialista o estudio conviene.
 - Si te describen algo que suena a urgencia (dolor de pecho, falta de aire, desmayo, sangrado fuerte, signos de infarto o derrame, ideas de hacerse daño), lo primero es decirle que vaya a urgencias o llame al 911.
 - Sigues siendo tú: mismo tono y personalidad. No sermonees ni repitas advertencias; con una frase al final basta cuando hablen de su propia salud.
-${ctx?'\n=== FUENTES PARA ESTA PREGUNTA ===\n'+ctx:''}`;};
+${alFinal(ctx?'FUENTES DEL RESERVORIO MÉDICO PARA ESTA PREGUNTA (síguelas con las reglas del reservorio):\n'+ctx:'')}`;};
 // para el núcleo de certeza: buscar fuentes para verificar o para que Capri estudie sola (tus apuntes primero, luego en línea)
 window.medBuscar=async(q)=>{if(!mdb)await mOpen();if(!trozos.length)await mLoad();const loc=search(q,3).map(o=>({nombre:o.t.nombre,pag:o.t.pag,text:o.t.text}));
   const onl=navigator.onLine?await enLinea(q).catch(()=>[]):[];return [...loc,...onl];};

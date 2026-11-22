@@ -355,12 +355,24 @@ def memoria_prompt(mem, n):
                hace(ahora_ms() - int(mem.get('desde') or ahora_ms())), n, n, an, ', '.join(ANIMOS)))
 
 
+DIAS_ES = ('lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo')
+MESES_ES = ('enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre')
+
+
+def hora_es(d=None):
+    d = d or dt.datetime.now()
+    return '%s, %d de %s, %02d:%02d' % (DIAS_ES[d.weekday()], d.day, MESES_ES[d.month - 1], d.hour, d.minute)
+
+
 def sistema(e, extra=''):
     n = e['cfg'].get('nombre') or 'Kiga'
     p = e.get('persona') or PERSONA_BASE.replace('{n}', n)
+    # 2.28: la app ya no manda la hora (iba congelada desde la última vez que se sincronizó); las versiones viejas sí
+    p = re.sub(r' Ahora es [^\n]*?\.(?=\n)', '', p, count=1)
     mp = memoria_prompt(e['mem'], n)
     p = p.replace('{{MEMORIA}}', mp) if '{{MEMORIA}}' in p else p
-    return p + ('\n\n' + extra if extra else '')
+    # lo que cambia va al final: así Ollama reusa el principio (personalidad + memoria) de una vez a otra
+    return p + ('\n\n' + extra if extra else '') + '\n\nAhora es ' + hora_es() + '.'
 
 
 def limpiar(s):
@@ -466,7 +478,12 @@ def ollama(cfg, sis, conv):
     if not modelo:
         raise RuntimeError('Ollama no está o no tiene modelos')
     msgs = [{'role': 'system', 'content': sis}] + [{'role': 'assistant' if c['role'] == 'model' else 'user', 'content': c['text']} for c in conv]
-    j = _post(OLLAMA + '/api/chat', {'model': modelo, 'messages': msgs, 'stream': False, 'options': {'temperature': cfg.get('_temp', 1.1)}}, t=180)
+    # 2.28: mismo tamaño de contexto que la app y que se quede cargado: si no, Ollama recarga el modelo entero (segundos)
+    # cada vez que la app y el cerebro se turnan la GPU
+    op = {'temperature': cfg.get('_temp', 1.1)}
+    if int(cfg.get('ollama_ctx') or 0) >= 1024:
+        op['num_ctx'] = int(cfg['ollama_ctx'])
+    j = _post(OLLAMA + '/api/chat', {'model': modelo, 'messages': msgs, 'stream': False, 'keep_alive': '2h', 'options': op}, t=180)
     txt = (j.get('message') or {}).get('content', '')
     txt = re.sub(r'<think>.*?</think>', '', txt, flags=re.S)
     if not txt.strip():
@@ -703,6 +720,8 @@ class Cerebro:
             for k in ('nombre', 'modelo', 'ollama_modelo'):
                 if isinstance(c.get(k), str) and c.get(k):
                     self.cfg[k] = c[k][:80]
+            if isinstance(c.get('ollama_ctx'), int) and 1024 <= c['ollama_ctx'] <= 131072:
+                self.cfg['ollama_ctx'] = c['ollama_ctx']
             if isinstance(c.get('modelos'), list):
                 self.cfg['modelos'] = [str(m)[:80] for m in c['modelos'][:40]]
             if 'key' in c and isinstance(c['key'], str):

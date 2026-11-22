@@ -47,7 +47,7 @@ let usadas=[];
 const _prep=window.medPrepare;
 window.medPrepare=async q=>{usadas=q&&q.length>=8?parecidas(q):[];if(usadas.length)log('🧠 '+usadas.length+' lección(es) de entrenamiento para esta respuesta','g');return _prep?_prep(q):undefined;};
 const _prompt=window.medPrompt;
-window.medPrompt=()=>(_prompt?_prompt():'')+(usadas.length?`
+window.medPrompt=()=>(_prompt?_prompt():'')+alFinal(usadas.length?`
 
 LO QUE ${(cfg.name||'Kiga').toUpperCase()} TE HA ENSEÑADO EN PREGUNTAS PARECIDAS (es tu entrenamiento: síguelo sin mencionarlo)
 ${usadas.map(l=>l.voto>0?`- Ante «${l.q.slice(0,160)}» le gustó esta respuesta${l.cer?' ('+NOMBRE[l.cer]+')':''}: «${limpio(l.a).slice(0,420)}». Contesta con ese estilo y nivel.`

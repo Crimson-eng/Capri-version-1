@@ -157,7 +157,10 @@ let ctx='',cob=[],prog=null;
 window.lecturaPesada=()=>ctx.length;
 async function prepara(q){const ds=objetivos(q);if(!ds)return false;
   const local=!nube();if(local&&!gpu())return false;
-  const DIRECTO=local?7000:90000,S=local?6500:60000,TOPE=local?7000:70000;
+  // 2.28: con Gemini, hasta 160k caracteres (~45k tokens, unas 50 páginas de texto corrido) van directo en una sola llamada en vez de resumir
+  // por secciones primero (antes desde 90k ya hacía 2+ llamadas extra antes de contestar). Las preguntas que siguen sobre
+  // el mismo documento salen más rápido porque Gemini guarda en caché el principio del mensaje.
+  const DIRECTO=local?7000:160000,S=local?6500:60000,TOPE=local?7000:165000;
   const docs=ds.slice(0,MAXDOCS),lecs=[];for(const d of docs){const l=await (d.src==='med'?window.medLectura:window.bibLectura)?.(d.id);if(l)lecs.push([d,l]);}
   if(!lecs.length)return false;
   const tot=lecs.reduce((s,[,l])=>s+l.paginas.reduce((t,p)=>t+p.text.length,0),0);

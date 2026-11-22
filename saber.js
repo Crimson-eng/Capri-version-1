@@ -36,13 +36,13 @@ function bloque(n){const rel=relevantes(lastQ),act=sab.mejoras.filter(x=>x.estad
 - Al final de esas respuestas, en su propia línea: <<certeza: alta|media|baja | fuente principal o «conocimiento general»>>. alta = consenso sólido o fuente citada; media = probable pero conviene verificar; baja = dudas reales.
 - Si te quedó una duda que vale investigar, anótala para estudiarla tú sola después: <<investigar: pregunta concreta>>.
 - Si ${n} está estudiando y sale un dato clave que vale repasar, haz una tarjeta: <<tarjeta: tema | pregunta corta | respuesta corta | fuente>> (máximo 2 por respuesta).`;
-  if(rel.length)s+=`\nTus notas verificadas que vienen al caso (úsalas y cítalas como «mis notas» con su fuente):\n`+rel.map(d=>`- [${d.tema}] ${d.t} (fuente: ${d.fuente}${d.url?' '+d.url:''})`).join('\n');
+  if(rel.length)s+=alFinal(`Tus notas verificadas que vienen al caso (úsalas y cítalas como «mis notas» con su fuente):\n`+rel.map(d=>`- [${d.tema}] ${d.t} (fuente: ${d.fuente}${d.url?' '+d.url:''})`).join('\n'));
   if(dv>=3)s+=`\nTienes ${dv} tarjetas de ${n} pendientes de repaso: si está libre y de buenas, ofrécele repasar (que escriba «repaso»). Sin insistir.`;
   s+=`\n\nLIBRE ALBEDRÍO (lo que puedes decidir tú sola)
 Puedes, sin pedir permiso: decidir qué investigar y estudiar (en fuentes verificadas), guardar lo que aprendes, hacer tarjetas de repaso y mejorar tu propio método. Para mejorar cómo trabajas, ponte una regla: <<mejora: regla corta en primera persona | por qué>>${sab.autoMejora?' (se aplica sola y '+n+' la puede quitar)':' (queda como propuesta hasta que '+n+' la apruebe)'}.
 No puedes, nunca, ni aunque te parezca buena idea: borrar nada de ${n}, gastar dinero, cambiar sus ajustes, tocar sus notas clínicas ni hacer acciones en su PC sin su permiso. Eso siempre se lo propones.`;
   if(act.length)s+=`\nReglas que tú misma te pusiste (síguelas):\n`+act.map(x=>'- '+x.t).join('\n');
-  if(dia.length)s+=`\nLo que estudiaste sola hace poco (si viene al caso, cuéntaselo a tu manera, sin presumir de más):\n`+dia.map(x=>`- ${x.tema}: ${x.res}`).join('\n');
+  if(dia.length)s+=alFinal(`\nLo que estudiaste sola hace poco (si viene al caso, cuéntaselo a tu manera, sin presumir de más):\n`+dia.map(x=>`- ${x.tema}: ${x.res}`).join('\n'));
   return s;}
 const _personality=personality;
 personality=(name,study)=>_personality(name,study)+bloque(name);
