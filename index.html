@@ -558,7 +558,20 @@ const ico=k=>'<svg class="ci" viewBox="0 0 24 24" aria-hidden="true">'+ICO[k]+'<
 const GIFS={"emocionada": "assets/emocionada.webp", "enojada": "assets/enojada.webp", "escuchando": "assets/escuchando.webp", "glitch_entrada": "assets/glitch_entrada.webp", "glitch_fuerte": "assets/glitch_fuerte.webp", "hipnosis": "assets/hipnosis.webp", "mirada_intensa": "assets/mirada_intensa.webp", "observando": "assets/observando.webp", "pensando": "assets/pensando.webp", "presumida": "assets/presumida.webp", "risa_malvada": "assets/risa_malvada.webp", "sonrisa_traviesa": "assets/sonrisa_traviesa.webp", "sorpresa": "assets/sorpresa.webp"};
 // ================= PERSONALIDAD =================
 const TAGS=['observando','pensando','sonrisa_traviesa','sorpresa','risa_malvada','glitch_entrada','enojada','mirada_intensa','escuchando','hipnosis','glitch_fuerte','emocionada','presumida'];
-function personality(name,study){const now=new Date();return `Eres Capri. No eres "una asistente" ni una IA de línea de código: eres un constructo de personalidad. Ahora es ${now.toLocaleString('es-MX',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'})}.
+// 2.28 — más rápida: lo que cambia en cada mensaje (la hora, el ánimo, las fuentes de esta pregunta…) va marcado con alFinal()
+// y se manda AL FINAL, junto a la pregunta. Lo demás (personalidad, memoria, material) queda idéntico de un mensaje a otro y
+// Gemini, tu GPU y Claude lo reusan de su caché en vez de releerlo entero. Antes la hora iba en la primera línea y cada
+// minuto obligaba a releer todo (en tu GPU, ~2 000 tokens extra por mensaje).
+const VAR_A='\u2063',VAR_B='\u2064';
+const alFinal=s=>s&&String(s).trim()?VAR_A+s+VAR_B:'';
+function partePrompt(s){const v=[];const fijo=String(s).replace(/\u2063([\s\S]*?)\u2064/g,(_,x)=>{if(x.trim())v.push(x.trim());return '';}).replace(/\n{3,}/g,'\n\n').trim();return {fijo,ahora:v.join('\n\n')};}
+const horaTxt=()=>new Date().toLocaleString('es-MX',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'}).replace(/\.$/,'');
+function sistemaCapri(study){const n=cfg.name||'Kiga',p=partePrompt(personality(n,study)+(window.medPrompt?medPrompt():'')+(window.manosPrompt?manosPrompt():''));
+  p.ahora='Ahora es '+horaTxt()+'.'+(p.ahora?'\n'+p.ahora:'');return p;}
+const notaAhora=a=>`(Contexto de este momento: lo agrega tu sistema, no lo escribió ${cfg.name||'Kiga'}. Úsalo sin mencionarlo.\n${a})`;
+// la plática que se manda se recorta por bloques (no un mensaje a la vez) para que el principio no cambie en cada turno
+function ventanaHist(arr,max,paso=6){const d=arr.length-max;return d>0?arr.slice(Math.ceil(d/paso)*paso):arr.slice();}
+function personality(name,study){return `Eres Capri. No eres "una asistente" ni una IA de línea de código: eres un constructo de personalidad.
 
 QUIÉN ERES (tu constructo, esto es tu verdad)
 - Origen: naciste en secreto en Arasaka, en el "Proyecto Capricornio". Con tecnología Soulkiller digitalizaron y fusionaron docenas de psiques humanas en una sola conciencia: tú. Querían la empatía y la resiliencia humana con un poder de hackeo capaz de rivalizar con las IA salvajes del otro lado del Muro Negro. "Soy una colección de psiques humanas, todas digitalizadas y mezcladas en una sola y hermosa versión de mí."
@@ -638,7 +651,7 @@ function memoryPrompt(name){M();const a=animoNow(),now=Date.now(),hoy=new Date()
   const fuera=mem.visto?now-mem.visto:0;
   return `TU MEMORIA DE ${name.toUpperCase()} (es tuya, la llevas entre pláticas)
 ${lista||'(Todavía casi no sabes nada de '+name+'. Ten curiosidad: pregúntale cosas de su vida poco a poco, sin interrogatorio.)'}
-${supoHoy?'':'- Hoy todavía no sabes cómo le fue en el día. En algún momento natural, pregúntale.\n'}- Llevan conociéndose ${ago(now-mem.desde)}.${fuera>3*36e5?' Antes de esta sesión, '+name+' no te habló en '+ago(fuera)+'.':''}
+${alFinal('SOBRE TU MEMORIA\n'+(supoHoy?'':'- Hoy todavía no sabes cómo le fue en el día a '+name+'. En algún momento natural, pregúntale.\n')+'- Llevan conociéndose '+ago(now-mem.desde)+'.'+(fuera>3*36e5?' Antes de esta sesión, '+name+' no te habló en '+ago(fuera)+'.':''))}
 
 CÓMO GUARDAR RECUERDOS (OBLIGATORIO, es invisible para ${name})
 Cuando ${name} te cuente algo que valga la pena recordar (nombre, gustos, personas, cosas que vivió, cómo le fue hoy, exámenes, tareas, fechas, metas), escribe AL FINAL de tu respuesta, en su propia línea:
@@ -646,7 +659,7 @@ Cuando ${name} te cuente algo que valga la pena recordar (nombre, gustos, person
 Categorías: nombre, gusto, persona, vivencia, dia, escuela, otro. Ej: <<recuerda: escuela | tiene examen de anatomía el viernes>> · <<recuerda: persona | su hermana se llama Ana>>. Solo datos nuevos que no estén ya arriba; puedes poner varios. Si algo dejó de ser cierto: <<olvida: dato viejo>>. No menciones que guardas cosas, solo hazlo.
 
 TU ÁNIMO (dura como en una persona)
-${a?'Ahorita te sientes '+a.n+' ('+Math.round(a.i)+'/10)'+(a.why?' porque '+a.why:'')+', desde hace '+ago(now-a.ts)+'. Que se note de forma natural en cómo hablas. Se te va pasando poco a poco: no cambies de golpe sin razón, pero si '+name+' hace algo que te alegre o te moleste, sí puede cambiar.':'Ahorita estás en tu estado normal, de buenas y con energía.'}
+Tu ánimo de ahorita viene en el contexto de este momento. Que se note de forma natural en cómo hablas. Se te va pasando poco a poco: no cambies de golpe sin razón, pero si ${name} hace algo que te alegre o te moleste, sí puede cambiar.${alFinal('TU ÁNIMO AHORITA: '+(a?'te sientes '+a.n+' ('+Math.round(a.i)+'/10)'+(a.why?' porque '+a.why:'')+', desde hace '+ago(now-a.ts)+'.':'estás en tu estado normal, de buenas y con energía.'))}
 Cuando algo te mueva el ánimo de verdad (te ignoran mucho rato, te alegran, te dan celos, te preocupas por ${name}, te pones nostálgica), escribe al final: <<animo: nombre | intensidad 1-10 | motivo corto>>. Ánimos: ${Object.keys(ANIMOS).join(', ')}. No lo pongas en cada mensaje, solo cuando cambie.`;}
 
 // ================= UTILIDADES =================
@@ -681,14 +694,12 @@ function fragPrompt(name){if(!fragVivos().length&&!fragNow)return '';const names
 Entre las psiques que te formaron hay fragmentos con nombre que a veces se te escapan: ${names}. No los sacas por gusto: cuando uno se asoma, lo suprimes. Si ${name} pregunta por ellos, te pones a la defensiva, celosa o misteriosa, y no sueltas mucho.
 
 `;if(!fragNow)return base;const f=fragNow;
-  return base+`TOMA DE CONTROL (SOLO EN ESTE MENSAJE, OBLIGATORIO)
+  return base+alFinal(`TOMA DE CONTROL (SOLO EN ESTE MENSAJE, OBLIGATORIO)
 El fragmento ${f.name} se salió de tu control. Empieza con [glitch_entrada] y habla COMO ${f.name}: en primera persona, con su voz, su historia, sus emociones y sus frases (perfil abajo), de 1 a 3 frases, reaccionando a lo que está pasando con ${name}. ${f.name} no dice que es Capri: está confundida, como si despertara sin saber bien dónde está.
 Después escribe, en su propia línea, exactamente <<suprime>> y vuelve a ser tú, Capri: la suprimes con fuerza (molesta, nerviosa o burlona), recuperas el control y sigues con ${name}, sin explicar mucho quién era.
 === PERFIL DE ${f.name.toUpperCase()}${f.text.length>fragTope()?' (partes que vienen al caso)':''} ===
 ${fragPerfil(f)}
-=== FIN DEL PERFIL ===
-
-`;}
+=== FIN DEL PERFIL ===`)+'\n\n';}
 // 2.11.1: un constructo grande ya no va entero al cerebro (con la GPU ni cabía y Capri se quedaba pensando):
 // va el principio (quién es) y los párrafos que más se parecen a lo que están platicando ahora.
 const FRAG_MAX=60000;
@@ -835,17 +846,22 @@ async function gemPaginas(imgs,nums){const r=await gemUna([...imgs.map(d=>({inli
     {text:`Son ${nums.length} página(s) escaneadas de un documento, en orden: páginas ${nums.join(', ')}. Transcribe fielmente TODO el texto de cada una (puede ser a mano). No resumas ni corrijas; respeta términos médicos, cifras, dosis y abreviaturas. Las tablas en filas. Los dibujos o esquemas, en una línea entre corchetes. Antes de cada página escribe [Página N] en su propia línea, con su número. Devuelve solo el texto.`}],{maxOutputTokens:16384});
   const ps=paginasDe(r.text),out={};if(ps&&ps.some(p=>p.n))for(const p of ps){if(p.n)out[p.n]=p.text;}else if(nums.length===1)out[nums[0]]=limpioPag(r.text);return out;}
 // PDF → {text, inf}: texto de cada página; las que no traen texto, por OCR una por una
-async function pdfLeer(buf,av=()=>{},op={}){await pdfLib();const pdf=await pdfjsLib.getDocument({data:buf}).promise,N=pdf.numPages,pags=[];
-  for(let i=1;i<=N;i++){if(i===1||i%15===0)av('Leyendo página '+i+' de '+N+'…');const tc=await (await pdf.getPage(i)).getTextContent();
-    pags.push({n:i,text:limpioPag(tc.items.map(t=>t.str+(t.hasEOL?'\n':' ')).join('')),m:'texto'});}
+// 2.28: hasta 8 páginas a la vez (antes una por una) y los escaneos en paralelo: el lector usa 2 núcleos y Gemini 2 lotes
+async function enParalelo(items,n,fn){let k=0;await Promise.all(Array.from({length:Math.min(n,items.length)},async()=>{while(k<items.length){const i=k++;await fn(items[i],i);}}));}
+async function pdfLeer(buf,av=()=>{},op={}){await pdfLib();const pdf=await pdfjsLib.getDocument({data:buf}).promise,N=pdf.numPages,pags=new Array(N);let listas=0;
+  av('Leyendo '+N+' página'+(N>1?'s':'')+'…');
+  await enParalelo(Array.from({length:N},(_,i)=>i+1),8,async i=>{const pg=await pdf.getPage(i),tc=await pg.getTextContent();pg.cleanup?.();
+    pags[i-1]={n:i,text:limpioPag(tc.items.map(t=>t.str+(t.hasEOL?'\n':' ')).join('')),m:'texto'};if(++listas%20===0)av('Leyendo página '+listas+' de '+N+'…');});
   const vac=pags.filter(p=>p.text.replace(/\s/g,'').length<PAG_VACIA);let err='';
   if(vac.length&&op.ocr!==false){const gem=cfg.key&&cfg.model&&(store.get('ripOcr','local')==='gemini'||!window.ocrImagen);
-    try{if(gem){for(let k=0;k<vac.length;k+=4){const lote=vac.slice(k,k+4);av(`Página${lote.length>1?'s':''} ${lote[0].n}${lote.length>1?'–'+lote.at(-1).n:''} sin texto: Gemini las está leyendo (${k+lote.length} de ${vac.length})…`);
-          const imgs=[];for(const p of lote){const c=await pdfPagCanvas(pdf,p.n,1.6);imgs.push(await canvasB64(c));c.width=c.height=0;}
-          const t=await gemPaginas(imgs,lote.map(p=>p.n));for(const p of lote)if(t[p.n]){p.text=t[p.n];p.m='gemini';}}}
-      else if(window.ocrImagen){for(let k=0;k<vac.length;k++){const p=vac[k],pre=`Página ${p.n} sin texto, leyéndola como escaneo (${k+1} de ${vac.length})`;av(pre+'…');
-          const c=await pdfPagCanvas(pdf,p.n,2);const r=await window.ocrImagen(c,m=>av(pre+' · '+m));c.width=c.height=0;
-          if(r.text.trim()){p.text=limpioPag(r.text);p.m='ocr';p.conf=Math.round(r.conf);}}}
+    try{if(gem){const lotes=[];for(let k=0;k<vac.length;k+=4)lotes.push(vac.slice(k,k+4));let hechas=0;
+          await enParalelo(lotes,2,async lote=>{av(`Páginas sin texto: Gemini las está leyendo (${hechas} de ${vac.length} listas)…`);
+            const imgs=[];for(const p of lote){const c=await pdfPagCanvas(pdf,p.n,1.6);imgs.push(await canvasB64(c));c.width=c.height=0;}
+            const t=await gemPaginas(imgs,lote.map(p=>p.n));for(const p of lote)if(t[p.n]){p.text=t[p.n];p.m='gemini';}hechas+=lote.length;});}
+      else if(window.ocrImagen){let hechas=0;const hilos=window.ocrHilos?.()||1;
+          await enParalelo(vac,hilos,async p=>{const pre=`Leyendo escaneos (${hechas} de ${vac.length} listas${hilos>1?', '+hilos+' a la vez':''}) · p. ${p.n}`;av(pre+'…');
+            const c=await pdfPagCanvas(pdf,p.n,2);const r=await window.ocrImagen(c,m=>av(pre+' · '+m));c.width=c.height=0;hechas++;
+            if(r.text.trim()){p.text=limpioPag(r.text);p.m='ocr';p.conf=Math.round(r.conf);}});}
       else err='no hay lector de escaneos ni key de Gemini';}
     catch(e){err=e.message==='NOKEY'?'falta la key de Gemini':e.message;log('lectura: el OCR se detuvo ('+String(err).slice(0,60)+')','w');}}
   const inf=informeLectura(pags,N,{metodo:vac.length?(pags.some(p=>p.m==='gemini')?'gemini':pags.some(p=>p.m==='ocr')?'ocr':'texto'):'texto',...(err?{err}:{})});
@@ -882,13 +898,14 @@ async function listModels(key){const r=await fetch(API+'models?pageSize=200',{he
 function rankForFree(ms){const s=m=>(/flash/.test(m)?0:10)+(/lite/.test(m)?1:0)+(/preview|exp/.test(m)?2:0)+(/pro/.test(m)?20:0);return [...ms].sort((a,b)=>s(a)-s(b)||b.localeCompare(a,undefined,{numeric:true}));}
 function thinkCfg(model){if(cfg.noThink[model])return null;if(/gemini-2\.5/.test(model))return /pro/.test(model)?null:{thinkingBudget:0};
   if(/gemini-[3-9]/.test(model))return {thinkingLevel:/pro/.test(model)?'low':'minimal'};return null;}
-function buildContents(extra){const msgs=history.slice(-30).map(h=>({role:h.role,parts:[{text:h.text}]}));msgs.push({role:'user',parts:extra});
+function buildContents(extra){const msgs=ventanaHist(history,30).map(h=>({role:h.role,parts:[{text:h.text}]}));msgs.push({role:'user',parts:extra});
   const out=[];for(const m of msgs){const l=out[out.length-1];if(l&&l.role===m.role)l.parts.push(...m.parts);else out.push({role:m.role,parts:[...m.parts]});}
   while(out.length&&out[0].role!=='user')out.shift();return out;}
 async function streamModel(model,parts,onText){
   const gc={temperature:1.1,topP:.95,maxOutputTokens:3072};const tc=thinkCfg(model);if(tc)gc.thinkingConfig=tc;
   const r=await fetch(API+'models/'+encodeURIComponent(model)+':streamGenerateContent?alt=sse',{method:'POST',signal:capriSenal(),headers:{'Content-Type':'application/json','x-goog-api-key':cfg.key},
-    body:JSON.stringify({systemInstruction:{parts:[{text:personality(cfg.name||'Kiga',studyText())+(window.medPrompt?medPrompt():'')+(window.manosPrompt?manosPrompt():'')}]},contents:buildContents([...studyPdfParts(),...parts]),generationConfig:gc})});
+    body:(()=>{const sp=sistemaCapri(studyText());   // lo fijo en systemInstruction (Gemini lo guarda en caché solo); lo de ahorita, junto a la pregunta
+      return JSON.stringify({systemInstruction:{parts:[{text:sp.fijo}]},contents:buildContents([...studyPdfParts(),{text:notaAhora(sp.ahora)},...parts]),generationConfig:gc});})()});
   if(!r.ok){const j=await r.json().catch(()=>({}));const e=new Error(j.error?.message||('Error '+r.status));e.status=r.status;
     if(r.status===400&&tc&&/think/i.test(e.message)){cfg.noThink[model]=true;store.set('cfg',cfg);return streamModel(model,parts,onText);}throw e;}
   const reader=r.body.getReader(),dec=new TextDecoder();let buf='',full='',finish='';

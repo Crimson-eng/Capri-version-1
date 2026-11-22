@@ -50,7 +50,7 @@ Lo que te dejó:\n${resto.map(x=>'  · ['+(CATS[x.c]||x.c)+'] '+x.t).join('\n')|
 Recuerdos que te dejó:\n${crim.caps.slice(-12).map(c=>'  · '+c.t+': '+c.txt.slice(0,400)).join('\n')||'  (ninguno)'}`;}
 let once=null;
 const _personality=personality;
-personality=(name,study)=>_personality(name,study)+(ecoOn()?ecoBlock(name):'')+(crim.learn||once?learnBlock(name):'')+(once?`\n\nPARA ESTE MENSAJE: ${once}`:'');
+personality=(name,study)=>_personality(name,study)+(ecoOn()?ecoBlock(name):'')+(crim.learn||once?learnBlock(name):'')+alFinal(once?`PARA ESTE MENSAJE: ${once}`:'');
 window.crimsonWho=()=>ecoOn()?'CAPRI // CRIMSON NIGHTMARE':null;
 
 // ---------- leer lo que Capri anotó ----------

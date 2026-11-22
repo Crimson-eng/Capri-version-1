@@ -54,7 +54,7 @@ ${TAGS_ENG(n)}`;
 ${FORMAT_PROFE(n)}
 ${TAGS_ENG(n)}`;}
 const _personality=personality;
-personality=(name,study)=>_personality(name,study)+engBlock(name)+(once?`\n\nPARA ESTE MENSAJE: ${once}`:'');
+personality=(name,study)=>_personality(name,study)+engBlock(name)+alFinal(once?`PARA ESTE MENSAJE: ${once}`:'');
 
 // ---------- leer lo que Capri anotó ----------
 const TAGRE=/<<\s*(vocab|error|nivel|repaso)\s*:([^>]*)>>/gi;

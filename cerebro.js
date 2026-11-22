@@ -50,7 +50,7 @@ window.cerebroJSON=async(system,user)=>{if(!listo())return null;
   const r=await fetch(OLL+'/api/chat',{method:'POST',body:JSON.stringify(body),signal:window.capriSenal?.(180000)||AbortSignal.timeout(180000)});if(!r.ok)throw new Error('GPU: Error '+r.status);
   const j=await r.json();const t=(j.message?.content||'').replace(/<think>[\s\S]*?<\/think>/g,'').trim();try{return JSON.parse(t);}catch(e){throw new Error('la GPU no devolvió JSON válido');}};
 const listo=()=>ok&&!!cer.modelo;
-window.cerebroInfo=()=>({ok,modelo:cer.modelo,modo:cer.modo,emb:cer.emb,mems:mems.length,ultimo,claude:cer.claude,claudeKey:!!cfg.claudeKey,gasto:claudeSpent,tope:cer.tope});
+window.cerebroInfo=()=>({ok,modelo:cer.modelo,ctx:ctxDe(),modo:cer.modo,emb:cer.emb,mems:mems.length,ultimo,claude:cer.claude,claudeKey:!!cfg.claudeKey,gasto:claudeSpent,tope:cer.tope});
 
 // ---------- ¿quién contesta? ----------
 const PESADO=/\b(explica|expl[ií]came|analiza|resume|resumen|c[oó]digo|programa|script|traduce|examen|investiga|compara|calcula|ecuaci[oó]n|ensayo|tarea|redacta|escr[ií]beme)\b|por qu[eé]|c[oó]mo funciona/i;
@@ -66,12 +66,11 @@ function rutaLocal(parts){if(!listo()||cer.modo==='gemini')return false;
   return t.length<260&&!PESADO.test(t)&&!SALUD.test(t);}
 
 // ---------- pensar con la GPU ----------
-function sysPrompt(){const name=cfg.name||'Kiga';
-  let s=personality(name,'')+(window.medPrompt?medPrompt():'')+(window.manosPrompt?manosPrompt():'');
-  // la hora va al final: si cambia al principio, Ollama tiene que releer todo el texto en cada mensaje
-  const now=new Date().toLocaleString('es-MX',{weekday:'long',day:'numeric',month:'long',hour:'2-digit',minute:'2-digit'});
-  s=s.replace('Ahora es '+now+'.','');
-  return [s,`Ahora es ${now}${now.endsWith('.')?'':'.'}\nEmpieza SIEMPRE con tu estado entre corchetes, ej. [presumida]. Contesta en español, corto y natural.`];}
+function sysPrompt(){
+  // 2.28: [lo fijo, lo de ahorita]. Lo fijo va de system y no cambia entre mensajes: Ollama lo reusa de su caché
+  // (antes la hora y el ánimo iban en medio y tu GPU releía ~2 000 tokens en cada mensaje). Lo de ahorita va con la pregunta.
+  const sp=sistemaCapri('');
+  return [sp.fijo,sp.ahora+'\nEmpieza SIEMPRE con tu estado entre corchetes, ej. [presumida]. Contesta en español, corto y natural.'];}
 // 2.27.1 — por qué Capri se quedaba «pensando» con Ollama prendido:
 // a) desde 2.6 el turbo baja el contexto (hasta 2048) para que el modelo quepa en 4 GB, pero su personalidad + memoria
 //    ya pasan de 3 500 tokens: Ollama recortaba el principio (¡su personalidad!) y leía todo de nuevo en cada mensaje.
@@ -83,18 +82,39 @@ const GPU_ESPERA={caliente:20e3,fria:45e3},GPU_PAUSA=10*60e3,RESERVA=700;   // R
 let gpuLentaHasta=0;
 const hayNube=()=>!!(cfg.key&&cfg.model)&&navigator.onLine!==false;
 const hayOtro=()=>hayNube()||(claudeOk()&&!window.cerebroSinGasto);
-async function local(parts,onText,opc={}){
+// arma lo que lee tu GPU: system fijo + plática + (lo de ahorita y la pregunta)
+function armaGPU(parts,otro){
   window.fragTope=2500;let sp;try{sp=sysPrompt();}finally{window.fragTope=0;}   // en la GPU el contexto es chico: del constructo que se asoma va lo esencial
-  const ctx=ctxDe(),sys=sp.join('\n\n'),preg=parts.filter(p=>p.text).map(p=>p.text).join('\n'),otro=opc.otro??hayOtro();
-  let hist=history.slice(-12);const total=()=>tok(sys)+tok(preg)+hist.reduce((a,h)=>a+tok(h.text)+4,0)+RESERVA;
-  while(hist.length>2&&total()>ctx)hist=hist.slice(1);
+  const ctx=ctxDe(),sys=sp[0],preg=notaAhora(sp[1])+'\n\n'+parts.filter(p=>p.text).map(p=>p.text).join('\n');
+  // la plática se recorta de 4 en 4 mensajes (no de uno en uno) para que el principio se repita y Ollama lo reuse
+  let hist=ventanaHist(history,12,4);const total=()=>tok(sys)+tok(preg)+hist.reduce((a,h)=>a+tok(h.text)+4,0)+RESERVA;
+  while(hist.length>2&&total()>ctx)hist=hist.slice(Math.min(4,hist.length-2));
   let sysUsa=sys;
   if(total()>ctx){if(otro)throw new Error('NOCABE');   // no cabe en tu GPU: mejor que conteste Gemini/Claude completo
-    hist=[];const lugar=Math.max(1200,(ctx-tok(preg)-RESERVA)*3);sysUsa=sys.slice(0,lugar-sp[1].length-40)+'\n…\n'+sp[1];}   // sin otro cerebro: lo esencial de ella
+    hist=[];const lugar=Math.max(1200,(ctx-tok(preg)-RESERVA)*3);sysUsa=sys.slice(0,lugar-40)+'\n…';}   // sin otro cerebro: lo esencial de ella
   const msgs=[{role:'system',content:sysUsa}];
   for(const h of hist)msgs.push({role:h.role==='model'?'assistant':'user',content:h.text});
   msgs.push({role:'user',content:preg});
   const m2=[];for(const m of msgs){const l=m2[m2.length-1];if(l&&l.role===m.role&&m.role!=='system')l.content+='\n'+m.content;else m2.push({...m});}
+  return {m2,ctx,firma:firma(sysUsa,hist)};}
+// huella corta de lo que ya leyó tu GPU (para no precargar dos veces lo mismo)
+function firma(sys,hist){let h=5381;const t=sys+hist.map(x=>x.text).join('\u0001');for(let i=0;i<t.length;i++)h=(h*33^t.charCodeAt(i))>>>0;return t.length+':'+h;}
+let prefijoGPU='',precargando=null,precargaTs=0;
+// 2.28 — precarga: en cuanto empiezas a escribir, tu GPU lee de una vez su personalidad, su memoria y la plática;
+// cuando mandas el mensaje solo le falta leer tu pregunta. (Ollama guarda lo último que leyó y reusa el principio igual.)
+function precargaGPU(){if(precargando||busy||!listo()||cer.modo==='gemini'||cer.turbo===false||Date.now()<gpuLentaHasta||Date.now()-precargaTs<15e3)return;
+  let a;try{a=armaGPU([{text:'.'}],true);}catch(e){return;}
+  if(a.firma===prefijoGPU)return;precargaTs=Date.now();const t0=performance.now();
+  const body={model:cer.modelo,messages:a.m2,stream:false,keep_alive:VIVO,options:{temperature:1,num_ctx:a.ctx,num_predict:1}};
+  if(/qwen3|deepseek-r1/i.test(cer.modelo))body.think=false;
+  precargando=fetch(OLL+'/api/chat',{method:'POST',body:JSON.stringify(body),signal:AbortSignal.timeout(60e3)}).then(r=>r.ok?r.json():null)
+    .then(j=>{if(j){prefijoGPU=a.firma;caliente=Date.now();log('⚡ GPU leyó por adelantado su personalidad y la plática ('+Math.round(performance.now()-t0)+' ms)','g');}})
+    .catch(()=>{}).finally(()=>{precargando=null;});}
+window.cerebroPrecarga=precargaGPU;
+{let tq=0;const qi=document.getElementById('q');qi?.addEventListener('input',()=>{clearTimeout(tq);if(qi.value.trim().length<2)return;
+  tq=setTimeout(()=>{precargaGPU();if(ok&&cer.emb&&cer.aprende&&Date.now()-embedVivo>100*60e3&&mems.some(m=>m.v))embed(['.']).catch(()=>{});},350);});}   // y despierta el buscador de recuerdos
+async function local(parts,onText,opc={}){
+  const otro=opc.otro??hayOtro(),{m2,ctx,firma:fi}=armaGPU(parts,otro);prefijoGPU=fi;
   const body={model:cer.modelo,messages:m2,stream:true,keep_alive:VIVO,options:{temperature:1,num_ctx:ctx}};
   if(/qwen3|deepseek-r1/i.test(cer.modelo))body.think=false;
   // tope para la primera palabra (solo si hay otro cerebro que pueda contestar)
@@ -128,12 +148,13 @@ function rutaClaude(parts){if(!claudeOk()||window.cerebroSinGasto||modoAct==='wa
   return parts.some(p=>p.inlineData)||(cfg.study&&!!studyText())||t.length>=260||PESADO.test(t)||SALUD.test(t);}
 async function claudeBrain(parts,onText){
   const [base,hora]=sysPrompt();
-  // lo que no cambia va primero y se marca para caché: Anthropic cobra menos por releerlo
-  const system=[{type:'text',text:base,cache_control:{type:'ephemeral'}},{type:'text',text:hora}];
+  // lo que no cambia va primero y se marca para caché (Anthropic lo relee más rápido y cobra menos); la plática también
+  const system=[{type:'text',text:base,cache_control:{type:'ephemeral'}}];
   const msgs=[];const add=(role,content)=>{const l=msgs[msgs.length-1];if(l&&l.role===role)l.content.push(...content);else msgs.push({role,content:[...content]});};
-  for(const h of history.slice(-16))add(h.role==='model'?'assistant':'user',[{type:'text',text:h.text}]);
+  for(const h of ventanaHist(history,16,4))add(h.role==='model'?'assistant':'user',[{type:'text',text:h.text}]);
   while(msgs.length&&msgs[0].role!=='user')msgs.shift();
-  const cur=[];for(const p of [...studyPdfParts(),...parts]){const d=p.inlineData;
+  if(msgs.length>1){const l=msgs.at(-1).content;l[l.length-1]={...l[l.length-1],cache_control:{type:'ephemeral'}};}
+  const cur=[{type:'text',text:notaAhora(hora)}];for(const p of [...studyPdfParts(),...parts]){const d=p.inlineData;
     if(d&&/^image\//.test(d.mimeType))cur.push({type:'image',source:{type:'base64',media_type:d.mimeType,data:d.data}});
     else if(d&&d.mimeType==='application/pdf')cur.push({type:'document',source:{type:'base64',media_type:'application/pdf',data:d.data}});
     else if(p.text)cur.push({type:'text',text:p.text});}
@@ -150,8 +171,10 @@ function claudeFallo(e){const m=String(e.message||'');
 // ---------- el que decide ----------
 const _ask=ask;
 let preRec=null;
+const conTope=(pr,ms,tarde)=>new Promise(res=>{const t=setTimeout(()=>{tarde?.();res('');},ms);Promise.resolve(pr).then(v=>{clearTimeout(t);res(v||'');},()=>{clearTimeout(t);res('');});});
 ask=async(parts,onText)=>{
-  const rec=await (preRec||recordar(parts)).catch(()=>'');preRec=null;const p2=rec?[{text:rec},...parts]:parts;
+  // 2.28: buscar en los recuerdos no puede frenar la respuesta más de 1.2 s (antes hasta 4 s si el modelo de embeddings estaba dormido)
+  const rec=await conTope(preRec||recordar(parts),1200,()=>log('🧠 recuerdos: tardaron, contesto sin ellos','y'));preRec=null;const p2=rec?[{text:rec},...parts]:parts;
   if(rutaClaude(parts)){let dijo=false;try{return await claudeBrain(p2,x=>{dijo=true;onText(x);});}catch(e){if(dijo||esCorte(e))throw e;claudeFallo(e);}}
   if(rutaLocal(parts)){let dijo=false;try{return await local(p2,x=>{dijo=true;onText(x);});}catch(e){if(esCorte(e))throw e;log(String(e.message).slice(0,60),'w');if(dijo||!hayOtro())throw e;
       if(e.message==='LENTA')line('s','(Tu GPU tardó demasiado en contestar; te contesto con '+(hayNube()?'Gemini':'Claude')+'. Por 10 min la plática va directo ahí.)');
@@ -190,10 +213,11 @@ function hiloDe(txt){const u=sinAcento(String(txt).split('\nCapri:')[0]);
   if(/manana|pasado manana|tengo que|tengo cita|debo |recuerdame|pendiente|no se me olvide|el (lunes|martes|miercoles|jueves|viernes|sabado|domingo)|a las \d|entrega|planeo|voy a ir|la proxima semana/.test(u))return 'planes';
   if(/\bmi (mama|papa|madre|padre|herman|novi|amig|abuel|tio|tia|prim|pareja|esposa|esposo|hij|famil|jefe|compa)|me siento|estoy (triste|feliz|cansad|enojad|estresad|aburrid|nervios|ansios)|me gusta|odio|mi cumple|me paso|me dijo|me dijeron/.test(u))return 'personal';
   return 'dia';}
+let embedVivo=0;
 const norm=v=>{let n=0;for(const x of v)n+=x*x;n=Math.sqrt(n)||1;return Float32Array.from(v,x=>x/n);};
 // los embeddings van en el procesador (num_gpu 0) para no sacar de la tarjeta al modelo que platica: con 4 GB no caben los dos
 async function embed(texts){if(!ok||!cer.emb)return null;
-  const r=await fetch(OLL+'/api/embed',{method:'POST',body:JSON.stringify({model:cer.emb,input:texts,keep_alive:'30m',options:{num_gpu:0}}),signal:AbortSignal.timeout(4000)});
+  const r=await fetch(OLL+'/api/embed',{method:'POST',body:JSON.stringify({model:cer.emb,input:texts,keep_alive:VIVO,options:{num_gpu:0}}),signal:AbortSignal.timeout(4000)});embedVivo=Date.now();
   if(!r.ok)return null;const j=await r.json();return (j.embeddings||[]).map(norm);}
 const palabras=t=>new Set((t.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').match(/[a-zñ0-9]{4,}/g)||[]));
 const cos=(a,b)=>{let s=0;for(let i=0;i<a.length;i++)s+=a[i]*b[i];return s;};

@@ -12,13 +12,14 @@ const ponHist=(h,ts)=>{history=h;_set.call(store,'history',h);histTs=ts;_set.cal
 const H=()=>({'Content-Type':'application/json','X-Capri':'1',...(S.token?{'X-Capri-Token':S.token}:{})});
 const post=(r,b,ms=5000)=>fetch(S.url+r,{method:'POST',headers:H(),body:JSON.stringify(b),signal:AbortSignal.timeout(ms)}).then(x=>{if(!x.ok)throw new Error('cerebro '+x.status);return x.json();});
 // su personalidad tal cual, con un hueco donde el cerebro pone la memoria al día
-function persona(){try{const n=cfg.name||'Kiga',m=memoryPrompt(n),p=personality(n,'');return p.includes(m)?p.replace(m,'{{MEMORIA}}'):p;}catch(e){return '';}}
+// 2.28: sin lo «de ahorita» (hora, ánimo, fuentes de la última pregunta): el cerebro pone su propia hora y su memoria al día
+function persona(){try{const n=cfg.name||'Kiga',m=memoryPrompt(n),p=personality(n,'');return partePrompt(p.includes(m)?p.replace(m,'{{MEMORIA}}'):p).fijo;}catch(e){return '';}}
 const llave=h=>(h.t||'').trim().toLowerCase();
 async function sync(){
   if(!S.on||sinc)return;sinc=true;
   try{
     const enviados=new Set(M().hechos.map(llave));
-    const c={nombre:cfg.name||'Kiga',modelo:cfg.model||'',modelos:cfg.models||[],ollama_modelo:window.cerebroInfo?.().modelo||''};
+    const c={nombre:cfg.name||'Kiga',modelo:cfg.model||'',modelos:cfg.models||[],ollama_modelo:window.cerebroInfo?.().modelo||'',ollama_ctx:window.cerebroInfo?.().ctx||0};
     if(S.key)c.key=cfg.key||'';
     const j=await post('/api/sync',{dispositivo:S.dev,rev:S.rev||'',mem:mem,history:history.slice(-60),hist_ts:histTs,persona:persona(),cfg:c});
     if(!vivo){vivo=true;log('🧠 cerebro Python conectado','y');

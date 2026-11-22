@@ -151,7 +151,7 @@ async function prepara(q){ctx='';fuentes=[];if(!bib.on||!q||q.length<4||!docs.so
   fuentes=fuerte.map(o=>({nombre:o.t.nombre,pag:o.t.pag,text:o.t.text}));
   ctx=fuentes.map((f,i)=>`[B${i+1}] ${f.nombre}${f.pag?', p. '+f.pag:''}\n${f.text}`).join('\n\n');log('biblioteca: '+fuentes.length+' trozo(s) en '+Math.round(performance.now()-t0)+' ms','g');}
 const _prep=window.medPrepare;window.medPrepare=async q=>{await Promise.all([_prep?_prep(q):null,prepara(q).catch(()=>{})]);};  // en paralelo: no suma espera
-const _prompt=window.medPrompt;window.medPrompt=()=>(_prompt?_prompt():'')+(ctx?`
+const _prompt=window.medPrompt;window.medPrompt=()=>(_prompt?_prompt():'')+alFinal(ctx?`
 
 BIBLIOTECA DE ${(cfg.name||'Kiga').toUpperCase()}${foco?' (está platicando contigo del documento «'+foco.name+'»)':''}
 Si la pregunta tiene que ver con estos trozos de sus documentos, apóyate en ellos y cita así, sin markdown: (nombre del documento, p. N). Si no vienen al caso, ignóralos sin mencionarlos. No inventes lo que no dicen. Son solo algunos trozos, no el documento entero: no los presentes como resumen completo.

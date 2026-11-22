@@ -103,9 +103,8 @@ function mundoBlock(n){if(!mu.on)return '';
   let s=`\n\nENLACE SATELITAL (módulo Mundo: clima, mapa, tráfico y cámaras públicas)`;
   s+=mu.lugar?`\nLugar de ${n}: ${mu.lugar.nombre}.`:`\nTodavía no sabes dónde está ${n}: si pregunta por clima o tráfico, pídele que te dé permiso de ubicación o te diga su colonia/ciudad en el panel Mundo.`;
   const c=cache.clima,f=cache.flujo,i=cache.inc;const fresco=x=>x&&Date.now()-x.ts<40*60000;
-  if(fresco(c))s+=`\nClima (Open-Meteo, ${new Date(c.ts).toTimeString().slice(0,5)}): ${c.txt}`;
-  if(fresco(f))s+=`\nTráfico cerca (TomTom): ${f.txt}.`;
-  if(fresco(i))s+=`\nIncidentes viales (TomTom): ${i.txt}.`;
+  const vivo=(fresco(c)?`\nClima (Open-Meteo, ${new Date(c.ts).toTimeString().slice(0,5)}): ${c.txt}`:'')+(fresco(f)?`\nTráfico cerca (TomTom): ${f.txt}.`:'')+(fresco(i)?`\nIncidentes viales (TomTom): ${i.txt}.`:'');
+  s+=alFinal(vivo&&'ENLACE SATELITAL, DATOS DE AHORITA:'+vivo);   // 2.28: cambian seguido, van con la pregunta
   if(!mu.tt)s+=`\nNo tienes llave de TomTom: no puedes leer el tráfico tú misma, pero puedes abrirle el mapa de Waze en vivo con <<mundo: mapa | lugar>> para que lo vea.`;
   s+=`\nPara consultar algo, escribe al final en su propia línea:
 <<mundo: clima | lugar>>  pronóstico de otro lugar (o del suyo si lo dejas vacío)

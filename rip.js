@@ -44,7 +44,7 @@ async function preparaOfi(q){ofiCtx='';ofiFuentes=[];if(!q||q.length<6||!SALUD.t
     return `[O${i+1}] ${o.tipo} ${o.clave||''}${o.anio?', '+o.anio:''}${viejo?' (de hace más de 5 años)':''} — «${f.d.name}»${f.pag?', p. '+f.pag:''}\n${f.text}`;}).join('\n\n');
   log('R.I.P: '+ofiFuentes.length+' trozo(s) de fuentes oficiales','g');}
 const _prep=window.medPrepare;window.medPrepare=async q=>{await Promise.all([_prep?_prep(q):null,preparaOfi(q).catch(()=>{})]);};
-const _prompt=window.medPrompt;window.medPrompt=()=>(_prompt?_prompt():'')+(ofiCtx?`
+const _prompt=window.medPrompt;window.medPrompt=()=>(_prompt?_prompt():'')+alFinal(ofiCtx?`
 
 FUENTES OFICIALES DE MÉXICO QUE ${(cfg.name||'Kiga').toUpperCase()} CARGÓ EN R.I.P (mandan sobre tu memoria)
 - Para dosis, criterios, tratamientos y normas, lo que digan estas fuentes va primero. Cítalas así, sin markdown: (GPC IMSS-000-00, 2020, p. N) o (NOM-000-SSA0-0000, p. N).
@@ -297,22 +297,33 @@ ${(r.cnis||[]).map(c=>c.cita+': '+c.text.slice(0,500)).join('\n')}`;
 
 // ================= LECTOR DE ESCANEOS (OCR local) =================
 const OCR_DIR=()=>new URL('vendor/ocr/',location.href).href;
-let tw=null,twT=0;
+// 2.28: hasta 2 lectores a la vez si la PC tiene 4 núcleos o más (un PDF escaneado se lee ~2× más rápido)
+const OCR_MAX=Math.max(1,Math.min(2,Math.floor((navigator.hardwareConcurrency||2)/2)));
+window.ocrHilos=()=>OCR_MAX;
+let pool=[],twT=0;const espera=[];
+function nuevo(e){const d=OCR_DIR();
+  e.w=Tesseract.createWorker('spa+eng',1,{workerPath:d+'worker.min.js',corePath:d,langPath:d,workerBlobURL:false,gzip:true,cacheMethod:'none',
+    logger:m=>{if(m.status==='recognizing text'&&e.av)e.av('Leyendo… '+Math.round(m.progress*100)+'%');}});
+  e.w.catch(()=>{pool=pool.filter(x=>x!==e);});}   // si no pudo arrancar, la siguiente vez se intenta de nuevo
 async function worker(av){if(!window.Tesseract)await loadScript('vendor/ocr/tesseract.min.js');
-  if(!tw){av?.('Despertando el lector (la primera vez tarda unos segundos)…');const d=OCR_DIR();
-    tw=Tesseract.createWorker('spa+eng',1,{workerPath:d+'worker.min.js',corePath:d,langPath:d,workerBlobURL:false,gzip:true,cacheMethod:'none',
-      logger:m=>{if(m.status==='recognizing text'&&av)av('Leyendo… '+Math.round(m.progress*100)+'%');}});}
-  clearTimeout(twT);twT=setTimeout(async()=>{const w=await tw;tw=null;w.terminate();},120000);return tw;}
-async function reconoce(img,av){const w=await worker(av);const {data}=await w.recognize(img);
+  clearTimeout(twT);
+  let e=pool.find(x=>!x.ocupado);
+  if(!e&&pool.length<OCR_MAX){if(!pool.length)av?.('Despertando el lector (la primera vez tarda unos segundos)…');e={ocupado:false};nuevo(e);pool.push(e);}
+  if(!e)e=await new Promise(r=>espera.push(r));
+  e.ocupado=true;e.av=av;return e;}
+function suelta(e){e.ocupado=false;e.av=null;const sig=espera.shift();if(sig)return sig(e);
+  if(pool.every(x=>!x.ocupado)){clearTimeout(twT);twT=setTimeout(async()=>{const ps=pool;pool=[];for(const x of ps)try{(await x.w).terminate();}catch(_){}},120000);}}
+async function reconoce(img,av){const e=await worker(av);let data;try{({data}=await (await e.w).recognize(img));}finally{suelta(e);}
   const ws=(data.words||[]).map(x=>({t:x.text,c:x.confidence}));return {text:data.text||'',conf:data.confidence||0,ws};}
 async function ocrLocal(buf,mime,av=()=>{}){
   if(/heic|heif/.test(mime||''))throw new Error('las fotos HEIC del iPhone no las abre el lector; pásala a JPG o mándala por WhatsApp a tu PC.');
   if(mime==='application/pdf'){if(!window.pdfjsLib)await pdfText(new ArrayBuffer(0)).catch(()=>{});   // carga pdf.js como lo hace Capri
-    const pdf=await pdfjsLib.getDocument({data:buf.slice(0)}).promise;let text='',sum=0,ws=[];
-    for(let i=1;i<=pdf.numPages;i++){av('Página '+i+' de '+pdf.numPages+'…');const pg=await pdf.getPage(i),vp=pg.getViewport({scale:2});
+    const pdf=await pdfjsLib.getDocument({data:buf.slice(0)}).promise,N=pdf.numPages,res=new Array(N);let listas=0;
+    await enParalelo(Array.from({length:N},(_,i)=>i+1),OCR_MAX,async i=>{av('Página '+i+' de '+N+'…');const pg=await pdf.getPage(i),vp=pg.getViewport({scale:2});
       const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
-      const r=await reconoce(c,m=>av('Página '+i+'/'+pdf.numPages+' · '+m));text+=`\n[Página ${i}]\n`+r.text;sum+=r.conf;ws.push(...r.ws);}
-    return {text:text.trim(),conf:sum/Math.max(1,pdf.numPages),ws};}
+      res[i-1]=await reconoce(c,m=>av('Página '+i+'/'+N+' · '+m+(OCR_MAX>1?' ('+listas+' listas)':'')));c.width=c.height=0;listas++;});
+    const text=res.map((r,i)=>`\n[Página ${i+1}]\n`+r.text).join(''),sum=res.reduce((a,r)=>a+r.conf,0),ws=res.flatMap(r=>r.ws);
+    return {text:text.trim(),conf:sum/Math.max(1,N),ws};}
   return reconoce(new Blob([buf],{type:mime||'image/png'}),av);}
 window.ocrLocal=ocrLocal;window.ocrImagen=reconoce;   // una sola página (canvas o imagen): la lectura completa de PDFs la usa para las páginas sin texto
 let ocrRes=null;
