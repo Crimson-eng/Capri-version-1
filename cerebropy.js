@@ -20,7 +20,7 @@ async function sync(){
   try{
     const enviados=new Set(M().hechos.map(llave));
     const c={nombre:cfg.name||'Kiga',modelo:cfg.model||'',modelos:cfg.models||[],ollama_modelo:window.cerebroInfo?.().modelo||'',ollama_ctx:window.cerebroInfo?.().ctx||0};
-    if(S.key)c.key=cfg.key||'';
+    if(S.key){c.key=cfg.key||'';for(const n of ['groq','openrouter']){c[n+'_key']=cfg.nubes?.[n]?.key||'';c[n+'_modelo']=cfg.nubes?.[n]?.modelo||'';}}   // 2.29: y las de respaldo
     const j=await post('/api/sync',{dispositivo:S.dev,rev:S.rev||'',mem:mem,history:history.slice(-60),hist_ts:histTs,persona:persona(),cfg:c});
     if(!vivo){vivo=true;log('🧠 cerebro Python conectado','y');
       if(!store.get('cerebroPyAviso',false)){_set.call(store,'cerebroPyAviso',true);
@@ -52,7 +52,8 @@ window.cerebroPySync=()=>sync();
 // «en: <texto>» lo manda ahí siempre, aunque la IA esté prendida. «quiz: <pregunta con incisos>» la resuelve el profe de reglas.
 function sinIA(){const ci=window.cerebroInfo?.()||{},red=navigator.onLine!==false;
   const gem=!!(cfg.key&&cfg.model)&&red,loc=!!(ci.ok&&ci.modelo&&ci.modo!=='gemini'),cla=!!(ci.claude&&ci.claudeKey)&&red;
-  return !gem&&!loc&&!cla;}
+  const nub=!!ci.nubes?.length&&red;   // 2.29: Groq / OpenRouter
+  return !gem&&!loc&&!cla&&!nub;}
 window.capriSinIA=sinIA;
 const EN_CMD=/^(?:en|ingl[eé]s sin ia|english)\s*:\s*([\s\S]+)$/i;
 const QUIZ_CMD=/^(?:quiz|resuelve)\s*:\s*([\s\S]+)$/i;
@@ -78,7 +79,7 @@ send=async v=>{const t=(v||'').trim(),k=t.toLowerCase();
   if(!busy&&t&&vivo&&!mEn&&!/^(cerebro|help|limpiar|recuerdos|olvida |ajustes|estudio|m[eé]dico|sal|fragmentos|despierta )/i.test(k)&&sinIA()
      &&await inglesSinIA(t,t,false))return;
   if(/^cerebro(\s+(key|abrir|url|apagar|prender)\b.*)?$/.test(k)&&!busy){line('u',t);const a=t.split(/\s+/).slice(1);const sub=(a[0]||'').toLowerCase();line('c','CAPRI');
-    if(sub==='key'){S.key=/^(s[ií]|si|yes|on)$/i.test(a[1]||'');guarda();if(!S.key&&vivo)post('/api/sync',{dispositivo:S.dev,cfg:{key:''}}).catch(()=>{});sync();
+    if(sub==='key'){S.key=/^(s[ií]|si|yes|on)$/i.test(a[1]||'');guarda();if(!S.key&&vivo)post('/api/sync',{dispositivo:S.dev,cfg:{key:'',groq_key:'',openrouter_key:''}}).catch(()=>{});sync();
       return line('t',S.key?'ok, le paso tu key a mi cerebro. Se queda solo en tu PC'+(navigator.platform.startsWith('Win')?' (cifrada con tu usuario de Windows)':'')+'. Con eso te hablo aunque cierres mi ventana >:)':'listo, le quité tu key a mi cerebro. Si tienes Ollama, piensa con eso.');}
     if(sub==='abrir'){window.open(S.url+'/','_blank');return line('t','te abro mi cerebro en el navegador~');}
     if(sub==='url'&&a[1]){S.url=a[1].replace(/\/+$/,'');S.token=(a[2]||'').toUpperCase();guarda();vivo=false;sync();return line('t','ok, ahora busco mi cerebro en '+S.url+'.');}

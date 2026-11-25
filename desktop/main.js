@@ -240,6 +240,23 @@ app.on('before-quit', (e) => {
   vaciarBoveda().then(() => app.quit());
 });
 const sesionCapri = () => BOVEDA_ON ? session.fromPartition('capri-ram') : session.defaultSession;
+// 2.29: cerebros de respaldo (Groq, OpenRouter). Capri les habla directo desde la página; si alguno dejara de mandar el
+// permiso CORS, aquí se lo ponemos (solo si falta: si se repite el navegador lo rechaza).
+const NUBES_URLS = ['https://api.groq.com/*', 'https://openrouter.ai/*'];
+const corsListo = new WeakSet();
+function corsNubes(ses) {
+  if (corsListo.has(ses)) return; corsListo.add(ses);
+  ses.webRequest.onHeadersReceived({ urls: NUBES_URLS }, (d, cb) => {
+    const h = d.responseHeaders || {}, tiene = k => Object.keys(h).some(x => x.toLowerCase() === k);
+    if (!tiene('access-control-allow-origin')) {
+      h['Access-Control-Allow-Origin'] = ['*'];
+      h['Access-Control-Allow-Headers'] = ['authorization, content-type, x-title, http-referer'];
+      h['Access-Control-Allow-Methods'] = ['GET, POST, OPTIONS'];
+      if (d.method === 'OPTIONS') return cb({ responseHeaders: h, statusLine: 'HTTP/1.1 204 No Content' });
+    }
+    cb({ responseHeaders: h });
+  });
+}
 app.setAppUserModelId('com.crimson.capri');
 
 function deskURL() {
@@ -278,6 +295,7 @@ function createWindow() {
   });
   setMode('desk');
   proteger(win);
+  try { corsNubes(win.webContents.session); } catch (e) {}
   // con bóveda, primero la pantalla de la llave; ella abre a Capri ya descifrada
   win.loadURL(BOVEDA_ON ? CAPRI_URL + 'boveda.html?next=' + encodeURIComponent(deskURL()) : deskURL());
   win.webContents.on('did-navigate', () => { escucha = false; });
