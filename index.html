@@ -914,14 +914,18 @@ async function streamModel(model,parts,onText){
       try{const j=JSON.parse(ln.slice(5));const c=j.candidates?.[0];if(c?.finishReason)finish=c.finishReason;
         const t=(c?.content?.parts||[]).filter(p=>!p.thought&&p.text).map(p=>p.text).join('');if(t){full+=t;onText(t);}}catch(_){}}}
   if(!full.trim())throw new Error(finish==='SAFETY'||finish==='PROHIBITED_CONTENT'?'SAFETY':'EMPTY');return full;}
+// 2.28.1: Google a veces contesta 500/503 («model is overloaded») un rato. Antes eso iba directo a tu GPU sin reintentar
+// ni probar otro modelo de Gemini; ahora reintenta una vez y, si sigue, prueba otros modelos igual que cuando no hay cupo.
+const gemSaturado=e=>e?.status>=500&&e.status<600;
 async function ask(parts,onText){if(!cfg.key||!cfg.model)throw new Error('NOKEY');
-  try{return await streamModel(cfg.model,parts,onText);}
-  catch(e){if(e.status!==429&&e.status!==404)throw e;let models=cfg.models?.length?cfg.models:[];
+  try{try{return await streamModel(cfg.model,parts,onText);}
+    catch(e){if(!gemSaturado(e))throw e;log('Gemini '+e.status+' ('+String(e.message).slice(0,40)+'): reintento','y');await capriEspera(1500);return await streamModel(cfg.model,parts,onText);}}
+  catch(e){if(e.status!==429&&e.status!==404&&!gemSaturado(e))throw e;let models=cfg.models?.length?cfg.models:[];
     if(!models.length){try{models=await listModels(cfg.key);cfg.models=models;}catch(_){throw e;}}
     const tried=new Set([cfg.model]);
-    for(const m of rankForFree(models)){if(tried.has(m))continue;tried.add(m);if(tried.size>6)break;line('s','(Modelo sin cupo… probando '+m+')');
+    for(const m of rankForFree(models)){if(tried.has(m))continue;tried.add(m);if(tried.size>6)break;line('s','('+(gemSaturado(e)?'Gemini saturado ('+e.status+')':'Modelo sin cupo')+'… probando '+m+')');
       try{const t=await streamModel(m,parts,onText);cfg.model=m;store.set('cfg',cfg);$('mdl').textContent=m;line('s','(✔ Ahora uso '+m+')');return t;}
-      catch(e2){if(e2.status!==429&&e2.status!==404)throw e2;e=e2;}}throw e;}}
+      catch(e2){if(e2.status!==429&&e2.status!==404&&!gemSaturado(e2))throw e2;e=e2;}}throw e;}}
 
 // ================= SEGUNDA OPINIÓN (Claude) =================
 // Llama a la API de Claude directo desde el navegador con la key de console.anthropic.com (se guarda solo aquí).

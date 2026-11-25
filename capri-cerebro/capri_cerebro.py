@@ -473,10 +473,50 @@ def ollama_modelo(cfg):
         return ''
 
 
+def _tok(t):
+    t = str(t or '')
+    d = sum(ch.isdigit() for ch in t)
+    return (len(t) - d) // 3 + d + 1
+
+
+def _corta(t, n, cola=False):
+    t = str(t or '')
+    if _tok(t) <= n:
+        return t
+    c = min(len(t), max(0, n) * 3)
+    for _ in range(12):
+        r = ('…' + t[-c:]) if cola else (t[:c] + '\n…')
+        if _tok(r) <= n:
+            return r
+        c = int(c * .85)
+    return ''
+
+
+def cabe_en_ctx(sis, conv, ctx, reserva=780):
+    """2.28.1: que el prompt nunca pase del contexto de la GPU (Ollama truena con «the prompt is longer than the context
+    length»). Primero quita mensajes viejos; luego recorta la personalidad dejando su principio y lo de ahorita (va al final)."""
+    conv = list(conv)
+    total = lambda: _tok(sis) + sum(_tok(c['text']) + 4 for c in conv) + reserva
+    while len(conv) > 1 and total() > ctx:
+        conv.pop(0)
+    if total() > ctx and conv:
+        ult = dict(conv[-1])
+        ult['text'] = _corta(ult['text'], max(150, int((ctx - reserva) * .4)), cola=True)
+        conv[-1] = ult
+    lugar = ctx - reserva - sum(_tok(c['text']) + 4 for c in conv)
+    if _tok(sis) > lugar:
+        fin = _corta(sis, max(0, int(lugar * .3)), cola=True)
+        sis = _corta(sis, max(0, lugar - _tok(fin))) + '\n' + fin
+    return sis, conv
+
+
 def ollama(cfg, sis, conv):
     modelo = ollama_modelo(cfg)
     if not modelo:
         raise RuntimeError('Ollama no está o no tiene modelos')
+    ctx = int(cfg.get('ollama_ctx') or 0)
+    if ctx >= 1024:
+        sis, conv = cabe_en_ctx(sis, conv, ctx)
     msgs = [{'role': 'system', 'content': sis}] + [{'role': 'assistant' if c['role'] == 'model' else 'user', 'content': c['text']} for c in conv]
     # 2.28: mismo tamaño de contexto que la app y que se quede cargado: si no, Ollama recarga el modelo entero (segundos)
     # cada vez que la app y el cerebro se turnan la GPU
