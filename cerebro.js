@@ -77,26 +77,42 @@ function sysPrompt(){
 //    Ahora se mide antes: se quitan mensajes viejos de la plática y, si aun así no cabe, contesta otro cerebro.
 // b) si la GPU no suelta la primera palabra a tiempo (ocupada, lenta o atorada), se corta y contesta Gemini/Claude,
 //    y por 10 min la plática va directo a ellos. Antes solo cambiaba de cerebro si Ollama daba error, nunca por lento.
-const tok=s=>Math.ceil(String(s||'').length/3);            // aprox. conservadora para español con gemma/llama
-const GPU_ESPERA={caliente:20e3,fria:45e3},GPU_PAUSA=10*60e3,RESERVA=700;   // RESERVA: lugar para lo que contesta
+// 2.28.1: los números cuentan como 1 token por dígito en gemma (clima, horas, coordenadas…): antes se contaban como 1/3
+const tok=s=>{s=String(s||'');const d=(s.match(/[0-9]/g)||[]).length;return Math.ceil((s.length-d)/3+d);};
+// recorta un texto hasta que quepa en n tokens (desde el principio, o desde el final si cola=true)
+function cabe(s,n,cola){s=String(s||'');if(tok(s)<=n)return s;if(n<=8)return '';let c=Math.min(s.length,n*3);
+  for(let i=0;i<12;i++){const t=cola?'…'+s.slice(-c):s.slice(0,c)+'\n…';if(tok(t)<=n)return t;c=Math.floor(c*.85);}return '';}
+const GPU_ESPERA={caliente:20e3,fria:45e3},GPU_PAUSA=10*60e3,RESERVA=700,MARCO=80;   // MARCO: lo que agrega la plantilla de chat de Ollama   // RESERVA: lugar para lo que contesta
 let gpuLentaHasta=0;
 const hayNube=()=>!!(cfg.key&&cfg.model)&&navigator.onLine!==false;
 const hayOtro=()=>hayNube()||(claudeOk()&&!window.cerebroSinGasto);
 // arma lo que lee tu GPU: system fijo + plática + (lo de ahorita y la pregunta)
-function armaGPU(parts,otro){
+// 2.28.1 — «the prompt is longer than the context length»: desde 2.28 lo de ahorita (hora, ánimo, clima, fuentes, biblioteca,
+// recuerdos…) va junto a la pregunta, y eso NUNCA se recortaba: solo se recortaba la personalidad. Con el contexto de tu GPU
+// en 2048 bastaba poco para pasarse y Ollama tronaba (sobre todo cuando Gemini falla y tu GPU tiene que contestar sí o sí).
+// Ahora TODO se mide y se reparte: primero tu pregunta, luego lo de ahorita, luego su personalidad. Nunca se pasa del contexto.
+// apretar<1 deja más margen (si aun así Ollama dice que no cupo, se vuelve a armar más chico).
+function armaGPU(parts,otro,apretar=1){
   window.fragTope=2500;let sp;try{sp=sysPrompt();}finally{window.fragTope=0;}   // en la GPU el contexto es chico: del constructo que se asoma va lo esencial
-  const ctx=ctxDe(),sys=sp[0],preg=notaAhora(sp[1])+'\n\n'+parts.filter(p=>p.text).map(p=>p.text).join('\n');
+  const ctx=ctxDe(),lim=Math.floor(ctx*apretar),sys=sp[0];let ahora=sp[1],usr=parts.filter(p=>p.text).map(p=>p.text).join('\n');
+  const preg=()=>notaAhora(ahora)+'\n\n'+usr;
   // la plática se recorta de 4 en 4 mensajes (no de uno en uno) para que el principio se repita y Ollama lo reuse
-  let hist=ventanaHist(history,12,4);const total=()=>tok(sys)+tok(preg)+hist.reduce((a,h)=>a+tok(h.text)+4,0)+RESERVA;
-  while(hist.length>2&&total()>ctx)hist=hist.slice(Math.min(4,hist.length-2));
+  let hist=ventanaHist(history,12,4);const total=()=>tok(sys)+tok(preg())+hist.reduce((a,h)=>a+tok(h.text)+4,0)+RESERVA+MARCO;
+  while(hist.length>2&&total()>lim)hist=hist.slice(Math.min(4,hist.length-2));
   let sysUsa=sys;
-  if(total()>ctx){if(otro)throw new Error('NOCABE');   // no cabe en tu GPU: mejor que conteste Gemini/Claude completo
-    hist=[];const lugar=Math.max(1200,(ctx-tok(preg)-RESERVA)*3);sysUsa=sys.slice(0,lugar-40)+'\n…';}   // sin otro cerebro: lo esencial de ella
+  if(total()>lim){if(otro)throw new Error('NOCABE');   // no cabe en tu GPU: mejor que conteste Gemini/Claude completo
+    hist=[];   // sin otro cerebro: lo esencial de cada parte, sin pasarse
+    const B=Math.max(300,lim-RESERVA-MARCO-tok(notaAhora('')));
+    const uB=Math.min(tok(usr),Math.floor(B*.4));usr=cabe(usr,uB,true);          // tu pregunta va al final: se queda la cola
+    const resto=B-tok(usr),sB0=Math.min(tok(sys),Math.floor(resto*.55));
+    ahora=cabe(ahora,resto-sB0);sysUsa=cabe(sys,resto-tok(ahora));
+    log('🧠 tu GPU tiene contexto '+ctx+': le mandé lo esencial (personalidad '+tok(sysUsa)+', ahorita '+tok(ahora)+', pregunta '+tok(usr)+' tokens)','y');}
   const msgs=[{role:'system',content:sysUsa}];
   for(const h of hist)msgs.push({role:h.role==='model'?'assistant':'user',content:h.text});
-  msgs.push({role:'user',content:preg});
+  msgs.push({role:'user',content:preg()});
   const m2=[];for(const m of msgs){const l=m2[m2.length-1];if(l&&l.role===m.role&&m.role!=='system')l.content+='\n'+m.content;else m2.push({...m});}
   return {m2,ctx,firma:firma(sysUsa,hist)};}
+const noCupo=e=>/context length|longer than the context|exceeds the context|context window/i.test(String(e?.message||e||''));
 // huella corta de lo que ya leyó tu GPU (para no precargar dos veces lo mismo)
 function firma(sys,hist){let h=5381;const t=sys+hist.map(x=>x.text).join('\u0001');for(let i=0;i<t.length;i++)h=(h*33^t.charCodeAt(i))>>>0;return t.length+':'+h;}
 let prefijoGPU='',precargando=null,precargaTs=0;
@@ -114,7 +130,13 @@ window.cerebroPrecarga=precargaGPU;
 {let tq=0;const qi=document.getElementById('q');qi?.addEventListener('input',()=>{clearTimeout(tq);if(qi.value.trim().length<2)return;
   tq=setTimeout(()=>{precargaGPU();if(ok&&cer.emb&&cer.aprende&&Date.now()-embedVivo>100*60e3&&mems.some(m=>m.v))embed(['.']).catch(()=>{});},350);});}   // y despierta el buscador de recuerdos
 async function local(parts,onText,opc={}){
-  const otro=opc.otro??hayOtro(),{m2,ctx,firma:fi}=armaGPU(parts,otro);prefijoGPU=fi;
+  const otro=opc.otro??hayOtro();
+  // 2.28.1: si Ollama aun así dice que no cupo (su conteo real es distinto), se vuelve a armar más chico en vez de tronar
+  try{return await local1(parts,onText,otro,opc.apretar||1);}
+  catch(e){if(!noCupo(e))throw e;if(otro)throw new Error('NOCABE');const ap=(opc.apretar||1)*.6;if(ap<.2)throw e;
+    log('🧠 Ollama dijo que no cupo: lo armo más chico','y');return local(parts,onText,{...opc,otro,apretar:ap});}}
+async function local1(parts,onText,otro,apretar){
+  const {m2,ctx,firma:fi}=armaGPU(parts,otro,apretar);prefijoGPU=fi;
   const body={model:cer.modelo,messages:m2,stream:true,keep_alive:VIVO,options:{temperature:1,num_ctx:ctx}};
   if(/qwen3|deepseek-r1/i.test(cer.modelo))body.think=false;
   // tope para la primera palabra (solo si hay otro cerebro que pueda contestar)
@@ -186,7 +208,8 @@ ask=async(parts,onText)=>{
     if(!algo&&caido&&claudeOk()&&!window.cerebroSinGasto&&!parts.some(p=>p.inlineData&&/^audio/.test(p.inlineData.mimeType))){
       line('s','(Gemini no respondió; te contesto con Claude.)');try{return await claudeBrain(p2,onText);}catch(e2){claudeFallo(e2);}}
     if(algo||!caido||!listo()||cer.modo==='gemini'||parts.some(p=>p.inlineData))throw e;
-    line('s','(Gemini no respondió'+(e.status===429?' (sin cupo)':e instanceof TypeError?' (sin internet)':'')+'; te contesto con el cerebro de tu GPU.)');
+    line('s','(Gemini no respondió'+(e.status===429?' (sin cupo)':e instanceof TypeError?' (sin internet)':e.status>=500?' (Google saturado, '+e.status+')':e.message==='NOKEY'?' (falta su key)':e.status?' ('+e.status+')':'')+'; te contesto con el cerebro de tu GPU.)');
+    log('Gemini: '+(e.status||'')+' '+String(e.message).slice(0,120),'w');
     return local(p2,onText,{otro:false});}};
 const _respond=respond;
 // la búsqueda en recuerdos arranca ya, en paralelo con las fuentes médicas y la biblioteca, en vez de esperar a que terminen

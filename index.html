@@ -914,14 +914,18 @@ async function streamModel(model,parts,onText){
       try{const j=JSON.parse(ln.slice(5));const c=j.candidates?.[0];if(c?.finishReason)finish=c.finishReason;
         const t=(c?.content?.parts||[]).filter(p=>!p.thought&&p.text).map(p=>p.text).join('');if(t){full+=t;onText(t);}}catch(_){}}}
   if(!full.trim())throw new Error(finish==='SAFETY'||finish==='PROHIBITED_CONTENT'?'SAFETY':'EMPTY');return full;}
+// 2.28.1: Google a veces contesta 500/503 («model is overloaded») un rato. Antes eso iba directo a tu GPU sin reintentar
+// ni probar otro modelo de Gemini; ahora reintenta una vez y, si sigue, prueba otros modelos igual que cuando no hay cupo.
+const gemSaturado=e=>e?.status>=500&&e.status<600;
 async function ask(parts,onText){if(!cfg.key||!cfg.model)throw new Error('NOKEY');
-  try{return await streamModel(cfg.model,parts,onText);}
-  catch(e){if(e.status!==429&&e.status!==404)throw e;let models=cfg.models?.length?cfg.models:[];
+  try{try{return await streamModel(cfg.model,parts,onText);}
+    catch(e){if(!gemSaturado(e))throw e;log('Gemini '+e.status+' ('+String(e.message).slice(0,40)+'): reintento','y');await capriEspera(1500);return await streamModel(cfg.model,parts,onText);}}
+  catch(e){if(e.status!==429&&e.status!==404&&!gemSaturado(e))throw e;let models=cfg.models?.length?cfg.models:[];
     if(!models.length){try{models=await listModels(cfg.key);cfg.models=models;}catch(_){throw e;}}
     const tried=new Set([cfg.model]);
-    for(const m of rankForFree(models)){if(tried.has(m))continue;tried.add(m);if(tried.size>6)break;line('s','(Modelo sin cupo… probando '+m+')');
+    for(const m of rankForFree(models)){if(tried.has(m))continue;tried.add(m);if(tried.size>6)break;line('s','('+(gemSaturado(e)?'Gemini saturado ('+e.status+')':'Modelo sin cupo')+'… probando '+m+')');
       try{const t=await streamModel(m,parts,onText);cfg.model=m;store.set('cfg',cfg);$('mdl').textContent=m;line('s','(✔ Ahora uso '+m+')');return t;}
-      catch(e2){if(e2.status!==429&&e2.status!==404)throw e2;e=e2;}}throw e;}}
+      catch(e2){if(e2.status!==429&&e2.status!==404&&!gemSaturado(e2))throw e2;e=e2;}}throw e;}}
 
 // ================= SEGUNDA OPINIÓN (Claude) =================
 // Llama a la API de Claude directo desde el navegador con la key de console.anthropic.com (se guarda solo aquí).
@@ -1370,4 +1374,4 @@ if(DESK){if(cfg.key&&cfg.model)minimize();else expand();}
 autoConectar();
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 </script>
-<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="redaccion.js"></script><script src="crimson.js"></script><script src="tecnico.js"></script><script src="saber.js"></script><script src="clinica.js"></script><script src="mundo.js"></script><script src="expediente.js"></script><script src="biblioteca.js"></script><script src="rip.js"></script><script src="receta.js"></script><script src="lectura.js"></script><script src="vozlocal.js"></script><script src="vozid.js"></script><script src="voz.js"></script><script src="vozlab.js"></script><script src="grabadora.js"></script><script src="rvc.js"></script><script src="canto.js"></script><script src="cerebro.js"></script><script src="aprende.js"></script><script src="hilos.js"></script><script src="asocia.js"></script><script src="cerebropy.js"></script><script src="hud.js"></script><script src="relic.js"></script><script src="toefl.js"></script><script src="sigilo.js"></script><script src="desk.js"></script><script src="interfaz.js"></script></body></html>
+<script src="medico.js"></script><script src="ingles.js"></script><script src="manos.js"></script><script src="redaccion.js"></script><script src="crimson.js"></script><script src="tecnico.js"></script><script src="saber.js"></script><script src="clinica.js"></script><script src="mundo.js"></script><script src="expediente.js"></script><script src="biblioteca.js"></script><script src="rip.js"></script><script src="receta.js"></script><script src="lectura.js"></script><script src="vozlocal.js"></script><script src="vozid.js"></script><script src="voz.js"></script><script src="vozlab.js"></script><script src="grabadora.js"></script><script src="rvc.js"></script><script src="canto.js"></script><script src="cerebro.js"></script><script src="aprende.js"></script><script src="hilos.js"></script><script src="asocia.js"></script><script src="cerebropy.js"></script><script src="hud.js"></script><script src="relic.js"></script><script src="toefl.js"></script><script src="sigilo.js"></script><script src="desk.js"></script><script src="interfaz.js"></script><script src="registro.js"></script></body></html>
