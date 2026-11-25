@@ -122,6 +122,7 @@ function comandos(){const c=[];const add=(n,d,kw,run,ok=true)=>ok&&c.push({k:'c:
   add('Resolver quiz de inglés','pega la pregunta con incisos: cuál es la correcta y por qué','quiz inciso respuesta correcta opcion multiple examen gramatica toefl',()=>window.toeflQuiz?.(),!!window.toeflQuiz);
   add('Voz de Capri','RELIC → Voz: motor, afinar, entrenar','voz rvc piper cantar',()=>window.relicAbrir?.(4),!!window.relicAbrir);
   add(ui.ligero?'Apagar modo ligero':'Modo ligero','menos efectos, más rápido','ligero rapido lento rendimiento efectos',()=>ligero(!ui.ligero));
+  add('Registro','lo que hace Capri por dentro, en grande (Ctrl+Shift+L)','registro log errores avisos sistema consola depurar',()=>window.registroAbrir?.(),!!window.registroAbrir);
   add('Esconder a Capri','como Ctrl+Alt+H','sigilo esconder ocultar compartir',()=>$('sigiloChip')?.click(),!!$('sigiloChip')&&!!window.capriDesk);
   for(const s of seccionesAj())add('Ajustes: '+s.n,'abre Ajustes en esa sección','ajustes '+s.kw,()=>abreAj(s.n));
   return c;}
