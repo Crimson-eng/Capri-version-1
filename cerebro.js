@@ -50,7 +50,7 @@ window.cerebroJSON=async(system,user)=>{if(!listo())return null;
   const r=await fetch(OLL+'/api/chat',{method:'POST',body:JSON.stringify(body),signal:window.capriSenal?.(180000)||AbortSignal.timeout(180000)});if(!r.ok)throw new Error('GPU: Error '+r.status);
   const j=await r.json();const t=(j.message?.content||'').replace(/<think>[\s\S]*?<\/think>/g,'').trim();try{return JSON.parse(t);}catch(e){throw new Error('la GPU no devolvió JSON válido');}};
 const listo=()=>ok&&!!cer.modelo;
-window.cerebroInfo=()=>({ok,modelo:cer.modelo,ctx:ctxDe(),modo:cer.modo,emb:cer.emb,mems:mems.length,ultimo,claude:cer.claude,claudeKey:!!cfg.claudeKey,gasto:claudeSpent,tope:cer.tope});
+window.cerebroInfo=()=>({nubes:nubesListas(),ok,modelo:cer.modelo,ctx:ctxDe(),modo:cer.modo,emb:cer.emb,mems:mems.length,ultimo,claude:cer.claude,claudeKey:!!cfg.claudeKey,gasto:claudeSpent,tope:cer.tope});
 
 // ---------- ¿quién contesta? ----------
 const PESADO=/\b(explica|expl[ií]came|analiza|resume|resumen|c[oó]digo|programa|script|traduce|examen|investiga|compara|calcula|ecuaci[oó]n|ensayo|tarea|redacta|escr[ií]beme)\b|por qu[eé]|c[oó]mo funciona/i;
@@ -85,33 +85,38 @@ function cabe(s,n,cola){s=String(s||'');if(tok(s)<=n)return s;if(n<=8)return '';
 const GPU_ESPERA={caliente:20e3,fria:45e3},GPU_PAUSA=10*60e3,RESERVA=700,MARCO=80;   // MARCO: lo que agrega la plantilla de chat de Ollama   // RESERVA: lugar para lo que contesta
 let gpuLentaHasta=0;
 const hayNube=()=>!!(cfg.key&&cfg.model)&&navigator.onLine!==false;
-const hayOtro=()=>hayNube()||(claudeOk()&&!window.cerebroSinGasto);
+const hayOtro=()=>hayNube()||(claudeOk()&&!window.cerebroSinGasto)||nubesListas().length>0;   // 2.29: Groq y OpenRouter también cuentan
 // arma lo que lee tu GPU: system fijo + plática + (lo de ahorita y la pregunta)
 // 2.28.1 — «the prompt is longer than the context length»: desde 2.28 lo de ahorita (hora, ánimo, clima, fuentes, biblioteca,
 // recuerdos…) va junto a la pregunta, y eso NUNCA se recortaba: solo se recortaba la personalidad. Con el contexto de tu GPU
 // en 2048 bastaba poco para pasarse y Ollama tronaba (sobre todo cuando Gemini falla y tu GPU tiene que contestar sí o sí).
 // Ahora TODO se mide y se reparte: primero tu pregunta, luego lo de ahorita, luego su personalidad. Nunca se pasa del contexto.
 // apretar<1 deja más margen (si aun así Ollama dice que no cupo, se vuelve a armar más chico).
-function armaGPU(parts,otro,apretar=1){
-  window.fragTope=2500;let sp;try{sp=sysPrompt();}finally{window.fragTope=0;}   // en la GPU el contexto es chico: del constructo que se asoma va lo esencial
-  const ctx=ctxDe(),lim=Math.floor(ctx*apretar),sys=sp[0];let ahora=sp[1],usr=parts.filter(p=>p.text).map(p=>p.text).join('\n');
+// 2.29: lo mismo sirve para los cerebros de respaldo en la nube (Groq, OpenRouter), que también tienen tope de tokens por mensaje
+function armaChat(parts,o){
+  window.fragTope=o.frag||0;let sp;try{sp=sysPrompt();}finally{window.fragTope=0;}   // en la GPU el contexto es chico: del constructo que se asoma va lo esencial
+  const lim=o.lim,RES=o.reserva??RESERVA,sys=sp[0];let ahora=sp[1],usr=parts.filter(p=>p.text).map(p=>p.text).join('\n');
   const preg=()=>notaAhora(ahora)+'\n\n'+usr;
   // la plática se recorta de 4 en 4 mensajes (no de uno en uno) para que el principio se repita y Ollama lo reuse
-  let hist=ventanaHist(history,12,4);const total=()=>tok(sys)+tok(preg())+hist.reduce((a,h)=>a+tok(h.text)+4,0)+RESERVA+MARCO;
+  let hist=ventanaHist(history,o.hist||12,4);const total=()=>tok(sys)+tok(preg())+hist.reduce((a,h)=>a+tok(h.text)+4,0)+RES+MARCO;
   while(hist.length>2&&total()>lim)hist=hist.slice(Math.min(4,hist.length-2));
   let sysUsa=sys;
-  if(total()>lim){if(otro)throw new Error('NOCABE');   // no cabe en tu GPU: mejor que conteste Gemini/Claude completo
+  if(total()>lim){if(o.otro)throw new Error('NOCABE');   // no cabe en tu GPU: mejor que conteste Gemini/Claude completo
     hist=[];   // sin otro cerebro: lo esencial de cada parte, sin pasarse
-    const B=Math.max(300,lim-RESERVA-MARCO-tok(notaAhora('')));
+    const B=Math.max(300,lim-RES-MARCO-tok(notaAhora('')));
     const uB=Math.min(tok(usr),Math.floor(B*.4));usr=cabe(usr,uB,true);          // tu pregunta va al final: se queda la cola
     const resto=B-tok(usr),sB0=Math.min(tok(sys),Math.floor(resto*.55));
     ahora=cabe(ahora,resto-sB0);sysUsa=cabe(sys,resto-tok(ahora));
-    log('🧠 tu GPU tiene contexto '+ctx+': le mandé lo esencial (personalidad '+tok(sysUsa)+', ahorita '+tok(ahora)+', pregunta '+tok(usr)+' tokens)','y');}
+    log('🧠 '+o.quien+': le mandé lo esencial (personalidad '+tok(sysUsa)+', ahorita '+tok(ahora)+', pregunta '+tok(usr)+' tokens)','y');}
   const msgs=[{role:'system',content:sysUsa}];
   for(const h of hist)msgs.push({role:h.role==='model'?'assistant':'user',content:h.text});
   msgs.push({role:'user',content:preg()});
   const m2=[];for(const m of msgs){const l=m2[m2.length-1];if(l&&l.role===m.role&&m.role!=='system')l.content+='\n'+m.content;else m2.push({...m});}
-  return {m2,ctx,firma:firma(sysUsa,hist)};}
+  // la plática tiene que empezar con un mensaje tuyo (algunas APIs truenan si después del system viene uno de Capri)
+  if(o.empiezaTu)while(m2.length>2&&m2[1].role==='assistant')m2.splice(1,1);
+  return {m2,firma:firma(sysUsa,hist)};}
+function armaGPU(parts,otro,apretar=1){const ctx=ctxDe();
+  return {...armaChat(parts,{lim:Math.floor(ctx*apretar),otro,frag:2500,quien:'tu GPU tiene contexto '+ctx}),ctx};}
 const noCupo=e=>/context length|longer than the context|exceeds the context|context window/i.test(String(e?.message||e||''));
 // huella corta de lo que ya leyó tu GPU (para no precargar dos veces lo mismo)
 function firma(sys,hist){let h=5381;const t=sys+hist.map(x=>x.text).join('\u0001');for(let i=0;i<t.length;i++)h=(h*33^t.charCodeAt(i))>>>0;return t.length+':'+h;}
@@ -190,6 +195,85 @@ function claudeFallo(e){const m=String(e.message||'');
   claudeFuera=Date.now()+(sinCredito||key?30:5)*60e3;
   line('s','(◆ Claude no respondió'+(sinCredito?': tu cuenta de Anthropic no tiene créditos todavía':key?': la key no es válida':' ('+m.slice(0,80)+')')+'. Te contesto con otro cerebro.)');}
 
+// ---------- más cerebros de respaldo (2.29): Groq y OpenRouter ----------
+// Si Gemini no contesta (sin cupo, Google saturado, sin key) o tu GPU se tarda y no hay Gemini, antes de caer al cerebro
+// chico de tu GPU prueba estos dos, cada uno con su key gratis. Groq va primero porque es el más rápido; OpenRouter
+// después porque tiene los modelos gratis que mejor razonan (DeepSeek). Hablan el mismo idioma que OpenAI (chat/completions).
+// Lo que les manda se arma con armaChat, igual que para tu GPU: nunca se pasa de su tope de tokens (el bug de 2.28.1).
+const NUBES={
+  groq:{nom:'Groq',api:'https://api.groq.com/openai/v1/',def:'llama-3.3-70b-versatile',lim:6000,max:1024,frag:2500,hist:10,espera:20e3,
+    llave:'gsk_…',donde:'console.groq.com/keys',
+    sugeridos:[['llama-3.3-70b-versatile','Llama 3.3 70B · el más rápido'],['moonshotai/kimi-k2-instruct-0905','Kimi K2 · más listo, también rápido'],['openai/gpt-oss-120b','GPT-OSS 120B · razona'],['llama-3.1-8b-instant','Llama 3.1 8B · instantáneo, el más simple']]},
+  openrouter:{nom:'OpenRouter',api:'https://openrouter.ai/api/v1/',def:'deepseek/deepseek-chat-v3-0324:free',lim:24000,max:2048,frag:0,hist:16,espera:40e3,
+    llave:'sk-or-…',donde:'openrouter.ai/keys',
+    sugeridos:[['deepseek/deepseek-chat-v3-0324:free','DeepSeek V3 (gratis) · listo y sin pausa'],['deepseek/deepseek-r1-0528:free','DeepSeek R1 (gratis) · el que mejor razona, lento'],['moonshotai/kimi-k2:free','Kimi K2 (gratis)'],['meta-llama/llama-3.3-70b-instruct:free','Llama 3.3 70B (gratis)']]}};
+const NUBES_ORDEN=['groq','openrouter'];
+cfg.nubes=Object.assign({groq:{key:'',modelo:''},openrouter:{key:'',modelo:''}},cfg.nubes||{});
+const nc=id=>cfg.nubes[id]||(cfg.nubes[id]={key:'',modelo:''});
+const nubeFuera={},nubeVio={},nubeGasto={};   // nubeFuera: hasta cuándo descansa (sin cupo o key mala) · nubeVio: último modelo que contestó
+const nubeModelo=id=>nc(id).modelo||NUBES[id].def;
+const nubeOk=id=>!!nc(id).key&&Date.now()>(nubeFuera[id]||0)&&navigator.onLine!==false;
+const nubesListas=()=>NUBES_ORDEN.filter(nubeOk);
+const piensaLargo=m=>/deepseek-r1|qwq|gpt-oss|thinking|:thinking|reason/i.test(m);
+// el tope real de cada modelo lo aprende de sus errores («Limit 6000, Requested 7400») y lo guarda
+// capa gratis de Groq: cada modelo tiene su tope de tokens por minuto (llama 70B 12 000, Kimi 10 000, gpt-oss 8 000, 8B 6 000)
+const LIM_MODELO={'llama-3.3-70b-versatile':9000,'moonshotai/kimi-k2-instruct-0905':8000,'moonshotai/kimi-k2-instruct':8000,'openai/gpt-oss-120b':7000,'llama-3.1-8b-instant':5000};
+const nubeLim=(id,m)=>cer.nubeLim?.[id+'|'+m]||(id==='groq'&&LIM_MODELO[m])||NUBES[id].lim;
+function aprendeLim(id,m,e){const x=String(e?.message||'').match(/limit[^0-9]{0,12}(\d{3,7})/i);if(!x)return false;
+  const n=Math.floor(+x[1]*.85);if(!(n>=800)||n>=nubeLim(id,m))return false;cer.nubeLim=Object.assign(cer.nubeLim||{},{[id+'|'+m]:n});save();
+  log('🧠 '+NUBES[id].nom+' · '+m+': su tope es '+x[1]+' tokens; desde ahora le mando hasta '+n,'y');return true;}
+const muyGrande=e=>e?.status===413||/too large|context length|context_length|maximum context|reduce the length|tokens per minute|\bTPM\b/i.test(String(e?.message||''));
+async function nube1(id,modelo,parts,onText,apretar){const N=NUBES[id],lim=Math.floor(nubeLim(id,modelo)*apretar);
+  const reserva=Math.min(N.max,Math.floor(lim/3)),{m2}=armaChat(parts,{lim,otro:false,frag:N.frag,reserva:reserva+100,hist:N.hist,empiezaTu:true,quien:N.nom+' (tope '+lim+' tokens)'});
+  const body={model:modelo,messages:m2,stream:true,temperature:1,max_tokens:reserva};
+  const headers={'Content-Type':'application/json','Authorization':'Bearer '+nc(id).key};if(id==='openrouter')headers['X-Title']='Capri';
+  const ac=new AbortController(),sg=[ac.signal];const ext=window.capriSenal?.();if(ext)sg.push(ext);
+  const tLenta=setTimeout(()=>ac.abort(new Error('LENTA')),piensaLargo(modelo)?Math.max(N.espera,90e3):N.espera);
+  try{const r=await fetch(N.api+'chat/completions',{method:'POST',headers,body:JSON.stringify(body),signal:sg.length>1?AbortSignal.any(sg):sg[0]});
+    if(!r.ok){const j=await r.json().catch(()=>({}));const e=new Error(j.error?.message||j.message||('Error '+r.status));e.status=r.status;e.espera=+r.headers.get('retry-after')||0;throw e;}
+    const reader=r.body.getReader(),dec=new TextDecoder();let buf='',raw='',sent=0,fin=false;
+    while(!fin){const {value,done}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});let i;
+      while((i=buf.indexOf('\n'))>=0){const ln=buf.slice(0,i).trim();buf=buf.slice(i+1);if(!ln.startsWith('data:'))continue;const d=ln.slice(5).trim();
+        if(d==='[DONE]'){fin=true;break;}let j;try{j=JSON.parse(d);}catch(_){continue;}
+        if(j.error){const e=new Error(j.error.message||'error');e.status=+j.error.code||500;throw e;}
+        const dl=j.choices?.[0]?.delta||{};if(dl.reasoning||dl.reasoning_content){clearTimeout(tLenta);window.capriLatido?.();}   // está pensando (R1): eso cuenta como señal de vida
+        raw+=dl.content||'';const vis=raw.replace(/<think>[\s\S]*?(<\/think>|$)/g,'');
+        if(vis.trim())clearTimeout(tLenta);if(vis.length>sent){onText(vis.slice(sent));sent=vis.length;}}}
+    const full=raw.replace(/<think>[\s\S]*?(<\/think>|$)/g,'');if(!full.trim())throw new Error('EMPTY');
+    nubeVio[id]=modelo;marca(N.nom+' · '+modelo.replace(/^[^/]+\//,''));return full;}
+  catch(e){if(ac.signal.aborted&&!ext?.aborted)throw new Error('LENTA');throw e;}
+  finally{clearTimeout(tLenta);}}
+// pide a una nube: su modelo; si no cabe, lo arma más chico; si ese modelo no tiene cupo, prueba otros de la misma nube
+async function nubePide(id,parts,onText){const N=NUBES[id],prim=nubeModelo(id);
+  const otros=N.sugeridos.map(x=>x[0]).filter(m=>m!==prim&&(!cer.nubeMods?.[id]?.length||cer.nubeMods[id].includes(m)));
+  let ult=null,dijo=false;const on=x=>{dijo=true;onText(x);},lista=[prim,...otros].slice(0,3);
+  for(const m of lista){
+    let ap=1;
+    for(let k=0;k<4&&ap>=.35;k++){
+      try{return await nube1(id,m,parts,on,ap);}
+      catch(e){if(esCorte(e)||dijo)throw e;ult=e;
+        if(!muyGrande(e))break;
+        if(aprendeLim(id,m,e))continue;                  // ya sabe su tope real: vuelve a armarlo a ese tamaño
+        if(e.status===429)break;                         // sin cupo este minuto (no es que no quepa): otro modelo
+        log('🧠 '+N.nom+' dijo que no cupo: lo armo más chico','y');ap*=.6;}}
+    if(!ult||!(ult.status===429||ult.status===404||ult.status>=500||ult.message==='LENTA'||muyGrande(ult)))throw ult;
+    if(m!==lista.at(-1))log('🧠 '+N.nom+' · '+m+' no pudo ('+(ult.status||ult.message)+'): pruebo otro modelo','y');}
+  throw ult||new Error('EMPTY');}
+function nubeFallo(id,e){const N=NUBES[id],m=String(e?.message||''),key=e?.status===401||e?.status===403,cupo=e?.status===429||e?.status===402;
+  nubeFuera[id]=Date.now()+(key?30*60e3:cupo?Math.max(60e3,(e.espera||0)*1000):e?.message==='LENTA'?5*60e3:2*60e3);
+  log(N.nom+': '+(e?.status||'')+' '+m.slice(0,120),'w');
+  if(key)line('s','(La key de '+N.nom+' no es válida o no tiene permiso. Revísala en AJUSTES → Cerebros de respaldo.)');
+  pinta();}
+// prueba las nubes en orden; porque = lo que se le dice a Kiga la primera vez
+async function respaldoNubes(parts,onText,porque){let ult=null,prev='';
+  for(const id of nubesListas()){const N=NUBES[id];let dijo=false;
+    line('s','('+(prev?prev+' tampoco pudo':porque)+'; te contesto con '+N.nom+'.)');prev=N.nom;window.capriLatido?.();
+    try{return await nubePide(id,parts,x=>{dijo=true;onText(x);});}
+    catch(e){if(esCorte(e)||dijo)throw e;nubeFallo(id,e);ult=e;}}
+  throw ult||new Error('SIN_NUBES');}
+const sinFotos=parts=>!parts.some(p=>p.inlineData);   // estas nubes solo leen texto: lo que trae imagen, audio o PDF se queda en Gemini/Claude
+window.capriNubes=()=>NUBES_ORDEN.map(id=>({id,nom:NUBES[id].nom,key:!!nc(id).key,ok:nubeOk(id),modelo:nubeModelo(id),fuera:nubeFuera[id]||0}));
+
 // ---------- el que decide ----------
 const _ask=ask;
 let preRec=null;
@@ -199,16 +283,25 @@ ask=async(parts,onText)=>{
   const rec=await conTope(preRec||recordar(parts),1200,()=>log('🧠 recuerdos: tardaron, contesto sin ellos','y'));preRec=null;const p2=rec?[{text:rec},...parts]:parts;
   if(rutaClaude(parts)){let dijo=false;try{return await claudeBrain(p2,x=>{dijo=true;onText(x);});}catch(e){if(dijo||esCorte(e))throw e;claudeFallo(e);}}
   if(rutaLocal(parts)){let dijo=false;try{return await local(p2,x=>{dijo=true;onText(x);});}catch(e){if(esCorte(e))throw e;log(String(e.message).slice(0,60),'w');if(dijo||!hayOtro())throw e;
-      if(e.message==='LENTA')line('s','(Tu GPU tardó demasiado en contestar; te contesto con '+(hayNube()?'Gemini':'Claude')+'. Por 10 min la plática va directo ahí.)');
-      else if(e.message==='NOCABE')log('🧠 la plática no cabe en el contexto de tu GPU: contesta '+(hayNube()?'Gemini':'Claude'),'y');
-      if(!hayNube()){try{return await claudeBrain(p2,onText);}catch(e2){if(esCorte(e2))throw e2;claudeFallo(e2);throw e;}}}}
+      const quien=hayNube()?'Gemini':nubesListas().length?NUBES[nubesListas()[0]].nom:'Claude';
+      if(e.message==='LENTA')line('s','(Tu GPU tardó demasiado en contestar; te contesto con '+quien+'. Por 10 min la plática va directo ahí.)');
+      else if(e.message==='NOCABE')log('🧠 la plática no cabe en el contexto de tu GPU: contesta '+quien,'y');
+      if(!hayNube()){
+        if(nubesListas().length&&sinFotos(parts)){try{return await respaldoNubes(p2,onText,'Sin Gemini');}catch(e2){if(esCorte(e2))throw e2;}}
+        if(claudeOk()&&!window.cerebroSinGasto){try{return await claudeBrain(p2,onText);}catch(e2){if(esCorte(e2))throw e2;claudeFallo(e2);}}
+        throw e;}}}
   let algo=false;
   try{const t=await _ask(p2,x=>{algo=true;onText(x);});marca('nube');return t;}
   catch(e){if(esCorte(e))throw e;const caido=e.status===429||e.status>=500||e.message==='NOKEY'||e instanceof TypeError;
+    const motivo=e.status===429?' (sin cupo)':e instanceof TypeError?' (sin internet)':e.status>=500?' (Google saturado, '+e.status+')':e.message==='NOKEY'?' (falta su key)':e.status?' ('+e.status+')':'';
     if(!algo&&caido&&claudeOk()&&!window.cerebroSinGasto&&!parts.some(p=>p.inlineData&&/^audio/.test(p.inlineData.mimeType))){
-      line('s','(Gemini no respondió; te contesto con Claude.)');try{return await claudeBrain(p2,onText);}catch(e2){claudeFallo(e2);}}
+      line('s','(Gemini no respondió; te contesto con Claude.)');try{return await claudeBrain(p2,onText);}catch(e2){if(esCorte(e2))throw e2;claudeFallo(e2);}}
+    // 2.29: antes de caer al cerebro chico de tu GPU, los de respaldo en la nube (Groq y luego OpenRouter)
+    let probeNubes=false;
+    if(!algo&&caido&&sinFotos(parts)&&nubesListas().length){probeNubes=true;
+      try{return await respaldoNubes(p2,onText,'Gemini no respondió'+motivo);}catch(e2){if(esCorte(e2))throw e2;}}
     if(algo||!caido||!listo()||cer.modo==='gemini'||parts.some(p=>p.inlineData))throw e;
-    line('s','(Gemini no respondió'+(e.status===429?' (sin cupo)':e instanceof TypeError?' (sin internet)':e.status>=500?' (Google saturado, '+e.status+')':e.message==='NOKEY'?' (falta su key)':e.status?' ('+e.status+')':'')+'; te contesto con el cerebro de tu GPU.)');
+    line('s',probeNubes?'(Tampoco contestó ningún cerebro de respaldo; te contesto con el de tu GPU.)':'(Gemini no respondió'+motivo+'; te contesto con el cerebro de tu GPU.)');
     log('Gemini: '+(e.status||'')+' '+String(e.message).slice(0,120),'w');
     return local(p2,onText,{otro:false});}};
 const _respond=respond;
@@ -366,6 +459,42 @@ const box=document.createElement('div');box.innerHTML=`<h3>Cerebro de tu GPU <sm
  <label>Tope de gasto en dólares (cuando llega, deja de usarlo)<input id="ceTope" type="number" min="0" step="0.5"></label>
  <small>Usa la key de «API key de Claude» de arriba y el modelo que elijas ahí. Cada respuesta cuesta centavos; Capri lleva la cuenta. La voz y lo que mira de tu pantalla siguen en Gemini.</small>`;
 $('cClose')?.parentElement?.before(box);
+// ---------- panel «Cerebros de respaldo» en Ajustes (2.29) ----------
+const boxN=document.createElement('div');boxN.id='nubesBox';
+boxN.innerHTML=`<h3>Cerebros de respaldo <small style="font-weight:400">· Groq y OpenRouter</small></h3>
+ <small>Si Gemini no contesta (sin cupo, saturado o sin key), antes de usar el cerebro chico de tu GPU Capri prueba estos, en este orden. Los dos tienen capa gratis: solo crea tu key y pégala. Solo leen texto: lo que trae foto, voz o PDF sigue en Gemini.</small>
+ ${NUBES_ORDEN.map((id,i)=>{const N=NUBES[id];return `<div class="nubeB" data-n="${id}" style="border-left:2px solid var(--cyan);padding-left:8px;margin:8px 0">
+  <b>${i+1}. ${N.nom}</b> <small id="nuSt_${id}"></small>
+  <label>API key de ${N.nom} (empieza con ${N.llave})<input id="nuK_${id}" type="password" placeholder="Pega aquí tu key de ${N.donde}" autocomplete="off"></label>
+  <label>Modelo<select id="nuM_${id}"></select></label>
+  <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" id="nuL_${id}" style="width:auto;flex:1;padding:8px 10px">Cargar modelos</button><button class="btn" id="nuT_${id}" style="width:auto;flex:1;padding:8px 10px">▶ Probar ${N.nom}</button></div>
+  <small id="nuO_${id}"></small></div>`;}).join('')}
+ <small>Groq: entra a <b>console.groq.com</b> → API Keys → Create. OpenRouter: <b>openrouter.ai</b> → Keys → Create (los modelos que terminan en <code>:free</code> no cuestan). Las keys se quedan solo en esta PC.</small>`;
+box.before(boxN);
+function pintaNubes(){for(const id of NUBES_ORDEN){const N=NUBES[id],c=nc(id),st=$('nuSt_'+id);if(!st)continue;
+  const ki=$('nuK_'+id);if(document.activeElement!==ki)ki.value=c.key||'';
+  const mods=[...N.sugeridos];for(const m of cer.nubeMods?.[id]||[])if(!mods.some(x=>x[0]===m))mods.push([m,m]);
+  const cur=nubeModelo(id);if(!mods.some(x=>x[0]===cur))mods.unshift([cur,cur]);
+  const s=$('nuM_'+id);s.innerHTML=mods.map(([v,t])=>`<option value="${esc(v)}">${esc(t)}</option>`).join('');s.value=cur;
+  const f=nubeFuera[id]||0;
+  st.textContent=!c.key?'○ sin key':Date.now()<f?'✖ descansando '+Math.ceil((f-Date.now())/60e3)+' min (falló hace poco)':'● lista'+(nubeVio[id]?' · último que contestó: '+nubeVio[id]:'');
+  st.style.color=!c.key?'var(--mut)':Date.now()<f?'#ffb000':'var(--grn)';}}
+for(const id of NUBES_ORDEN){const N=NUBES[id];
+  $('nuK_'+id).onchange=()=>{nc(id).key=$('nuK_'+id).value.trim();nubeFuera[id]=0;store.set('cfg',cfg);pintaNubes();};
+  $('nuM_'+id).onchange=()=>{nc(id).modelo=$('nuM_'+id).value;nubeFuera[id]=0;store.set('cfg',cfg);pintaNubes();};
+  $('nuL_'+id).onclick=async()=>{const o=$('nuO_'+id),k=$('nuK_'+id).value.trim();o.textContent='Buscando modelos…';
+    try{const r=await fetch(N.api+'models',{headers:k?{Authorization:'Bearer '+k}:{},signal:AbortSignal.timeout(15e3)});const j=await r.json();
+      if(!r.ok)throw new Error(r.status===401?'key inválida':j.error?.message||'Error '+r.status);
+      let ms=(j.data||[]).map(m=>m.id).filter(Boolean);
+      ms=id==='openrouter'?ms.filter(m=>/:free$/.test(m)):ms.filter(m=>!/whisper|tts|guard|embed|playai|orpheus|distil|compound/i.test(m));
+      cer.nubeMods=Object.assign(cer.nubeMods||{},{[id]:ms.sort()});save();pintaNubes();o.textContent='✔ '+ms.length+' modelo(s)'+(id==='openrouter'?' gratis':'')+'. Los recomendados salen primero.';}
+    catch(e){o.textContent='✖ '+String(e.message).slice(0,80);}};
+  $('nuT_'+id).onclick=async()=>{const o=$('nuO_'+id);nc(id).key=$('nuK_'+id).value.trim();store.set('cfg',cfg);if(!nc(id).key){o.textContent='Primero pega tu key.';return;}
+    o.textContent='Pensando con '+N.nom+' · '+nubeModelo(id)+'…';const t0=performance.now();let txt='';
+    try{await nubePide(id,[{text:'Salúdame en una frase y dime con qué cerebro estás pensando.'}],x=>{txt+=x;o.textContent=clean(txt);});
+      nubeFuera[id]=0;o.textContent=clean(txt).trim()+'  ·  '+((performance.now()-t0)/1000).toFixed(1)+' s';}
+    catch(e){o.textContent='No se pudo: '+(e instanceof TypeError?'no hubo conexión (¿sin internet o bloqueado?)':e.message==='LENTA'?'tardó demasiado':String(e.message).slice(0,120));}
+    pintaNubes();};}
 function pinta(){btn.classList.toggle('act',cer.modo!=='gemini'&&listo());const st=$('ceSt');if(!st)return;
   st.textContent=ok?(chats().length?'● Conectado a Ollama · '+chats().length+' modelo(s) · memoria buscable: '+mems.length+' plática(s)'+(cer.emb?' (por significado)':' (por palabras: baja embeddinggemma para que busque mejor)')+(ultimo?' · último que contestó: '+(ultimo==='nube'?'Gemini':ultimo):''):'● Ollama está abierto pero no tiene modelos: baja uno (abajo dice cómo).')
     :'✖ No encontré Ollama en tu PC (o está cerrado). Sin él, todo va a Gemini.';
@@ -374,7 +503,7 @@ function pinta(){btn.classList.toggle('act',cer.modo!=='gemini'&&listo());const 
   $('ceModo').value=cer.modo;$('ceApr').value=cer.aprende?'1':'0';$('ceTurbo').value=cer.turbo?'1':'0';
   bCl.classList.toggle('act',claudeOk());$('ceCl').value=cer.claude;$('ceTope').value=cer.tope;
   const cs=$('ceClSt');cs.textContent=!cfg.claudeKey?'○ Listo para cuando tengas créditos: falta tu API key de Anthropic.':cer.claude==='off'?'○ Key puesta, pero Claude está apagado.':claudeSpent>=cer.tope?'✖ Llegó al tope: gastado '+usd(claudeSpent)+' de '+usd(cer.tope)+'.':Date.now()<claudeFuera?'✖ Claude no respondió hace poco (¿sin créditos?); lo vuelve a intentar en unos minutos.':'● Activo · gastado '+usd(claudeSpent)+' de '+usd(cer.tope)+' · modelo '+(cfg.claudeModel||'claude-opus-5-5');
-  cs.style.color=claudeOk()?'var(--grn)':'#ffb000';}
+  cs.style.color=claudeOk()?'var(--grn)':'#ffb000';pintaNubes();}
 $('ceModo').onchange=()=>{cer.modo=$('ceModo').value;save();pinta();};
 $('ceMod').onchange=()=>{cer.modelo=$('ceMod').value;save();pinta();if(cer.turbo)calentar(true);};
 $('ceApr').onchange=()=>{cer.aprende=$('ceApr').value==='1';save();};

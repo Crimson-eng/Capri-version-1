@@ -39,7 +39,7 @@ try:  # 2.25: profe de TOEFL sin IA (módulo aparte)
 except Exception:  # pragma: no cover
     toefl_offline = None
 
-VERSION = '1.3.0'
+VERSION = '1.4.0'
 PUERTO = 47824  # la app de escritorio usa 47823; el cerebro vive justo al lado
 ORIGENES = {  # páginas de Capri que pueden hablar con el cerebro desde el navegador
     'http://127.0.0.1:47823', 'http://localhost:47823', 'https://crimson-eng.github.io',
@@ -531,9 +531,46 @@ def ollama(cfg, sis, conv):
     return txt, 'ollama:' + modelo
 
 
+# 2.29: cerebros de respaldo en la nube (misma API que OpenAI). Van después de Gemini y antes de Ollama.
+NUBES = {
+    'groq': ('https://api.groq.com/openai/v1/chat/completions', 'llama-3.3-70b-versatile', 6000, 1024),
+    'openrouter': ('https://openrouter.ai/api/v1/chat/completions', 'deepseek/deepseek-chat-v3-0324:free', 24000, 2048),
+}
+
+
+def _nube(nombre, cfg, sis, conv):
+    url, defecto, lim, maxt = NUBES[nombre]
+    key = cfg.get(nombre + '_key')
+    if not key:
+        raise RuntimeError('sin key de ' + nombre)
+    modelo = cfg.get(nombre + '_modelo') or defecto
+    maxt = min(maxt, int(cfg.get('_max', 1024)), lim // 3)
+    # igual que con la GPU: nunca mandar más de lo que aguanta (Groq gratis rechaza mensajes de más de ~6 000 tokens)
+    sis, conv = cabe_en_ctx(sis, conv, lim, reserva=maxt + 180)
+    msgs = [{'role': 'system', 'content': sis}] + [{'role': 'assistant' if c['role'] == 'model' else 'user', 'content': c['text']} for c in conv]
+    try:
+        j = _post(url, {'model': modelo, 'messages': msgs, 'stream': False, 'temperature': cfg.get('_temp', 1.1), 'max_tokens': maxt},
+                  {'Authorization': 'Bearer ' + key, 'X-Title': 'Capri'}, t=120)
+    except urllib.error.HTTPError as ex:
+        raise RuntimeError('%s %d: %s' % (nombre, ex.code, ex.read().decode('utf-8', 'ignore')[:160]))
+    txt = (((j.get('choices') or [{}])[0].get('message') or {}).get('content') or '')
+    txt = re.sub(r'<think>.*?</think>', '', txt, flags=re.S)
+    if not txt.strip():
+        raise RuntimeError(nombre + ' respondió vacío')
+    return txt, nombre + ':' + modelo
+
+
+def groq(cfg, sis, conv):
+    return _nube('groq', cfg, sis, conv)
+
+
+def openrouter(cfg, sis, conv):
+    return _nube('openrouter', cfg, sis, conv)
+
+
 def pensar(cfg, sis, conv):
     errores = []
-    for fn in (gemini, ollama):
+    for fn in (gemini, groq, openrouter, ollama):
         try:
             return fn(cfg, sis, conv)
         except Exception as ex:
@@ -544,6 +581,9 @@ def pensar(cfg, sis, conv):
 def que_cerebro(cfg):
     if cfg.get('key'):
         return 'gemini'
+    for n in ('groq', 'openrouter'):
+        if cfg.get(n + '_key'):
+            return n
     return 'ollama' if ollama_modelo(cfg) else 'ninguno'
 
 
@@ -766,6 +806,11 @@ class Cerebro:
                 self.cfg['modelos'] = [str(m)[:80] for m in c['modelos'][:40]]
             if 'key' in c and isinstance(c['key'], str):
                 self.cfg['key'] = c['key'].strip()[:200]
+            for n in ('groq', 'openrouter'):   # 2.29: cerebros de respaldo (solo si dijiste «cerebro key sí»)
+                if isinstance(c.get(n + '_key'), str):
+                    self.cfg[n + '_key'] = c[n + '_key'].strip()[:200]
+                if isinstance(c.get(n + '_modelo'), str):
+                    self.cfg[n + '_modelo'] = c[n + '_modelo'].strip()[:80]
             if isinstance(d.get('persona'), str) and len(d['persona']) > 200:
                 self.e['persona'] = d['persona'][:120000]
             rev = ''
