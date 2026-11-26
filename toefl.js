@@ -139,8 +139,12 @@ async function quizIA(r,aviso){if(!r?.dudas?.length||!r.prompt_ia)return r;
   const opciones=[];
   if(red&&cfg.claudeKey&&ci.claude!=='off'&&!(ci.tope&&ci.gasto>=ci.tope))opciones.push(['Claude',async()=>(await claudeStream('Eres un profesor experto de inglés y TOEFL. Respondes solo JSON válido.',[{role:'user',content:r.prompt_ia}],()=>{},4096)).full]);
   if(red&&cfg.key&&cfg.model)opciones.push(['Gemini',async()=>(await gemUna([{text:r.prompt_ia}],{responseMimeType:'application/json',maxOutputTokens:4096})).text]);
+  // 2.30: antes de tu GPU, los respaldos listos en la nube (Kimi K2 en Groq, DeepSeek en OpenRouter): más certeros que el cerebro chico
+  if(red&&ci.nubes?.length&&window.cerebroNubeTexto)opciones.push([ci.nubes.map(id=>id==='groq'?'Groq':'OpenRouter').join(' / '),async()=>{const x=await window.cerebroNubeTexto('Eres un profesor experto de inglés y TOEFL. Respondes solo JSON válido.',r.prompt_ia,25e3);if(!x)throw new Error('ninguna nube contestó');return x.texto;}]);
   if(ci.ok&&ci.modelo&&window.cerebroJSON)opciones.push(['tu GPU ('+ci.modelo+')',async()=>JSON.stringify(await window.cerebroJSON('Eres un profesor experto de inglés y TOEFL. Respondes solo JSON válido.',r.prompt_ia))]);
-  for(const [quien,fn] of opciones){try{aviso?.(quien);const txt=await fn();
+  // 2.30: cada cerebro tiene 25 s (40 s tu GPU); si se tarda, pasa al siguiente en vez de dejarte esperando
+  const tope=(pr,ms)=>Promise.race([pr,new Promise((_,no)=>setTimeout(()=>no(new Error('tardó más de '+ms/1000+' s')),ms))]);
+  for(const [quien,fn] of opciones){try{aviso?.(quien);const txt=await tope(fn(),/GPU/.test(quien)?40e3:25e3);
       const m=await api('/api/toefl/fusionar',{preguntas:r.preguntas,texto:txt,fuente:quien},10000);
       if(m.con_ia){log('quiz: '+m.con_ia+' pregunta(s) resueltas con '+quien,'g');return Object.assign({},m,{dudas:[]});}}
     catch(e){log('quiz: '+quien+' no pudo ('+String(e.message).slice(0,60)+')','w');}}

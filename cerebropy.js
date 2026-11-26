@@ -57,9 +57,10 @@ function sinIA(){const ci=window.cerebroInfo?.()||{},red=navigator.onLine!==fals
 window.capriSinIA=sinIA;
 const EN_CMD=/^(?:en|ingl[eé]s sin ia|english)\s*:\s*([\s\S]+)$/i;
 const QUIZ_CMD=/^(?:quiz|resuelve)\s*:\s*([\s\S]+)$/i;
-async function inglesSinIA(t,txt,forzado){
-  let r;try{r=await post('/api/ingles',{texto:txt},60000);}catch(e){if(forzado){line('u',t);line('c','CAPRI');line('t','…no encuentro mi cerebro Python, y ahí vive mi inglés sin IA. Prende capri-cerebro y lo vuelvo a intentar.');return true;}return false;}
+async function inglesSinIA(t,txt,forzado,soloQuiz){
+  let r;try{r=await post('/api/ingles',{texto:txt},soloQuiz?25000:60000);}catch(e){if(forzado){line('u',t);line('c','CAPRI');line('t','…no encuentro mi cerebro Python, y ahí vive mi inglés sin IA. Prende capri-cerebro y lo vuelvo a intentar.');return true;}return false;}
   if(!forzado&&r.intencion!=='toefl'&&(r.intencion==='no_ingles'||r.idioma==='es'||r.idioma==='?'))return false;
+  if(soloQuiz&&!r.quiz?.length)return false;   // 2.30: un quiz pegado en el chat que las reglas no entendieron: sigue a la IA en modo certeza
   if(r.dudas?.length&&window.quizIA){log('quiz: '+r.dudas.length+' pregunta(s) no seguras con reglas, le pregunto a una IA…','y');
     const q=await window.quizIA({preguntas:r.quiz,dudas:r.dudas,prompt_ia:r.prompt_ia,respuesta:r.respuesta}).catch(()=>null);if(q?.respuesta)r.respuesta=q.respuesta;}
   bump();line('u',t);line('c',r.quiz?'CAPRI · QUIZ':'CAPRI · SIN IA');line('t',r.respuesta);setState(r.estado||'sonrisa_traviesa');
@@ -68,6 +69,7 @@ async function inglesSinIA(t,txt,forzado){
   if(r.correcciones?.length)dispatchEvent(new CustomEvent('capri:ingles-correccion',{detail:r.correcciones}));
   if(r.accion){const [a,tipo]=r.accion.split(':');setTimeout(()=>window.toeflIr?.(a==='practicar'?tipo:''),600);}
   log('inglés sin IA: '+r.intencion+(r.puro?' (inglés puro)':' ('+r.idioma+')'),'g');return true;}
+window.inglesSinIA=inglesSinIA;
 
 // ---------- comandos en el chat ----------
 const _send=send;

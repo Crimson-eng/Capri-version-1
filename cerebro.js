@@ -57,6 +57,7 @@ const PESADO=/\b(explica|expl[ií]came|analiza|resume|resumen|c[oó]digo|program
 const SALUD=/s[ií]ntoma|dolor|enfermedad|diagn[oó]s|tratamiento|medicamento|f[aá]rmaco|dosis|cirug|anatom|fisiolog|patolog|cl[ií]nic|paciente|hospital/i;
 function rutaLocal(parts){if(!listo()||cer.modo==='gemini')return false;
   if(parts.some(p=>p.inlineData))return false;                 // oír, ver la pantalla o leer PDFs: solo Gemini
+  if(czAct.certeza&&cer.modo!=='local'&&hayOtro())return false;   // 2.30: tiene que estar bien (TOEFL, examen, salud, técnica, datos): el cerebro chico no
   if(cer.modo!=='local'&&Date.now()<gpuLentaHasta&&hayOtro())return false;   // 2.27.1: tu GPU anduvo lenta hace poco: contesta otro mientras
   if(cer.modo==='local'||!cfg.key||!cfg.model)return true;
   if(window.lecturaPesada?.()>8000)return false;                // «resúmeme todo el documento»: no cabe en el contexto de la GPU
@@ -114,9 +115,13 @@ function armaChat(parts,o){
   const m2=[];for(const m of msgs){const l=m2[m2.length-1];if(l&&l.role===m.role&&m.role!=='system')l.content+='\n'+m.content;else m2.push({...m});}
   // la plática tiene que empezar con un mensaje tuyo (algunas APIs truenan si después del system viene uno de Capri)
   if(o.empiezaTu)while(m2.length>2&&m2[1].role==='assistant')m2.splice(1,1);
+  if(o.imgs?.length)m2[m2.length-1].images=o.imgs;   // 2.30: tu GPU también ve imágenes si su modelo puede (gemma3:4b sí)
   return {m2,firma:firma(sysUsa,hist)};}
-function armaGPU(parts,otro,apretar=1){const ctx=ctxDe();
-  return {...armaChat(parts,{lim:Math.floor(ctx*apretar),otro,frag:2500,quien:'tu GPU tiene contexto '+ctx}),ctx};}
+// 2.30: modelos de Ollama que ven imágenes (gemma3 desde 4b, llava, qwen2.5vl, llama3.2-vision, minicpm-v…)
+const veGPU=()=>/gemma3|gemma-3|llava|vision|qwen2\.5vl|qwen2\.5-vl|-vl\b|minicpm-v|moondream|mistral-small3/i.test(cer.modelo)&&!/:(1b|270m)\b/i.test(cer.modelo);
+const fotosDe=parts=>parts.filter(p=>p.inlineData&&/^image\//.test(p.inlineData.mimeType)).map(p=>p.inlineData.data);
+function armaGPU(parts,otro,apretar=1){const ctx=ctxDe(),imgs=veGPU()?fotosDe(parts):[];
+  return {...armaChat(parts,{lim:Math.floor(ctx*apretar),otro,frag:2500,imgs,reserva:RESERVA+300*imgs.length,quien:'tu GPU tiene contexto '+ctx}),ctx};}
 const noCupo=e=>/context length|longer than the context|exceeds the context|context window/i.test(String(e?.message||e||''));
 // huella corta de lo que ya leyó tu GPU (para no precargar dos veces lo mismo)
 function firma(sys,hist){let h=5381;const t=sys+hist.map(x=>x.text).join('\u0001');for(let i=0;i<t.length;i++)h=(h*33^t.charCodeAt(i))>>>0;return t.length+':'+h;}
@@ -172,7 +177,7 @@ function rutaClaude(parts){if(!claudeOk()||window.cerebroSinGasto||modoAct==='wa
   if(cer.claude!=='siempre'&&window.lecturaPesada?.()>40000)return false;   // documentos enteros: Gemini los lee sin gastar tu saldo de Claude
   if(cer.claude==='siempre')return true;
   const t=parts.map(p=>p.text||'').join(' ');
-  return parts.some(p=>p.inlineData)||(cfg.study&&!!studyText())||t.length>=260||PESADO.test(t)||SALUD.test(t);}
+  return parts.some(p=>p.inlineData)||(cfg.study&&!!studyText())||t.length>=260||PESADO.test(t)||SALUD.test(t)||czAct.certeza;}
 async function claudeBrain(parts,onText){
   const [base,hora]=sysPrompt();
   // lo que no cambia va primero y se marca para caché (Anthropic lo relee más rápido y cobra menos); la plática también
@@ -244,7 +249,7 @@ async function nube1(id,modelo,parts,onText,apretar){const N=NUBES[id],lim=Math.
   catch(e){if(ac.signal.aborted&&!ext?.aborted)throw new Error('LENTA');throw e;}
   finally{clearTimeout(tLenta);}}
 // pide a una nube: su modelo; si no cabe, lo arma más chico; si ese modelo no tiene cupo, prueba otros de la misma nube
-async function nubePide(id,parts,onText){const N=NUBES[id],prim=nubeModelo(id);
+async function nubePide(id,parts,onText,pref){const N=NUBES[id],prim=pref?.(id)||nubeModelo(id);
   const otros=N.sugeridos.map(x=>x[0]).filter(m=>m!==prim&&(!cer.nubeMods?.[id]?.length||cer.nubeMods[id].includes(m)));
   let ult=null,dijo=false;const on=x=>{dijo=true;onText(x);},lista=[prim,...otros].slice(0,3);
   for(const m of lista){
@@ -265,12 +270,23 @@ function nubeFallo(id,e){const N=NUBES[id],m=String(e?.message||''),key=e?.statu
   if(key)line('s','(La key de '+N.nom+' no es válida o no tiene permiso. Revísala en AJUSTES → Cerebros de respaldo.)');
   pinta();}
 // prueba las nubes en orden; porque = lo que se le dice a Kiga la primera vez
-async function respaldoNubes(parts,onText,porque){let ult=null,prev='';
+async function respaldoNubes(parts,onText,porque,pref=czAct.certeza?prefCerteza:null){let ult=null,prev='';
   for(const id of nubesListas()){const N=NUBES[id];let dijo=false;
     line('s','('+(prev?prev+' tampoco pudo':porque)+'; te contesto con '+N.nom+'.)');prev=N.nom;window.capriLatido?.();
-    try{return await nubePide(id,parts,x=>{dijo=true;onText(x);});}
+    try{return await nubePide(id,parts,x=>{dijo=true;onText(x);},pref);}
     catch(e){if(esCorte(e)||dijo)throw e;nubeFallo(id,e);ult=e;}}
   throw ult||new Error('SIN_NUBES');}
+// 2.30: en modo certeza, si en Groq tienes puesto Llama (rápido pero el más simple), usa Kimi K2: igual de rápido y más certero
+const prefCerteza=id=>id==='groq'&&/llama/i.test(nubeModelo('groq'))?'moonshotai/kimi-k2-instruct-0905':null;
+// para el quiz de TOEFL y otros módulos: una pregunta suelta (sin personalidad) a la primera nube que conteste
+window.cerebroNubeTexto=async(system,user,ms=30e3)=>{for(const id of nubesListas()){const N=NUBES[id],m=prefCerteza(id)||nubeModelo(id);
+    try{const headers={'Content-Type':'application/json','Authorization':'Bearer '+nc(id).key};if(id==='openrouter')headers['X-Title']='Capri';
+      const r=await fetch(N.api+'chat/completions',{method:'POST',headers,signal:AbortSignal.timeout(ms),
+        body:JSON.stringify({model:m,messages:[{role:'system',content:system},{role:'user',content:user}],temperature:.1,max_tokens:2048})});
+      if(!r.ok){const j=await r.json().catch(()=>({}));const e=new Error(j.error?.message||('Error '+r.status));e.status=r.status;throw e;}
+      const t=((await r.json()).choices?.[0]?.message?.content||'').replace(/<think>[\s\S]*?(<\/think>|$)/g,'').trim();if(t)return {texto:t,quien:N.nom+' · '+m};}
+    catch(e){nubeFallo(id,e);}}
+  return null;};
 const sinFotos=parts=>!parts.some(p=>p.inlineData);   // estas nubes solo leen texto: lo que trae imagen, audio o PDF se queda en Gemini/Claude
 window.capriNubes=()=>NUBES_ORDEN.map(id=>({id,nom:NUBES[id].nom,key:!!nc(id).key,ok:nubeOk(id),modelo:nubeModelo(id),fuera:nubeFuera[id]||0}));
 
@@ -278,9 +294,18 @@ window.capriNubes=()=>NUBES_ORDEN.map(id=>({id,nom:NUBES[id].nom,key:!!nc(id).ke
 const _ask=ask;
 let preRec=null;
 const conTope=(pr,ms,tarde)=>new Promise(res=>{const t=setTimeout(()=>{tarde?.();res('');},ms);Promise.resolve(pr).then(v=>{clearTimeout(t);res(v||'');},()=>{clearTimeout(t);res('');});});
+// 2.30: ¿certeza o charla? (certeza.js). Lo que tiene que estar bien no va al cerebro chico, va con menos «creatividad»
+// y, si Gemini falla, primero a los respaldos más listos. La charla sigue por el camino más rápido de siempre.
+const NOCZ={certeza:false,tipo:'charla',por:''};let czAct=NOCZ;
+window.capriCzActual=()=>czAct;
 ask=async(parts,onText)=>{
+  czAct=modoAct==='user'&&window.capriCerteza?window.capriCerteza(parts.filter(p=>p.text).map(p=>p.text).join(' ')):NOCZ;
+  if(czAct.certeza)log('◎ certeza · '+czAct.tipo+' ('+czAct.por+'): contesta el cerebro más confiable','g');
+  try{return await ask2(parts,onText);}finally{czAct=NOCZ;}};
+const ask2=async(parts,onText)=>{
   // 2.28: buscar en los recuerdos no puede frenar la respuesta más de 1.2 s (antes hasta 4 s si el modelo de embeddings estaba dormido)
-  const rec=await conTope(preRec||recordar(parts),1200,()=>log('🧠 recuerdos: tardaron, contesto sin ellos','y'));preRec=null;const p2=rec?[{text:rec},...parts]:parts;
+  const rec=await conTope(preRec||recordar(parts),1200,()=>log('🧠 recuerdos: tardaron, contesto sin ellos','y'));preRec=null;let p2=rec?[{text:rec},...parts]:parts;
+  if(czAct.certeza)p2=[...p2,{text:window.capriNotaCerteza(czAct)}];
   if(rutaClaude(parts)){let dijo=false;try{return await claudeBrain(p2,x=>{dijo=true;onText(x);});}catch(e){if(dijo||esCorte(e))throw e;claudeFallo(e);}}
   if(rutaLocal(parts)){let dijo=false;try{return await local(p2,x=>{dijo=true;onText(x);});}catch(e){if(esCorte(e))throw e;log(String(e.message).slice(0,60),'w');if(dijo||!hayOtro())throw e;
       const quien=hayNube()?'Gemini':nubesListas().length?NUBES[nubesListas()[0]].nom:'Claude';
@@ -300,8 +325,9 @@ ask=async(parts,onText)=>{
     let probeNubes=false;
     if(!algo&&caido&&sinFotos(parts)&&nubesListas().length){probeNubes=true;
       try{return await respaldoNubes(p2,onText,'Gemini no respondió'+motivo);}catch(e2){if(esCorte(e2))throw e2;}}
-    if(algo||!caido||!listo()||cer.modo==='gemini'||parts.some(p=>p.inlineData))throw e;
+    if(algo||!caido||!listo()||cer.modo==='gemini'||parts.some(p=>p.inlineData&&!(veGPU()&&/^image\//.test(p.inlineData.mimeType))))throw e;
     line('s',probeNubes?'(Tampoco contestó ningún cerebro de respaldo; te contesto con el de tu GPU.)':'(Gemini no respondió'+motivo+'; te contesto con el cerebro de tu GPU.)');
+    if(czAct.certeza)line('s','(Ojo: esto pedía certeza y mi cerebro chico es el menos confiable. Verifícalo, o pregúntame otra vez cuando vuelva Gemini.)');
     log('Gemini: '+(e.status||'')+' '+String(e.message).slice(0,120),'w');
     return local(p2,onText,{otro:false});}};
 const _respond=respond;
